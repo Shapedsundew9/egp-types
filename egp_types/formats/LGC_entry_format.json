@@ -24,6 +24,7 @@
         "meta": {
             "description": "The UUID identifying the creator. If the genetic code has been created in another microbiome at an earlier time then this field will be updated."
         },
+        "nullable": true,
         "type": "uuid"
     },
     "gca": {

@@ -69,36 +69,6 @@ _GL_EXCLUDE_COLUMNS = (
 _SIGN = (1, -1)
 
 
-def ref_from_sig(sig, **kwargs):
-    """Create a reference from a signature.
-
-    Args
-    ----
-    sig (bytes): GC signature bytes object
-
-    Returns
-    -------
-    (int): A 64 bit reference.
-    """
-    a = int.from_bytes(sig[:8], 'little')
-    return (0x7FFFFFFFFFFFFFFF & a) - (a & (1 << 63))
-
-
-def random_reference():
-    """Quickest way to get a random (enough) reference."""
-    return getrandbits(63) * choice(_SIGN)
-
-
-def reference(**kwargs):
-    """Create a random reference.
-
-    Returns
-    -------
-    (int): A 64 bit reference.
-    """
-    return random_reference()
-
-
 def is_pgc(gc):
     """Determine if a GC is a PGC.
 

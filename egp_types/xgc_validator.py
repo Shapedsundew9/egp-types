@@ -84,7 +84,7 @@ class _gms_entry_validator(base_validator):
 
     def _check_with_valid__reference_count(self, field, value):
         if value > self.document['reference_count']:
-            self._error(f"_reference_count ({value}) cannot be higher than reference_count {self.document['reference_count']}.")
+            self._error(field, f"_reference_count ({value}) cannot be higher than reference_count {self.document['reference_count']}.")
 
     def _check_with_valid_created(self, field, value):
         if value > datetime.utcnow():
@@ -173,7 +173,7 @@ class _gms_entry_validator(base_validator):
 
     def _check_with_valid_reference_count(self, field, value):
         if value < self.document['_reference_count']:
-            self._error(f"reference_count ({value}) cannot be lower than _reference_count {self.document['_reference_count']}.")
+            self._error(field, f"reference_count ({value}) cannot be lower than _reference_count {self.document['_reference_count']}.")
 
     def _check_with_valid_updated(self, field, value):
         if value > datetime.utcnow():

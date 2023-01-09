@@ -2,7 +2,7 @@ from logging import DEBUG, NullHandler, getLogger
 from copy import copy
 from .gc_type_tools import is_pgc, _GL_EXCLUDE_COLUMNS
 from .xgc_validator import GGC_entry_validator
-from gc_graph import gc_graph
+from .gc_graph import gc_graph
 from egp_execution.execution import remove_callable
 from .ep_type import vtype, interface_definition
 from ._GC import _GC
@@ -39,6 +39,7 @@ class GGC(_GC):
         super().__init__(gc)
         assert self['ref'] is not None
 
+        self._sv = sv
         self['modified'] = modified
         self.setdefault('ac_count', 1)
         self.setdefault('cb')
@@ -68,21 +69,7 @@ class GGC(_GC):
         self['num_outputs'] = len(self['outputs'])
         self['callable'] = None
 
-        for col in filter(lambda x: x[1:] in gc.keys(), GGC.higher_layer_cols):
-            gc[col] = copy(gc[col[1:]])
-
-        # PGCs have special fields in the Gene Pool
-        if is_pgc(self) and 'pgc_f_valid' not in self:
-            self['pgc_f_valid'] = [f > 0.0 for f in self['pgc_fitness']]
-        else:
-            self.setdefault('fitness', 0.0)
-            self.setdefault('survivability', 0.0)
-
-        # Remove Genomic Library fields
-        for gl_column in filter(lambda x: x in self, _GL_EXCLUDE_COLUMNS):
-            del self[gl_column]
-
-        if _LOG_DEBUG:
+        if _LOG_DEBUG and not sv:
             # Inefficient to recreate GGC's.
             assert not isinstance(gc, GGC)
 
