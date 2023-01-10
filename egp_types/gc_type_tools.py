@@ -9,12 +9,6 @@ _logger.addHandler(NullHandler())
 _LOG_DEBUG = _logger.isEnabledFor(DEBUG)
 
 
-# Pretty print for references
-_OVER_MAX = 1 << 64
-_MASK = _OVER_MAX - 1
-ref_str = lambda x: 'None' if x is None else f"{((_OVER_MAX + x) & _MASK):016x}"
-
-
 # Evolve a pGC after this many 'uses'.
 # MUST be a power of 2
 M_CONSTANT = 1 << 4

@@ -85,6 +85,13 @@
         "nullable": true,
         "type": "integer"
     },
+    "signature": {
+        "maxlength": 32,
+        "minlength": 32,
+        "nullable": true,
+        "type": "binary",
+        "default": null
+    },
     "survivability": {
         "default": null,
         "nullable": true,
