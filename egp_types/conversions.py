@@ -76,7 +76,7 @@ def decode_effective_pgcs(obj:Union[list[list[str]], None]) -> Union[list[list[b
     return [[b64decode(signature) for signature in layer] for layer in obj]
 
 
-def compress_json(obj):
+def compress_json(obj) -> bytes | memoryview | bytearray | None:
     """Compress a JSON dict object.
 
     Args

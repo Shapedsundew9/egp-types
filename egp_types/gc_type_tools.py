@@ -91,41 +91,6 @@ def is_pgc(gc):
     return gc.get('pgc_fitness', None) is not None
 
 
-# https://stackoverflow.com/questions/7204805/how-to-merge-dictionaries-of-dictionaries
-def merge(a, b, path=None):
-    """Merge dict b into a recursively. a is modified.
-
-    This function is equivilent to a.update(b) if b contains no dictionary values with
-    the same key as in a.
-
-    If there are dictionaries
-    in b that have the same key as a then those dictionaries are merged in the same way.
-    Keys in a & b (or common key'd sub-dictionaries) where one is a dict and the other
-    some other type raise an exception.
-
-    Args
-    ----
-    a (dict): Dictionary to merge in to.
-    b (dict): Dictionary to merge.
-
-    Returns
-    -------
-    a (modified)
-    """
-    if path is None: path = []
-    for key in b:
-        if key in a:
-            if isinstance(a[key], dict) and isinstance(b[key], dict):
-                merge(a[key], b[key], path + [str(key)])
-            elif a[key] == b[key]:
-                pass # same leaf value
-            else:
-                raise Exception('Conflict at %s' % '.'.join(path + [str(key)]))
-        else:
-            a[key] = b[key]
-    return a
-
-
 def define_signature(gc):
     """Define the signature of a genetic code.
 

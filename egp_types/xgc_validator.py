@@ -223,7 +223,7 @@ class _gms_entry_validator(base_validator):
 
 class _LGC_entry_validator(_gms_entry_validator):
 
-    types_mapping = _gms_entry_validator.types_mapping.copy()
+    types_mapping = _gms_entry_validator.types_mapping.copy() # type: ignore
     types_mapping['uuid'] = TypeDefinition('uuid', (UUID,), ())
 
     # TODO: Make errors ValidationError types for full disclosure
@@ -297,7 +297,7 @@ class _LGC_json_entry_validator(_LGC_entry_validator):
 
 class _GGC_entry_validator(_gms_entry_validator):
 
-    types_mapping = _gms_entry_validator.types_mapping.copy()
+    types_mapping = _gms_entry_validator.types_mapping.copy() # type: ignore
 
     # TODO: Make errors ValidationError types for full disclosure
     # https://docs.python-cerberus.org/en/stable/customize.html#validator-error
