@@ -1,18 +1,19 @@
 """Validate & normalise JSON Genetic Code definitions."""
 
 from copy import deepcopy
+from datetime import datetime
 from json import load
 from os.path import dirname, join
-from datetime import datetime
 from uuid import UUID
+
 from cerberus import TypeDefinition
-from .gc_type_tools import PROPERTIES, define_signature
 from egp_utils.base_validator import base_validator
 from egp_utils.common import merge
-from .gc_graph import gc_graph
-from .ep_type import validate
-from .conversions import *
 
+from .conversions import encode_properties, str_to_datetime, str_to_sha256, str_to_UUID
+from .ep_type import validate
+from .gc_graph import gc_graph
+from .gc_type_tools import PROPERTIES, define_signature
 
 # Storage types schemas
 # The Genetic Material Store (GMS) is the abstract common base schema for LGC & GGC
@@ -45,16 +46,16 @@ class _gms_entry_validator(base_validator):
 
     def _check_with_valid__e_count(self, field, value):
         if not value and self.document['_evolvability'] > 0.0:
-            self._error(field, f'_e_count cannot be 0 if _evolvability is non-zero.')
+            self._error(field, '_e_count cannot be 0 if _evolvability is non-zero.')
         if value > self.document['e_count']:
             self._error(field, f"_e_count ({value}) cannot be greater than e_count ({self.document['e_count']})")
 
     def _check_with_valid__evolvability(self, field, value):
         if value > 0.0 and not self.document['_e_count']:
-            self._error(field, f'_e_count cannot be 0 if _evolvability is non-zero.')
+            self._error(field, '_e_count cannot be 0 if _evolvability is non-zero.')
 
     def _valid_pgc(self, field, value):
-        pgc_none = {k:v is None for k, v in self.document.items() if 'pgc_' in k and k != 'pgc_ref'}
+        pgc_none = {k: v is None for k, v in self.document.items() if 'pgc_' in k and k != 'pgc_ref'}
         if (value is None and not all(pgc_none.values())) or (value is not None and any(pgc_none.values())):
             pgc_defined = [k for k, v in pgc_none.items() if not v]
             pgc_undefined = [k for k, v in pgc_none.items() if v]
@@ -93,13 +94,13 @@ class _gms_entry_validator(base_validator):
 
     def _check_with_valid_e_count(self, field, value):
         if value == 1 and self.document['evolvability'] < 1.0:
-            self._error(field, f'e_count cannot be 1 if evolvability has changed (is not 1.0).')
+            self._error(field, 'e_count cannot be 1 if evolvability has changed (is not 1.0).')
         if value < self.document['_e_count']:
             self._error(field, f"e_count ({value}) cannot be less than _e_count ({self.document['_e_count']})")
 
     def _check_with_valid_evolvability(self, field, value):
         if value < 1.0 and self.document['e_count'] == 1:
-            self._error(field, f'e_count cannot be 1 if evolvability has changed (is not 1.0).')
+            self._error(field, 'e_count cannot be 1 if evolvability has changed (is not 1.0).')
 
     def _check_with_valid_graph(self, field, value):
         graph = gc_graph(value)
@@ -158,7 +159,9 @@ class _gms_entry_validator(base_validator):
             invalid = {i: v == 1 and self.document['pgc_fitness'][i] < 1.0 for i, v in enumerate(value)}
             if any(invalid.values()):
                 indices = [i for i, v in invalid.items() if not v]
-                self._error(field, f'pgc_f_count {list(invalid.values())} cannot be 1 if pgc_fitness has changed (is not 1.0) at indices {indices}.')
+                self._error(
+                    field,
+                    f'pgc_f_count {list(invalid.values())} cannot be 1 if pgc_fitness has changed (is not 1.0) at indices {indices}.')
 
             invalid = [idx for idx, pgc_f_count in enumerate(value) if pgc_f_count < self.document['_pgc_f_count'][idx]]
             if invalid:
@@ -197,18 +200,18 @@ class _gms_entry_validator(base_validator):
         inputs = []
         for row in document["graph"].values():
             inputs.extend((ep for ep in filter(lambda x: x[0] == 'I', row)))
-        return bytes((type_list.index(ep[2]) for ep in sorted(inputs, key=lambda x:x[1])))
+        return bytes((type_list.index(ep[2]) for ep in sorted(inputs, key=lambda x: x[1])))
 
     def _normalize_default_setter_set_output_indices(self, document):
         # Get the type list then find all the inputs in order & look them up.
         type_list = self._normalize_default_setter_set_output_types(document)
-        bytea = (type_list.index(ep[2]) for ep in sorted(document["graph"].get("O", tuple()), key=lambda x:x[1]))
+        bytea = (type_list.index(ep[2]) for ep in sorted(document["graph"].get("O", tuple()), key=lambda x: x[1]))
         return bytes(bytea)
 
     def _normalize_default_setter_set_num_inputs(self, document):
         inputs = set()
         for row in document["graph"].values():
-            for ep in filter(lambda x:x[0] == 'I', row):
+            for ep in filter(lambda x: x[0] == 'I', row):
                 inputs.add(ep[1])
         return len(inputs)
 
@@ -224,7 +227,7 @@ class _gms_entry_validator(base_validator):
 
 class _LGC_entry_validator(_gms_entry_validator):
 
-    types_mapping = _gms_entry_validator.types_mapping.copy() # type: ignore
+    types_mapping = _gms_entry_validator.types_mapping.copy()  # type: ignore
     types_mapping['uuid'] = TypeDefinition('uuid', (UUID,), ())
 
     # TODO: Make errors ValidationError types for full disclosure
@@ -232,43 +235,43 @@ class _LGC_entry_validator(_gms_entry_validator):
 
     def _check_with_valid_ancestor_a(self, field, value):
         if value is None and self.document['generation']:
-            self._error(field, f'GC has no primary parent (ancestor A) but is not a codon (0th generation).')
+            self._error(field, 'GC has no primary parent (ancestor A) but is not a codon (0th generation).')
         if value is not None and not self.document['generation']:
-            self._error(field, f'GC has a primary parent (ancestor A) but is a codon (0th generation).')
+            self._error(field, 'GC has a primary parent (ancestor A) but is a codon (0th generation).')
         if value is not None and value == self.document['signature']:
-            self._error(field, f'A GC cannot be its own ancestor (A).')
+            self._error(field, 'A GC cannot be its own ancestor (A).')
 
     def _check_with_valid_ancestor_b(self, field, value):
         if value is not None and self.document['ancestor_a'] is None:
-            self._error(field, f'GC has a secondary parent (ancestor B) but no primary parent (ancestor A).')
+            self._error(field, 'GC has a secondary parent (ancestor B) but no primary parent (ancestor A).')
         if value is not None and value == self.document['signature']:
-            self._error(field, f'A GC cannot be its own ancestor (B).')
+            self._error(field, 'A GC cannot be its own ancestor (B).')
 
     def _check_with_valid_gca(self, field, value):
         if 'A' in self.document['graph'] and value is None:
-            self._error(field, f'graph references row A but gca is None.')
-        if not 'A' in self.document['graph'] and value is not None:
-            self._error(field, f'No reference to row A in graph but gca is not None.')
+            self._error(field, 'graph references row A but gca is None.')
+        if 'A' not in self.document['graph'] and value not in None:
+            self._error(field, 'No reference to row A in graph but gca is not None.')
         if value is not None and value == self.document['signature']:
-            self._error(field, f'A GC cannot reference itself in row A.')
+            self._error(field, 'A GC cannot reference itself in row A.')
 
     def _check_with_valid_gcb(self, field, value):
         if 'B' in self.document['graph'] and value is None:
-            self._error(field, f'graph references row B but gcb is None.')
+            self._error(field, 'graph references row B but gcb is None.')
         if value is not None and self.document['gca'] is None:
-            self._error(field, f'gcb is defined but gca is None.')
+            self._error(field, 'gcb is defined but gca is None.')
         if value is not None and value == self.document['signature']:
-            self._error(field, f'A GC cannot reference itself in row B.')
+            self._error(field, 'A GC cannot reference itself in row B.')
 
     def _check_with_valid_pgc(self, field, value):
         if self.document['generation'] and value is None:
-            self._error(field, f'Generation is > 0 but pgc is None.')
+            self._error(field, 'Generation is > 0 but pgc is None.')
         if not self.document['generation'] and value is not None:
             self._error(field, f'Generation is 0 but pgc is defined as {value}.')
         if self.document['ancestor_a'] is None and value is not None:
             self._error(field, f'GC has no primary parent (ancestor A) but pgc is defined as {value}.')
         if value is not None and value == self.document['signature']:
-            self._error(field, f'A GC cannot have been created by itself (pgc == signature).')
+            self._error(field, 'A GC cannot have been created by itself (pgc == signature).')
 
     def _normalize_default_setter_set_signature(self, document):
         return define_signature(self.document)
@@ -278,7 +281,6 @@ class _LGC_json_entry_validator(_LGC_entry_validator):
 
     # TODO: Make errors ValidationError types for full disclosure
     # https://docs.python-cerberus.org/en/stable/customize.html#validator-error
-
 
     def _normalize_coerce_signature_str_to_binary(self, value):
         return str_to_sha256(value)
@@ -298,50 +300,50 @@ class _LGC_json_entry_validator(_LGC_entry_validator):
 
 class _GGC_entry_validator(_gms_entry_validator):
 
-    types_mapping = _gms_entry_validator.types_mapping.copy() # type: ignore
+    types_mapping = _gms_entry_validator.types_mapping.copy()  # type: ignore
 
     # TODO: Make errors ValidationError types for full disclosure
     # https://docs.python-cerberus.org/en/stable/customize.html#validator-error
 
     def _check_with_valid_ancestor_a_ref(self, field, value):
         if value is None and self.document['generation']:
-            self._error(field, f'GC has no primary parent (ancestor A) but is not a codon (0th generation).')
+            self._error(field, 'GC has no primary parent (ancestor A) but is not a codon (0th generation).')
         if value is not None and not self.document['generation']:
-            self._error(field, f'GC has a primary parent (ancestor A) but is a codon (0th generation).')
+            self._error(field, 'GC has a primary parent (ancestor A) but is a codon (0th generation).')
         if value is not None and value == self.document['ref']:
-            self._error(field, f'A GC cannot be its own ancestor (A).')
+            self._error(field, 'A GC cannot be its own ancestor (A).')
 
     def _check_with_valid_ancestor_b_ref(self, field, value):
         if value is not None and self.document['ancestor_a_ref'] is None:
-            self._error(field, f'GC has a secondary parent (ancestor B) but no primary parent (ancestor A).')
+            self._error(field, 'GC has a secondary parent (ancestor B) but no primary parent (ancestor A).')
         if value is not None and value == self.document['ref']:
-            self._error(field, f'A GC cannot be its own ancestor (B).')
+            self._error(field, 'A GC cannot be its own ancestor (B).')
 
     def _check_with_valid_gca_ref(self, field, value):
         if 'A' in self.document['graph'] and value is None:
-            self._error(field, f'graph references row A but gca_ref is None.')
-        if not 'A' in self.document['graph'] and value is not None:
-            self._error(field, f'No reference to row A in graph but gca_ref is not None.')
+            self._error(field, 'graph references row A but gca_ref is None.')
+        if 'A' not in self.document['graph'] and value not in None:
+            self._error(field, 'No reference to row A in graph but gca_ref is not None.')
         if value is not None and value == self.document['ref']:
-            self._error(field, f'A GC cannot reference itself in row A.')
+            self._error(field, 'A GC cannot reference itself in row A.')
 
     def _check_with_valid_gcb_ref(self, field, value):
         if 'B' in self.document['graph'] and value is None:
-            self._error(field, f'graph references row B but gcb_ref is None.')
-        if not 'B' in self.document['graph'] and value is not None:
-            self._error(field, f'No reference to row B in graph but gcb_ref is not None.')
+            self._error(field, 'graph references row B but gcb_ref is None.')
+        if 'B' not in self.document['graph'] and value not in None:
+            self._error(field, 'No reference to row B in graph but gcb_ref is not None.')
         if value is not None and self.document['gca'] is None:
-            self._error(field, f'gcb_ref is defined but gca_ref is None.')
+            self._error(field, 'gcb_ref is defined but gca_ref is None.')
 
     def _check_with_valid_pgc_ref(self, field, value):
         if self.document['generation'] and value is None:
-            self._error(field, f'Generation is > 0 but pgc_ref is None.')
+            self._error(field, 'Generation is > 0 but pgc_ref is None.')
         if not self.document['generation'] and value is not None:
             self._error(field, f'Generation is 0 but pgc_ref is defined as {value}.')
         if self.document['ancestor_a'] is None and value is not None:
             self._error(field, f'GC has no primary parent (ancestor A) but pgc_ref is defined as {value}.')
         if value is not None and value == self.document['ref']:
-            self._error(field, f'A GC cannot have been created by itself (pgc_ref == ref).')
+            self._error(field, 'A GC cannot have been created by itself (pgc_ref == ref).')
 
 
 gms_entry_validator = _gms_entry_validator(GMS_ENTRY_SCHEMA)
@@ -350,7 +352,7 @@ LGC_json_entry_validator = _LGC_json_entry_validator(LGC_JSON_ENTRY_SCHEMA)
 GGC_entry_validator = _GGC_entry_validator(GGC_ENTRY_SCHEMA)
 
 # Superset validator from which to derive transient xGC type validators
+
+
 class xgc_validator_generator(_GGC_entry_validator, _LGC_entry_validator):
     pass
-
-
