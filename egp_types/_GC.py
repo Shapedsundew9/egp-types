@@ -1,10 +1,10 @@
-from logging import DEBUG, NullHandler, getLogger
+from logging import DEBUG, NullHandler, getLogger, Logger
 from .xgc_validator import xgc_validator_generator, XGC_ENTRY_SCHEMA
-from .gc_type_tools import ref_str
+from .reference import ref_str
 
-_logger = getLogger(__name__)
+_logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
-_LOG_DEBUG = _logger.isEnabledFor(DEBUG)
+_LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
 
 class _GC(dict):
@@ -17,24 +17,24 @@ class _GC(dict):
     it a valid _GC type. The dict is NOT copied.
     """
 
-    _GC_ENTRIES = ('ref',)
-    validator = xgc_validator_generator({k: XGC_ENTRY_SCHEMA[k] for k in _GC_ENTRIES}, allow_unknow=True)
+    _GC_ENTRIES: tuple[str, ...] = ('ref',)
+    validator: xgc_validator_generator = xgc_validator_generator({k: XGC_ENTRY_SCHEMA[k] for k in _GC_ENTRIES}, allow_unknow=True)
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-    def __repr__(self):
-        retval = '\t{\n'
+    def __repr__(self) -> str:
+        retval: str = '\t{\n'
         for k, v in sorted(self.items(), key=lambda x: x[0]):
             retval = retval + '\t\t' + f"'{k}'{' ' * (21 - len(k))}: "
-            if 'ref' in k and not 'refs' in k:
+            if 'ref' in k and 'refs' not in k:
                 retval += ref_str(v)
             else:
                 retval += str(v)
             retval += '\n'
         return retval + '\t}'
 
-    def validate(self):
+    def validate(self) -> None:
         """Validate all required key:value pairs are correct."""
         if not self.validator.validate(self):
             raise ValueError(f"Validation FAILED with:\n{self.validator.error_str()}")

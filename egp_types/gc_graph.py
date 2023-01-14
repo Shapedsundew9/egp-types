@@ -30,7 +30,7 @@ from graph_tool.draw import graph_draw
 from networkx import DiGraph, get_node_attributes, spring_layout
 
 from .ep_type import asint, asstr, compatible, import_str, type_str, validate, REAL_EP_TYPE_VALUES, UNKNOWN_EP_TYPE_VALUE, EP_TYPE_NAMES
-from .utils.text_token import register_token_code, text_token
+from egp_utils.text_token import register_token_code, text_token
 
 _logger = getLogger(__name__)
 _logger.addHandler(NullHandler())

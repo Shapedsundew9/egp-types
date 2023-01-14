@@ -6,8 +6,9 @@ from os.path import dirname, join
 from datetime import datetime
 from uuid import UUID
 from cerberus import TypeDefinition
-from .gc_type_tools import merge, PROPERTIES, define_signature
-from .utils.base_validator import base_validator
+from .gc_type_tools import PROPERTIES, define_signature
+from egp_utils.base_validator import base_validator
+from egp_utils.common import merge
 from .gc_graph import gc_graph
 from .ep_type import validate
 from .conversions import *
