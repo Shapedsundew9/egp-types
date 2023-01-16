@@ -453,7 +453,7 @@
                             "callable": {
                                 "maxlength": 128,
                                 "minlength": 1,
-                                "regex": "[a-zA-Z][a-zA-Z0-9_]{1,64}",
+                                "regex": "[a-zA-Z][a-zA-Z0-9_]{0,63}",
                                 "type": "string"
                             },
                             "code": {
@@ -469,21 +469,21 @@
                                             "maxlength": 64,
                                             "minlength": 1,
                                             "required": true,
-                                            "regex": "[a-zA-Z][a-zA-Z0-9_]{1,64}",
+                                            "regex": "[a-zA-Z][a-zA-Z0-9_\\.]{0,63}",
                                             "type": "string"
                                         },
                                         "name": {
                                             "maxlength": 64,
                                             "minlength": 1,
                                             "required": true,
-                                            "regex": "[a-zA-Z][a-zA-Z0-9_]{1,64}",
+                                            "regex": "[a-zA-Z][a-zA-Z0-9_]{0,63}",
                                             "type": "string"
                                         },
                                         "object": {
                                             "maxlength": 64,
                                             "minlength": 1,
                                             "required": true,
-                                            "regex": "[a-zA-Z][a-zA-Z0-9_]{1,64}",
+                                            "regex": "[a-zA-Z][a-zA-Z0-9_]{0,63}",
                                             "type": "string"
                                         }
                                     },

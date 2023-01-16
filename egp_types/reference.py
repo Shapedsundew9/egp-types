@@ -30,15 +30,14 @@ def ref_from_sig(signature:bytes, shift:int = 0) -> int:
     Reference    
     """
     if not shift:
-        return int.from_bytes(signature[:8], "little") | _GL_GC 
+        return (int.from_bytes(signature[:8], byteorder="little") & _REFERENCE_MASK) - _GL_GC
 
     low: int = shift >> 3
     high: int = low + 9
-    window: int = _REFERENCE_MASK << (shift & 0x3)
-    return ((int.from_bytes(signature[low:high], "little") & window) >> shift) | _GL_GC
+    return ((int.from_bytes(signature[low:high], byteorder="little", signed=True) >> shift) & _REFERENCE_MASK) - _GL_GC
     
 
-def reference(owner:int, counters:dict[int, count]) -> int:
+def reference(owner: int, counters: dict[int, count]) -> int:
     """Create a unique reference.
 
     References have the structure:
@@ -60,5 +59,5 @@ def reference(owner:int, counters:dict[int, count]) -> int:
     """
     if owner not in counters:
         assert owner < _MAX_OWNER, "Owner index out of range."
-        counters[owner] = count(2**32)
+        counters[owner] = count()
     return (next(counters[owner]) + (owner << 32))

@@ -100,7 +100,7 @@ def compress_json(obj) -> bytes | memoryview | bytearray | None:
     raise TypeError("Un-encodeable type '{}': Expected 'dict' or byte type.".format(type(obj)))
 
 
-def decompress_json(obj):
+def decompress_json(obj) -> dict | list | None:
     """Decompress a compressed JSON dict object.
 
     Args
@@ -114,7 +114,7 @@ def decompress_json(obj):
     return None if obj is None else loads(decompress(obj).decode())
 
 
-def memoryview_to_bytes(obj):
+def memoryview_to_bytes(obj) -> bytes | None:
     """Convert a memory view to a bytes object.
 
     Args
@@ -128,7 +128,7 @@ def memoryview_to_bytes(obj):
     return None if obj is None else bytes(obj)
 
 
-def str_to_sha256(obj):
+def str_to_sha256(obj) -> bytearray | memoryview | bytes | None:
     """Convert a hexidecimal string to a bytearray.
 
     Args
@@ -148,7 +148,7 @@ def str_to_sha256(obj):
     raise TypeError("Un-encodeable type '{}': Expected 'str' or byte type.".format(type(obj)))
 
 
-def str_to_UUID(obj):
+def str_to_UUID(obj) -> UUID | None:
     """Convert a UUID formated string to a UUID object.
 
     Args
@@ -168,7 +168,7 @@ def str_to_UUID(obj):
     raise TypeError("Un-encodeable type '{}': Expected 'str' or UUID type.".format(type(obj)))
 
 
-def str_to_datetime(obj):
+def str_to_datetime(obj) -> datetime | None:
     """Convert a datetime formated string to a datetime object.
 
     Args
@@ -188,7 +188,7 @@ def str_to_datetime(obj):
     raise TypeError("Un-encodeable type '{}': Expected 'str' or datetime type.".format(type(obj)))
 
 
-def sha256_to_str(obj):
+def sha256_to_str(obj: bytes) -> str | None:
     """Convert a bytearray to its lowercase hexadecimal string representation.
 
     Args
@@ -202,7 +202,7 @@ def sha256_to_str(obj):
     return None if obj is None else obj.hex()
 
 
-def UUID_to_str(obj):
+def UUID_to_str(obj: UUID) -> str | None:
     """Convert a UUID to its lowercase hexadecimal string representation.
 
     Args
@@ -216,7 +216,7 @@ def UUID_to_str(obj):
     return None if obj is None else str(obj)
 
 
-def datetime_to_str(obj):
+def datetime_to_str(obj: datetime) -> str | None:
     """Convert a datetime to its string representation.
 
     Args
@@ -230,7 +230,7 @@ def datetime_to_str(obj):
     return None if obj is None else obj.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
-def encode_properties(obj):
+def encode_properties(obj: dict | int) -> int:
     """Encode the properties dictionary into its integer representation.
 
     The properties field is a dictionary of properties to boolean values. Each
@@ -246,7 +246,7 @@ def encode_properties(obj):
     (int): Integer representation of the properties dictionary.
     """
     if isinstance(obj, dict):
-        bitfield = 0
+        bitfield: int = 0
         for k, v in filter(lambda x: x[1], obj.items()):
             bitfield |= PROPERTIES[k]
         return bitfield
@@ -255,7 +255,7 @@ def encode_properties(obj):
     raise TypeError("Un-encodeable type '{}': Expected 'dict' or integer type.".format(type(obj)))
 
 
-def decode_properties(obj):
+def decode_properties(obj: int) -> dict[str, bool]:
     """Decode the properties dictionary from its integer representation.
 
     The properties field is a dictionary of properties to boolean values. Each

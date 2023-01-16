@@ -54,16 +54,6 @@
         "nullable": true,
         "type": "integer"
     },
-    "pgc_f_valid": {
-        "default": [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
-        "maxlength": 16,
-        "minlength": 16,
-        "nullable": true,
-        "schema": {
-            "type": "boolean"
-        },
-        "type": "list"
-    },
     "pgc_ref": {
         "default": null,
         "nullable": true,
@@ -73,7 +63,7 @@
         "default": null,
         "nullable": true,
         "max": 32767,
-        "min": 0,
+        "min": 1,
         "type": "integer"
     },
     "ref": {

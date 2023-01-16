@@ -11,12 +11,13 @@ All other types values are > 0
 
 
 from enum import IntEnum
-from json import load
-from logging import NullHandler, getLogger
-from os.path import dirname, join
 from hashlib import blake2b
+from json import load
+from logging import Logger, NullHandler, getLogger
+from os.path import dirname, join
+from typing import Any, Iterable
 
-_logger = getLogger(__name__)
+_logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
 
 
@@ -33,9 +34,18 @@ _EGP_PHYSICAL_TYPE_LIMIT = -32369
 _EGP_REAL_TYPE_LIMIT = 0
 _EGP_TYPE_LIMIT = 32769
 
-def _SPECIAL_TYPE_FILTER(v): return v < _EGP_PHYSICAL_TYPE_LIMIT and v >= _EGP_SPECIAL_TYPE_LIMIT
-def _PHYSICAL_TYPE_FILTER(v): return v < _EGP_REAL_TYPE_LIMIT and v >= _EGP_PHYSICAL_TYPE_LIMIT
-def _REAL_TYPE_FILTER(v): return v < _EGP_TYPE_LIMIT and v >= _EGP_REAL_TYPE_LIMIT
+
+def _SPECIAL_TYPE_FILTER(v):
+    return v < _EGP_PHYSICAL_TYPE_LIMIT and v >= _EGP_SPECIAL_TYPE_LIMIT
+
+
+def _PHYSICAL_TYPE_FILTER(v):
+    return v < _EGP_REAL_TYPE_LIMIT and v >= _EGP_PHYSICAL_TYPE_LIMIT
+
+
+def _REAL_TYPE_FILTER(v):
+    return v < _EGP_TYPE_LIMIT and v >= _EGP_REAL_TYPE_LIMIT
+
 
 SPECIAL_EP_TYPE_VALUES = tuple((v for v in filter(_SPECIAL_TYPE_FILTER, ep_type_lookup['n2v'].values())))
 PHYSICAL_EP_TYPE_VALUES = tuple((v for v in filter(_PHYSICAL_TYPE_FILTER, ep_type_lookup['n2v'].values())))
@@ -107,12 +117,12 @@ def import_str(ep_type_int):
 # If a type does not exist on this system remove it (all instances will be treated as INVALID)
 # NOTE: This would cause a circular dependency with gc_type if GC types were not filtered out
 # We can assume GC types will be defined for the contexts they are used.
-def func(x):
+def func1(x):
     """Filter function."""
     return x[1][inst.PACKAGE] is not None and x[1][inst.PACKAGE] != 'egp_types'
 
 
-for ep_type_int, data in tuple(filter(func, ep_type_lookup['instanciation'].items())):
+for ep_type_int, data in tuple(filter(func1, ep_type_lookup['instanciation'].items())):
     try:
         exec(import_str(ep_type_int))
     except ModuleNotFoundError:
@@ -124,13 +134,13 @@ for ep_type_int, data in tuple(filter(func, ep_type_lookup['instanciation'].item
         _logger.info(import_str(ep_type_int))
 
 
-def func(x):
+def func2(x):
     """Filter function."""
     return x[inst.PACKAGE] is not None and x[inst.PACKAGE] == 'egp_types'
 
 
 _GC_TYPE_NAMES = []
-for i in tuple(filter(func, ep_type_lookup['instanciation'].values())):
+for i in tuple(filter(func2, ep_type_lookup['instanciation'].values())):
     _GC_TYPE_NAMES.append(f'{i[inst.MODULE]}_{i[inst.NAME]}')
 
 # Must be defined after the imports
@@ -310,7 +320,7 @@ def instance_str(ep_type_int, param_str=''):
     return inst_str
 
 
-def interface_definition(xputs, vt=vtype.TYPE_OBJECT):
+def interface_definition(xputs: Iterable[Any], vt: vtype = vtype.TYPE_OBJECT) -> tuple[tuple[int, ...], list[int], bytes]:
     """Create an interface definition from xputs.
 
     Used to define the inputs or outputs of a GC from an iterable
@@ -327,8 +337,8 @@ def interface_definition(xputs, vt=vtype.TYPE_OBJECT):
         format, a list of the EP types in xputs in value format in ascending order and a list of
         indexes into it in the order of xputs.
     """
-    xput_eps = tuple((asint(x, vt) for x in xputs))
-    xput_types = sorted(set(xput_eps))
+    xput_eps: tuple[int, ...] = tuple((asint(x, vt) for x in xputs))
+    xput_types: list[int] = sorted(set(xput_eps))
     return xput_eps, xput_types, bytes([xput_types.index(x) for x in xput_eps])
 
 
@@ -349,16 +359,16 @@ def unordered_interface_hash(input_eps, output_eps):
     -------
     (int): 64 bit hash as a signed 64 bit int.
     """
-    h = blake2b(digest_size=8)
+    h: blake2b = blake2b(digest_size=8)
     for i in sorted(input_eps):
         h.update(i.to_bytes(2, 'big'))
     for o in sorted(output_eps):
         h.update(o.to_bytes(2, 'big'))
-    a = int.from_bytes(h.digest(), 'big')
+    a: int = int.from_bytes(h.digest(), 'big')
     return (0x7FFFFFFFFFFFFFFF & a) - (a & (1 << 63))
 
 
-def ordered_interface_hash(input_types, output_types, inputs, outputs):
+def ordered_interface_hash(input_types, output_types, inputs, outputs) -> int:
     """Create a 64-bit hash of the population interface definition.
 
     The interface hash is specific to the order and type in the inputs
