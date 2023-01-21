@@ -1,10 +1,9 @@
 """Reference definition and tools."""
-from typing import Literal, Callable
 from itertools import count
-
+from typing import Callable, Literal
 
 _REFERENCE_MASK: Literal[9223372036854775807] = 0x7FFFFFFFFFFFFFFF
-_GL_GC: Literal[9223372036854775808] = 0x8000000000000000 # type: ignore
+_GL_GC: Literal[9223372036854775808] = 0x8000000000000000  # type: ignore
 _MAX_OWNER: Literal[2147483647] = 0x7FFFFFFF
 
 
@@ -14,12 +13,17 @@ _MASK: int = _OVER_MAX - 1
 ref_str: Callable[[int], str] = lambda x: 'None' if x is None else f"{((_OVER_MAX + x) & _MASK):016x}"
 
 
-def ref_from_sig(signature:bytes, shift:int = 0) -> int:
-    """Create a 63 bit reference from a signature.
+def is_GLGC(ref: int) -> bool:
+    """Test if a reference is for a GC loaded from the GL."""
+    return bool(ref & _GL_GC)
+
+
+def ref_from_sig(signature: bytes, shift: int = 0) -> int:
+    """Create a 64 bit reference from a signature.
 
     See reference() for significance of bit fields.
-    shift can be used to make up to 193 alternate references
-    
+    shift can be used to make up to 192 alternate references
+
     Args
     ----
     signature: 32 element bytes object
@@ -27,15 +31,16 @@ def ref_from_sig(signature:bytes, shift:int = 0) -> int:
 
     Returns
     -------
-    Reference    
+    Reference
     """
-    if not shift:
-        return (int.from_bytes(signature[:8], byteorder="little") & _REFERENCE_MASK) - _GL_GC
+    high: int = 32 - (shift >> 3)
+    mask: int = shift & 7
+    if not mask:
+        return (int.from_bytes(signature[high - 8:high], byteorder="big") & _REFERENCE_MASK) | _GL_GC
 
-    low: int = shift >> 3
-    high: int = low + 9
-    return ((int.from_bytes(signature[low:high], byteorder="little", signed=True) >> shift) & _REFERENCE_MASK) - _GL_GC
-    
+    low: int = high - 9
+    return ((int.from_bytes(signature[low:high], byteorder="big") >> mask) & _REFERENCE_MASK) | _GL_GC
+
 
 def reference(owner: int, counters: dict[int, count]) -> int:
     """Create a unique reference.

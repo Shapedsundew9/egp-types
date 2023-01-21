@@ -32,7 +32,7 @@ with open(join(dirname(__file__), "formats/LGC_json_entry_format.json"), "r", en
 
 # GGC is the storage schema for the Gene Pool
 GGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GMS_ENTRY_SCHEMA)
-with open(join(dirname(__file__), "formats/GGC_entry_format.json"), "r", encoding="utf8") as file_ptr:
+with open(join(dirname(__file__), "formats/gGC_entry_format.json"), "r", encoding="utf8") as file_ptr:
     merge(GGC_ENTRY_SCHEMA, load(file_ptr))
 
 # XGC_ENTRY_SCHEMA is the superset schema from which transient xGC's can be validated
@@ -295,7 +295,7 @@ class _LGC_json_entry_validator(_LGC_entry_validator):
         return encode_properties(value)
 
 
-class _GGC_entry_validator(_gms_entry_validator):
+class _gGC_entry_validator(_gms_entry_validator):
 
     def _check_with_valid_ancestor_a_ref(self, field: str, value: Any) -> None:
         if value is None and self.document['generation']:
@@ -341,10 +341,10 @@ class _GGC_entry_validator(_gms_entry_validator):
 gms_entry_validator: _gms_entry_validator = _gms_entry_validator(GMS_ENTRY_SCHEMA)
 LGC_entry_validator: _LGC_entry_validator = _LGC_entry_validator(LGC_ENTRY_SCHEMA)
 LGC_json_entry_validator: _LGC_json_entry_validator = _LGC_json_entry_validator(LGC_JSON_ENTRY_SCHEMA)
-GGC_entry_validator: _GGC_entry_validator = _GGC_entry_validator(GGC_ENTRY_SCHEMA, purge_unknown=True)
+gGC_entry_validator: _gGC_entry_validator = _gGC_entry_validator(GGC_ENTRY_SCHEMA, purge_unknown=True)
 
 # Superset validator from which to derive transient xGC type validators
 
 
-class xgc_validator_generator(_GGC_entry_validator, _LGC_entry_validator):
+class xgc_validator_generator(_gGC_entry_validator, _LGC_entry_validator):
     pass

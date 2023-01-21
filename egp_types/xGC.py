@@ -95,3 +95,7 @@ class xGC():
         """A view of the field values in the xGC."""
         for key in self._data.keys():
             yield self[key]
+
+
+# gGC is an alias of xGC
+gGC = xGC
