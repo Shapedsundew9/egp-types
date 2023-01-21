@@ -15,32 +15,33 @@ from the standard dict class for access performance and flexibility during live
 computation. The xGC class which has a highly optimised in memory storage
 implementation.
 """
-from logging import DEBUG, NullHandler, getLogger, Logger
-from .xgc_validator import xgc_validator_generator, XGC_ENTRY_SCHEMA
-from .reference import ref_str
+from logging import Logger, NullHandler, getLogger
+from typing import LiteralString, Any
+from egp_utils.base_validator import base_validator
 
+from .reference import ref_str
 
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
-_LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
 
 class _GC():
     """Abstract base class for genetic code (*GC) types.
 
-    All derived classes mutate the the supplied dict-like object to make
-    it a valid _GC type. The dict is NOT copied.
+    The base class assumes the derived class implements:
+        a) items()
+        b) validator as a Validator instance.
     """
 
-    _GC_ENTRIES: None
-    validator: None
+    _GC_ENTRIES: tuple[LiteralString, ...] = tuple()
+    validator: base_validator
 
     def __repr__(self) -> str:
         """Pretty print."""
         retval: str = '\t{\n'
-        for k, v in sorted(self.items(), key=lambda x: x[0]):
+        for k, v in sorted(self.items(), key=lambda x: x[0]):  # type: ignore
             retval = retval + '\t\t' + f"'{k}'{' ' * (21 - len(k))}: "
-            if 'ref' in k and 'refs' not in k:
+            if 'ref' in k and 'refs' not in k and v is not None:
                 retval += ref_str(v)
             else:
                 retval += str(v)
@@ -49,9 +50,19 @@ class _GC():
 
     def validate(self) -> None:
         """Validate all required key:value pairs are correct.
-        
+
         Validation is an expensive operation and should only be done for debugging.
         Where possible values are checked for consistency.
         """
         if not self.validator.validate(self):
             raise ValueError(f"Validation FAILED with:\n{self.validator.error_str()}")
+
+    @staticmethod
+    def new_reference() -> int:
+        """Bound to the reference generation function."""
+        raise NotImplementedError('Abstract base class.')
+
+    def stablize(self) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
+        """Bound to the stabilization function."""
+        raise NotImplementedError('Abstract base class.')
+

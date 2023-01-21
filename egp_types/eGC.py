@@ -1,74 +1,81 @@
-from logging import DEBUG, NullHandler, getLogger
-from .xgc_validator import xgc_validator_generator, XGC_ENTRY_SCHEMA
+from logging import DEBUG, Logger, NullHandler, getLogger
+from typing import Any, LiteralString, Iterable, Sequence
+
 from ._GC import _GC
-from .ep_type import vtype, interface_definition
+from .ep_type import interface_definition, vtype
 from .gc_graph import gc_graph
+from .xgc_validator import XGC_ENTRY_SCHEMA, xgc_validator_generator
 
-
-_logger = getLogger(__name__)
+_logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
-_LOG_DEBUG = _logger.isEnabledFor(DEBUG)
+_LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
 
-class eGC(_GC):
+class eGC(_GC, dict):
     """Embryonic GC type.
 
-    Embryonic GC's have the minimal set of fields necessary to form a GC but the values
-    are not necessarily valid. A Minimal GC (mGC) has the same fields as an
-    embryonic GC but provides the valid minimal field values guarantee.
+    Embryonic GC's have the minimal set of fields necessary to form a GC but the
+    graph is not necessarily valid.
     """
 
-    _EGC_ENTRIES = (
+    _EGC_ENTRIES: tuple[LiteralString, ...] = (
         *_GC._GC_ENTRIES, 'gca_ref', 'gcb_ref', 'ancestor_a_ref', 'ancestor_b_ref',
-        'generation', 'graph', 'igraph'
+        'generation', 'igraph'
     )
-    validator = xgc_validator_generator({k: XGC_ENTRY_SCHEMA[k] for k in _EGC_ENTRIES}, allow_unknow=True)
+    validator: xgc_validator_generator = xgc_validator_generator({k: XGC_ENTRY_SCHEMA[k] for k in _EGC_ENTRIES}, allow_unknow=True)
 
-    def __init__(self, gc={}, inputs=None, outputs=None, vt=vtype.OBJECT, sv=True):
+    def __init__(
+            self,
+            gc: dict,
+            inputs: Iterable[Any] | None = None,
+            outputs: Iterable[Any] | None = None,
+            vt: vtype = vtype.OBJECT) -> None:
         """Construct.
 
         NOTE: gc will be modified
 
         Args
         ----
-        gc (a dict-like object): GC to ensure is eGC compliant.
-        inputs (iterable(object)): GC inputs. Object is of the type defined by vt.
-        outputs (iterable(object)): GC outputs. Object is of the type defined by vt.
-        vt (vtype): The interpretation of the object. See vtype definition.
-        sv (bool): Suppress validation. If True the eGC will not be validated on construction.
+        gc: GC to ensure is eGC compliant.
+        inputs: GC inputs. Object is of the type defined by vt.
+        outputs: GC outputs. Object is of the type defined by vt.
+        vt: The interpretation of the object. See vtype definition.
         """
-        super().__init__(gc)
+        dict.__init__(gc)
 
+        graph_inputs: Sequence[int] | None = None
+        graph_outputs: Sequence[int] | None = None
         if inputs is not None:
-            graph_inputs, self['input_types'], self['inputs'] = interface_definition(inputs, vt)
-        else:
-            graph_inputs = []
+            iid_types: tuple[tuple[int, ...], list[int], bytes] = interface_definition(inputs, vt)
+            graph_inputs = iid_types[0]
+            self['input_types'] = iid_types[1]
+            self['inputs'] = iid_types[2]
+
         if outputs is not None:
-            graph_outputs, self['output_types'], self['outputs'] = interface_definition(outputs, vt)
-        else:
-            graph_outputs = []
-        self.setdefault('gca_ref', self.field_reference('gca'))
-        self.setdefault('gcb_ref', self.field_reference('gcb'))
-        self.setdefault('ancestor_a_ref', None)
-        self.setdefault('ancestor_b_ref', None)
+            oid_types: tuple[tuple[int, ...], list[int], bytes] = interface_definition(outputs, vt)
+            graph_outputs = oid_types[0]
+            self['output_types'] = oid_types[1]
+            self['outputs'] = oid_types[2]
+
         self.setdefault('generation', 0)
-        self['modified'] = True
+        self.setdefault('ancestor_a_ref')
+        self.setdefault('ancestor_b_ref')
+
+        if 'ref' not in self:
+            self['ref'] = self.new_reference()
+
         if 'igraph' not in self:
             if 'graph' in self:
-                igraph = gc_graph(self['graph'])
-                graph_inputs = igraph.input_if()
-                graph_outputs = igraph.output_if()
+                igraph: gc_graph = gc_graph(self['graph'])
             else:
                 igraph = gc_graph()
-                igraph.add_inputs(graph_inputs)
-                igraph.add_outputs(graph_outputs)
+                if graph_inputs is not None:
+                    igraph.add_inputs(graph_inputs)
+                if graph_outputs is not None:
+                    igraph.add_outputs(graph_outputs)
                 igraph.normalize()
-                self['graph'] = igraph.application_graph()
             self['igraph'] = igraph
-        elif 'graph' not in self:
-            self['graph'] = self['igraph'].application_graph()
-        
-        # Validation
-        if not sv:
-            if not eGC.validator(self):
-                _logger.error(f'eGC creation validation falied:\n{eGC.validator.error_str()}')
+
+        if _LOG_DEBUG:
+            if not eGC.validator.validate(self):
+                _logger.error(f'eGC creation validation failed:\n{eGC.validator.error_str()}')
