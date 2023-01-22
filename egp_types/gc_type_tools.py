@@ -105,9 +105,9 @@ def define_signature(gc):
     (str): Lowercase hex SHA256 string.
     """
     # NOTE: This needs to be very specific and stand the test of time!
-    gca_hex = '0' * 64 if gc['gca'] is None else gc['gca']
-    gcb_hex = '0' * 64 if gc['gcb'] is None else gc['gcb']
-    string = pformat(gc['graph'], indent=0, sort_dicts=True, width=65535, compact=True) + gca_hex + gcb_hex
+    gca_hex: str = '0' * 64 if gc['gca'] is None else gc['gca'].hexdigest()
+    gcb_hex: str = '0' * 64 if gc['gcb'] is None else gc['gcb'].hexdigest()
+    string: str = pformat(gc['graph'], indent=0, sort_dicts=True, width=65535, compact=True) + gca_hex + gcb_hex
 
     # If it is a codon glue on the mandatory definition
     if "generation" in gc and gc["generation"] == 0:
@@ -115,4 +115,6 @@ def define_signature(gc):
             string += gc["meta_data"]["function"]["python3"]["0"]["inline"]
             if 'code' in gc["meta_data"]["function"]["python3"]["0"]:
                 string += gc["meta_data"]["function"]["python3"]["0"]["code"]
+                string += str(gc['creator'])
+
     return sha256(string.encode()).digest()

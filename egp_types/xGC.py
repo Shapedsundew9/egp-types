@@ -3,6 +3,8 @@ from typing import Any, NoReturn, TypedDict, Literal, Generator, Self
 from logging import DEBUG, Logger, NullHandler, getLogger
 from collections.abc import KeysView as dict_keys
 
+from .eGC import eGC
+
 
 class Field(TypedDict):
     """GPC configured field definition."""
@@ -28,8 +30,29 @@ _PROOF_OF_PGC: Literal['pgc_fitness'] = 'pgc_fitness'
 class xGC():
     """xGC is a dict-like object."""
 
-    def __init__(self, _data: dict[str, list[Any]], allocation: int, idx: int, fields: dict[str, Field]) -> None:
+    # _gpc must be bound before casting dict/eGC's to xGC's.
+    _gpc: Any = None
+
+    def __init__(self, gc: dict | eGC = {}) -> None:
         """xGC is a dict-like object with some specialisations for the GPC.
+
+        Casting a dictionary or eGC to an xGC pushes it to the bound GPC.
+        A GPC must be bound to the class before casting.
+
+        Args
+        ----
+        gc: GC data to put in bound GPC cache.
+        """
+        if gc:
+            xGC._gpc[gc['ref']] = gc
+        else:
+            self.bind_entry(xGC._gpc._ggc_cache._data, 0, 0, xGC._gpc._ggc_cache.fields)
+
+    def bind_entry(self, _data: dict[str, list[Any]], allocation: int, idx: int, fields: dict[str, Field]) -> Self:
+        """ Bind the xGOC to an entry in a GPC.
+
+        NOTE: The GPC does not need to be the same as bound in _gpc as the _data
+        store object is passed in.
 
         Args
         ----
@@ -42,6 +65,7 @@ class xGC():
         self._allocation: int = allocation
         self._idx: int = idx
         self.fields: dict[str, Field] = fields
+        return self
 
     def __contains__(self, key: str) -> bool:
         """Checks if key is one of the fields in xGC."""

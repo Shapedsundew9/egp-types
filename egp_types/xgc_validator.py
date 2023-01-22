@@ -11,7 +11,8 @@ from egp_utils.base_validator import base_validator
 from egp_utils.common import merge
 
 from .conversions import (encode_properties, str_to_datetime, str_to_sha256,
-                          str_to_UUID)
+                          str_to_UUID, decode_properties, datetime_to_str,
+                          sha256_to_str, UUID_to_str)
 from .ep_type import validate
 from .gc_graph import gc_graph
 from .gc_type_tools import PROPERTIES, define_signature
@@ -26,9 +27,13 @@ LGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GMS_ENTRY_SCHEMA)
 with open(join(dirname(__file__), "formats/LGC_entry_format.json"), "r", encoding="utf8") as file_ptr:
     merge(LGC_ENTRY_SCHEMA, load(file_ptr))
 
-LGC_JSON_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(LGC_ENTRY_SCHEMA)
-with open(join(dirname(__file__), "formats/LGC_json_entry_format.json"), "r", encoding="utf8") as file_ptr:
-    merge(LGC_JSON_ENTRY_SCHEMA, load(file_ptr))
+LGC_JSON_LOAD_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(LGC_ENTRY_SCHEMA)
+with open(join(dirname(__file__), "formats/LGC_json_load_entry_format.json"), "r", encoding="utf8") as file_ptr:
+    merge(LGC_JSON_LOAD_ENTRY_SCHEMA, load(file_ptr))
+
+LGC_JSON_DUMP_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(LGC_ENTRY_SCHEMA)
+with open(join(dirname(__file__), "formats/LGC_json_dump_entry_format.json"), "r", encoding="utf8") as file_ptr:
+    merge(LGC_JSON_DUMP_ENTRY_SCHEMA, load(file_ptr))
 
 # GGC is the storage schema for the Gene Pool
 GGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GMS_ENTRY_SCHEMA)
@@ -274,7 +279,7 @@ class _LGC_entry_validator(_gms_entry_validator):
         return define_signature(self.document)
 
 
-class _LGC_json_entry_validator(_LGC_entry_validator):
+class _LGC_json_load_entry_validator(_LGC_entry_validator):
 
     # TODO: Make errors ValidationError types for full disclosure
     # https://docs.python-cerberus.org/en/stable/customize.html#validator-error
@@ -293,6 +298,27 @@ class _LGC_json_entry_validator(_LGC_entry_validator):
 
     def _normalize_coerce_properties_dict_to_int(self, value) -> int:
         return encode_properties(value)
+
+
+class _LGC_json_dump_entry_validator(_LGC_entry_validator):
+
+    # TODO: Make errors ValidationError types for full disclosure
+    # https://docs.python-cerberus.org/en/stable/customize.html#validator-error
+
+    def _normalize_coerce_signature_binary_to_str(self, value) -> str | None:
+        return sha256_to_str(value)
+
+    def _normalize_coerce_signature_binary_list_to_str_list(self, value) -> list[list[str | None]] | None:
+        return [[sha256_to_str(v) for v in vv] for vv in value]
+
+    def _normalize_coerce_datetime_to_datetime_str(self, value) -> str | None:
+        return datetime_to_str(value)
+
+    def _normalize_coerce_UUID_to_UUID_str(self, value) -> str | None:
+        return UUID_to_str(value)
+
+    def _normalize_coerce_properties_int_to_dict(self, value) -> dict[str, bool]:
+        return decode_properties(value)
 
 
 class _gGC_entry_validator(_gms_entry_validator):
@@ -340,7 +366,8 @@ class _gGC_entry_validator(_gms_entry_validator):
 
 gms_entry_validator: _gms_entry_validator = _gms_entry_validator(GMS_ENTRY_SCHEMA)
 LGC_entry_validator: _LGC_entry_validator = _LGC_entry_validator(LGC_ENTRY_SCHEMA)
-LGC_json_entry_validator: _LGC_json_entry_validator = _LGC_json_entry_validator(LGC_JSON_ENTRY_SCHEMA)
+LGC_json_load_entry_validator: _LGC_json_load_entry_validator = _LGC_json_load_entry_validator(LGC_JSON_LOAD_ENTRY_SCHEMA)
+LGC_json_dump_entry_validator: _LGC_json_dump_entry_validator = _LGC_json_dump_entry_validator(LGC_JSON_DUMP_ENTRY_SCHEMA)
 gGC_entry_validator: _gGC_entry_validator = _gGC_entry_validator(GGC_ENTRY_SCHEMA, purge_unknown=True)
 
 # Superset validator from which to derive transient xGC type validators

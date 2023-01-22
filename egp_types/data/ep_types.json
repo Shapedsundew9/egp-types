@@ -1,17 +1,10 @@
 {
     "instanciation": {
-        "-3": [
-            "egp_types",
-            null,
-            "GGC",
-            "GGC",
-            true
-        ],
         "-2": [
             "egp_types",
             null,
-            "mGC",
-            "mGC",
+            "xGC",
+            "xGC",
             true
         ],
         "-1": [
@@ -74,16 +67,14 @@
         "builtins_int": 2,
         "builtins_str": 5,
         "complex": 4,
-        "egp_types.GGC_GGC": -3,
         "egp_types.eGC_eGC": -1,
-        "egp_types.mGC_mGC": -2,
+        "egp_types.xGC_xGC": -2,
         "float": 3,
         "int": 2,
         "str": 5
     },
     "v2n": {
-        "-3": "egp_types.GGC_GGC",
-        "-2": "egp_types.mGC_mGC",
+        "-2": "egp_types.xGC_xGC",
         "-1": "egp_types.eGC_eGC",
         "0": "builtins_NoneType",
         "1": "builtins_bool",

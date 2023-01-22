@@ -1,17 +1,17 @@
 from logging import DEBUG, Logger, NullHandler, getLogger
 from typing import Any, LiteralString, Iterable, Sequence
 
-from ._GC import _GC
 from .ep_type import interface_definition, vtype
 from .gc_graph import gc_graph
 from .xgc_validator import XGC_ENTRY_SCHEMA, xgc_validator_generator
+from .reference import ref_str
 
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
 _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
 
-class eGC(_GC, dict):
+class eGC(dict):
     """Embryonic GC type.
 
     Embryonic GC's have the minimal set of fields necessary to form a GC but the
@@ -19,14 +19,14 @@ class eGC(_GC, dict):
     """
 
     _EGC_ENTRIES: tuple[LiteralString, ...] = (
-        *_GC._GC_ENTRIES, 'gca_ref', 'gcb_ref', 'ancestor_a_ref', 'ancestor_b_ref',
+        'gca_ref', 'gcb_ref', 'ancestor_a_ref', 'ancestor_b_ref',
         'generation', 'igraph'
     )
     validator: xgc_validator_generator = xgc_validator_generator({k: XGC_ENTRY_SCHEMA[k] for k in _EGC_ENTRIES}, allow_unknow=True)
 
     def __init__(
             self,
-            gc: dict,
+            gc: dict = {},
             inputs: Iterable[Any] | None = None,
             outputs: Iterable[Any] | None = None,
             vt: vtype = vtype.OBJECT) -> None:
@@ -57,10 +57,6 @@ class eGC(_GC, dict):
             self['output_types'] = oid_types[1]
             self['outputs'] = oid_types[2]
 
-        self.setdefault('generation', 0)
-        self.setdefault('ancestor_a_ref')
-        self.setdefault('ancestor_b_ref')
-
         if 'ref' not in self:
             self['ref'] = self.new_reference()
 
@@ -79,3 +75,29 @@ class eGC(_GC, dict):
         if _LOG_DEBUG:
             if not eGC.validator.validate(self):
                 _logger.error(f'eGC creation validation failed:\n{eGC.validator.error_str()}')
+
+    def __repr__(self) -> str:
+        """Pretty print."""
+        retval: str = '\t{\n'
+        for k, v in sorted(self.items(), key=lambda x: x[0]):  # type: ignore
+            retval = retval + '\t\t' + f"'{k}'{' ' * (21 - len(k))}: "
+            if 'ref' in k and 'refs' not in k and v is not None:
+                retval += ref_str(v)
+            else:
+                retval += str(v)
+            retval += '\n'
+        return retval + '\t}'
+
+    def validate(self) -> None:
+        """Validate all required key:value pairs are correct.
+
+        Validation is an expensive operation and should only be done for debugging.
+        Where possible values are checked for consistency.
+        """
+        if not self.validator.validate(self):
+            raise ValueError(f"Validation FAILED with:\n{self.validator.error_str()}")
+
+    @staticmethod
+    def new_reference() -> int:
+        """Bound to the reference generation function."""
+        raise NotImplementedError('Abstract base class.')
