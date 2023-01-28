@@ -1,15 +1,14 @@
-from ._GC import _GC
 from .eGC import eGC
-from .mGC import mGC
 from .xgc_validator import XGC_ENTRY_SCHEMA
+from typing import Literal
 
 
 # GitHub Markdown Emoji's
-_DEFINABLE_MD = ":large_blue_circle:"
-_REQUIRED_MD = ":black_circle:"
+_DEFINABLE_MD: Literal[':large_blue_circle:'] = ":large_blue_circle:"
+_REQUIRED_MD: Literal[':black_circle:'] = ":black_circle:"
 
 
-def md_string(gct, key):
+def md_string(gct, key) -> Literal['', ':large_blue_circle:', ':black_circle:']:
     """Generate the GitHub MD string relevant to the key for gct."""
     if key not in gct.validator.schema:
         return ""
@@ -18,12 +17,10 @@ def md_string(gct, key):
     return _REQUIRED_MD
 
 
-def md_table():
+def md_table() -> None:
     """Create a GitHub Markdown table showing the requirements of each field for each GC type."""
-    gcts = (
-        _GC(sv=True),
-        eGC(sv=True),
-        mGC(sv=True)
+    gcts: tuple[eGC] = (
+        eGC(),
     )
     with open('gc_type_table.md', 'w') as file_ptr:
         file_ptr.write("GC Type Field Requirements\n")

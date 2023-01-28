@@ -91,7 +91,7 @@ def is_pgc(gc):
     return gc.get('pgc_fitness', None) is not None
 
 
-def define_signature(gc):
+def define_signature(gc) -> bytes:
     """Define the signature of a genetic code.
 
     The signature for a codon GC is slightly different to a regular GC.
