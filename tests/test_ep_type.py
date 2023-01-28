@@ -9,7 +9,7 @@ from egp_types.ep_type import (EP_TYPE_VALUES, INVALID_EP_TYPE_NAME,
                                  compatible, import_str, instance_str,
                                  type_str, validate, vtype)
 from egp_types.eGC import eGC
-from egp_types.mGC import mGC
+from egp_types.xGC import xGC
 
 _logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
@@ -21,7 +21,7 @@ _logger.addHandler(NullHandler())
                              (str, True),
                              (object, False),
                              (eGC, True),
-                             (mGC, True)
+                             (xGC, True)
                          )
                          )
 def test_validate_type_objects(type_object, valid):
@@ -35,7 +35,7 @@ def test_validate_type_objects(type_object, valid):
                              ("Test", True),
                              ([], False),
                              (eGC(), True),
-                             (mGC, False),
+                             (xGC, False),
                              ({}, False)
                          )
                          )
@@ -93,7 +93,7 @@ def test_validate_ep_type_names(string, valid):
                              (str, 5),
                              (object, INVALID_EP_TYPE_VALUE),
                              (eGC, -1),
-                             (mGC, -2)
+                             (xGC, -2)
                          )
                          )
 def test_asint_type_objects(type_object, ep_type_int):
@@ -107,7 +107,7 @@ def test_asint_type_objects(type_object, ep_type_int):
                              ("Test", 5),
                              ([], INVALID_EP_TYPE_VALUE),
                              (eGC(), -1),
-                             (mGC, INVALID_EP_TYPE_VALUE),
+                             (xGC, INVALID_EP_TYPE_VALUE),
                              ({}, INVALID_EP_TYPE_VALUE)
                          )
                          )
@@ -152,7 +152,7 @@ def test_asint_ep_type_names(string, ep_type_int):
                              (str, "builtins_str"),
                              (object, INVALID_EP_TYPE_NAME),
                              (eGC, "egp_types_eGC_eGC"),
-                             (mGC, "egp_types_mGC_mGC")
+                             (xGC, "egp_types_xGC_xGC")
                          )
                          )
 def test_asstr_type_objects(type_object, ep_type_str):
@@ -166,7 +166,7 @@ def test_asstr_type_objects(type_object, ep_type_str):
                              ("Test", "builtins_str"),
                              ([], INVALID_EP_TYPE_NAME),
                              (eGC(), "egp_types.gc_type_eGC"),
-                             (mGC, INVALID_EP_TYPE_NAME),
+                             (xGC, INVALID_EP_TYPE_NAME),
                              ({}, INVALID_EP_TYPE_NAME)
                          )
                          )
