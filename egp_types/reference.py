@@ -15,7 +15,7 @@ ref_str: Callable[[int], str] = lambda x: 'None' if x is None else f"{((_OVER_MA
 
 def is_GLGC(ref: int) -> bool:
     """Test if a reference is for a GC loaded from the GL."""
-    return bool(ref & _GL_GC)
+    return bool(ref < 0)
 
 
 def ref_from_sig(signature: bytes, shift: int = 0) -> int:
@@ -36,10 +36,10 @@ def ref_from_sig(signature: bytes, shift: int = 0) -> int:
     high: int = 32 - (shift >> 3)
     mask: int = shift & 7
     if not mask:
-        return (int.from_bytes(signature[high - 8:high], byteorder="big") & _REFERENCE_MASK) | _GL_GC
+        return (int.from_bytes(signature[high - 8:high], byteorder="big") & _REFERENCE_MASK) - _GL_GC
 
     low: int = high - 9
-    return ((int.from_bytes(signature[low:high], byteorder="big") >> mask) & _REFERENCE_MASK) | _GL_GC
+    return ((int.from_bytes(signature[low:high], byteorder="big") >> mask) & _REFERENCE_MASK) - _GL_GC
 
 
 def reference(owner: int, counters: dict[int, count]) -> int:
