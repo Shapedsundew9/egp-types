@@ -4,7 +4,6 @@ from typing import Callable, Literal
 
 _REFERENCE_MASK: Literal[9223372036854775807] = 0x7FFFFFFFFFFFFFFF
 _GL_GC: Literal[9223372036854775808] = 0x8000000000000000  # type: ignore
-_MAX_OWNER: Literal[2147483647] = 0x7FFFFFFF
 
 
 # Pretty print for references
@@ -42,7 +41,7 @@ def ref_from_sig(signature: bytes, shift: int = 0) -> int:
     return ((int.from_bytes(signature[low:high], byteorder="big") >> mask) & _REFERENCE_MASK) - _GL_GC
 
 
-def reference(owner: int, counters: dict[int, count]) -> int:
+def reference(owner_id: int, counter: count) -> int:
     """Create a unique reference.
 
     References have the structure:
@@ -56,13 +55,10 @@ def reference(owner: int, counters: dict[int, count]) -> int:
 
     Args
     ----
-    owner: 32 bit unsigned integer uniquely identifying the counter to be used.
+    owner_id: 31 bit unsigned integer uniquely identifying the counter to be used.
 
     Returns
     -------
-    Signed 64 bit integer reference.
+    Signed 64 bit integer reference where the MSb is 0
     """
-    if owner not in counters:
-        assert owner < _MAX_OWNER, "Owner index out of range."
-        counters[owner] = count()
-    return (next(counters[owner]) + (owner << 32))
+    return next(counter) + (owner_id << 32)
