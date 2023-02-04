@@ -94,9 +94,12 @@ class _gms_entry_validator(base_validator):
         if value > self.document['reference_count']:
             self._error(field, f"_reference_count ({value}) cannot be higher than reference_count {self.document['reference_count']}.")
 
-    def _check_with_valid_created(self, field: str, value: Any) -> None:
+    def _check_with_valid_created(self, field: str, value: datetime) -> None:
         if value > datetime.utcnow():
             self._error(field, "Created date-time cannot be in the future. Is the system clock correct?")
+        if self.document.get('updated') is not None:
+            if self.document['updated'] < value:
+                self._error(field, "A record cannot be updated before it has been created.")
 
     def _check_with_valid_e_count(self, field: str, value: Any) -> None:
         if value == 1 and self.document['evolvability'] < 1.0:
@@ -185,9 +188,12 @@ class _gms_entry_validator(base_validator):
         if value < self.document['_reference_count']:
             self._error(field, f"reference_count ({value}) cannot be lower than _reference_count {self.document['_reference_count']}.")
 
-    def _check_with_valid_updated(self, field: str, value: Any) -> None:
+    def _check_with_valid_updated(self, field: str, value: datetime) -> None:
         if value > datetime.utcnow():
             self._error(field, "Updated date-time cannot be in the future. Is the system clock correct?")
+        if self.document.get('created') is not None:
+            if self.document['updated'] > value:
+                self._error(field, "A record cannot be updated before it has been created.")
 
     def _normalize_default_setter_set_input_types(self, document) -> list[int]:
         # Gather all the input endpoint types. Reduce in a set then order the list.
