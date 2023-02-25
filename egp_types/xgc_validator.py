@@ -44,6 +44,10 @@ with open(join(dirname(__file__), "formats/gGC_entry_format.json"), "r", encodin
 XGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GGC_ENTRY_SCHEMA)
 merge(XGC_ENTRY_SCHEMA, LGC_ENTRY_SCHEMA)
 
+# Pull the grpah schema out of the GMS schema to create a standalone validator.
+GRAPH_SCHEMA: dict[str, dict[str, Any]] = {'graph': deepcopy(GMS_ENTRY_SCHEMA['graph'])}
+del GRAPH_SCHEMA['graph']['check_with']
+
 
 class _gms_entry_validator(base_validator):
 
@@ -71,8 +75,8 @@ class _gms_entry_validator(base_validator):
 
     def _check_with_valid__pgc_e_count(self, field: str, value: Any) -> None:
         if self._valid_pgc(field, value):
-            e: list[float] | tuple[float, ...] = self.document['_pgc_evolvability']
-            invalid: dict[int, bool] = {i: v == 0 and e[i] > 0.0 for i, v in enumerate(value)}
+            evolve: list[float] | tuple[float, ...] = self.document['_pgc_evolvability']
+            invalid: dict[int, bool] = {i: v == 0 and evolve[i] > 0.0 for i, v in enumerate(value)}
             if any(invalid.values()):
                 indices: list[int] = [i for i, v in invalid.items() if not v]
                 self._error(field, f'_pgc_e_count cannot be 0 if _pgc_evolvability is non-zero at indices {indices}.')
@@ -258,7 +262,7 @@ class _LGC_entry_validator(_gms_entry_validator):
     def _check_with_valid_gca(self, field: str, value: Any) -> None:
         if 'A' in self.document['graph'] and value is None:
             self._error(field, 'graph references row A but gca is None.')
-        if 'A' not in self.document['graph'] and value not in None:
+        if 'A' not in self.document['graph'] and value is not None:
             self._error(field, 'No reference to row A in graph but gca is not None.')
         if value is not None and value == self.document['signature']:
             self._error(field, 'A GC cannot reference itself in row A.')
@@ -346,7 +350,7 @@ class _gGC_entry_validator(_gms_entry_validator):
     def _check_with_valid_gca_ref(self, field: str, value: Any) -> None:
         if 'A' in self.document['graph'] and value is None:
             self._error(field, 'graph references row A but gca_ref is None.')
-        if 'A' not in self.document['graph'] and value not in None:
+        if 'A' not in self.document['graph'] and value is not None:
             self._error(field, 'No reference to row A in graph but gca_ref is not None.')
         if value is not None and value == self.document['ref']:
             self._error(field, 'A GC cannot reference itself in row A.')
@@ -354,7 +358,7 @@ class _gGC_entry_validator(_gms_entry_validator):
     def _check_with_valid_gcb_ref(self, field: str, value: Any) -> None:
         if 'B' in self.document['graph'] and value is None:
             self._error(field, 'graph references row B but gcb_ref is None.')
-        if 'B' not in self.document['graph'] and value not in None:
+        if 'B' not in self.document['graph'] and value is not None:
             self._error(field, 'No reference to row B in graph but gcb_ref is not None.')
         if value is not None and self.document['gca'] is None:
             self._error(field, 'gcb_ref is defined but gca_ref is None.')
@@ -375,9 +379,8 @@ LGC_entry_validator: _LGC_entry_validator = _LGC_entry_validator(LGC_ENTRY_SCHEM
 LGC_json_load_entry_validator: _LGC_json_load_entry_validator = _LGC_json_load_entry_validator(LGC_JSON_LOAD_ENTRY_SCHEMA)
 LGC_json_dump_entry_validator: _LGC_json_dump_entry_validator = _LGC_json_dump_entry_validator(LGC_JSON_DUMP_ENTRY_SCHEMA)
 gGC_entry_validator: _gGC_entry_validator = _gGC_entry_validator(GGC_ENTRY_SCHEMA, purge_unknown=True)
-
-# Superset validator from which to derive transient xGC type validators
+graph_validator: base_validator = base_validator(GRAPH_SCHEMA)
 
 
 class xgc_validator_generator(_gGC_entry_validator, _LGC_entry_validator):
-    pass
+    """Superset validator from which to derive transient xGC type validators."""

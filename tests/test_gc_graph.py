@@ -165,7 +165,7 @@ def test_graph_draw(i, case):
 def test_graph_internal(i, case):
     """Verification initializing with an internal representation is self consdistent."""
     gcg = gc_graph(case['graph'])
-    assert gcg.application_graph() == gc_graph(internal=deepcopy(gcg.save())).application_graph()
+    assert gcg.connection_graph() == gc_graph(internal=deepcopy(gcg.save())).connection_graph()
     assert gcg.graph == gc_graph(internal=deepcopy(gcg.save())).graph
 
 
@@ -179,7 +179,7 @@ def test_graph_conversion(i, case):
             idx = const_idx.TYPE if k == 'C' else conn_idx.TYPE
             for r in v:
                 r[idx] = r[idx]
-        assert case['graph'] == gcg.application_graph()
+        assert case['graph'] == gcg.connection_graph()
 
 
 @pytest.mark.parametrize("test", range(100))
