@@ -129,11 +129,11 @@ _GT_ROW_NODE_ATTR: dict[Row, dict[str, Any]] = {
     'O': {'fill_color': [0.0, 0.0, 0.0, 1.0], 'text': 'O'},
     'U': {'fill_color': [0.0, 1.0, 0.0, 1.0], 'text': 'U'}
 }
-for k, v in _GT_ROW_NODE_ATTR.items():
-    v['size'] = _GT_NODE_DIAMETER
-    v['shape'] = _GT_NODE_SHAPE
-    v['font_size'] = _GT_NODE_FONT_SIZE
-    v['font_weight'] = _GT_NODE_FONT_WEIGHT
+for _, _v in _GT_ROW_NODE_ATTR.items():
+    _v['size'] = _GT_NODE_DIAMETER
+    _v['shape'] = _GT_NODE_SHAPE
+    _v['font_size'] = _GT_NODE_FONT_SIZE
+    _v['font_weight'] = _GT_NODE_FONT_WEIGHT
 
 _GT_EDGE_PEN_WIDTH: Literal[4] = 4
 _GT_EDGE_MARKER_SIZE: Literal[24] = 24
@@ -179,7 +179,7 @@ register_token_code('I01900', 'No source endpoints in the list to remove.')
 
 
 # FIXME: Why is this here & not in ep_type.py?
-def validate_value(value_str, ep_type_int):
+def validate_value(value_str, ep_type_int) -> bool:
     """Validate the executable string is a valid ep_type value.
 
     Args
@@ -191,18 +191,18 @@ def validate_value(value_str, ep_type_int):
     -------
         bool: True if valid else False
     """
-    tstr = type_str(ep_type_int)
+    tstr: str = type_str(ep_type_int)
     try:
-        eval(tstr)
+        eval(tstr)  # pylint: disable=eval-used
     except NameError:
         if _LOG_DEBUG:
             _logger.debug(f'Importing {tstr}.')
-        exec(import_str(ep_type_int))
+        exec(import_str(ep_type_int))  # pylint: disable=exec-used
 
     if _LOG_DEBUG:
         _logger.debug(f'retval = isinstance({value_str}, {tstr})')
     try:
-        retval = eval(f'isinstance({value_str}, {tstr})')
+        retval: bool = eval(f'isinstance({value_str}, {tstr})')  # pylint: disable=eval-used
     except (NameError, SyntaxError):
         return False
     return retval
@@ -211,17 +211,20 @@ def validate_value(value_str, ep_type_int):
 # TODO: Consider caching calculated results.
 class gc_graph():
     """Manipulating Genetic Code Graphs."""
-    __slots__ = ('i_graph', 'rows', 'app_graph', 'status')
+    __slots__: tuple[LiteralString, ...] = ('i_graph', 'rows', 'app_graph', 'status', 'has_f')
     i_graph: InternalGraph
     rows: GCGraphRows
     app_graph: Any
     status: Any
+    has_f: bool
 
-    def __init__(self, c_graph: ConnectionGraph = dict(), i_graph: InternalGraph = InternalGraph()) -> None:
+    def __init__(self, c_graph: ConnectionGraph | None = None, i_graph: InternalGraph | None = None) -> None:
 
-        self.i_graph = i_graph if i_graph else self._convert_to_internal(c_graph)
-        self.rows = (dict(Counter([ep.row for ep in self.i_graph.values() if not ep.cls])),
-                     dict(Counter([ep.row for ep in self.i_graph.values() if ep.cls])))
+        nc_graph: ConnectionGraph = {} if c_graph is None else c_graph
+        self.i_graph = i_graph if i_graph is not None else self._convert_to_internal(nc_graph)
+        self.rows = (dict(Counter([ep.row for ep in self.i_graph.dst_filter()])),
+                     dict(Counter([ep.row for ep in self.i_graph.src_filter()])))
+        self.has_f = 'F' in self.rows[DST_EP]
 
     def __repr__(self) -> str:
         """Print the graph in row order sources then destinations in index order."""
@@ -241,22 +244,22 @@ class gc_graph():
         Types are stored in integer format for efficiency.
         """
         i_graph: InternalGraph = InternalGraph()
-        for row, cps in c_graph.items():
-            for index, cp in enumerate(cps):
+        for row, c_points in c_graph.items():
+            for index, c_point in enumerate(c_points):
                 if row != 'C':
-                    cp_row: Row = castRow(cp[CPI.ROW])
-                    cp_idx: EndPointIndex = castEndPointIndex(cp[CPI.IDX])
-                    cp_typ: EndPointType = castEndPointType(cp[CPI.TYP])
-                    dst_ep: EndPoint = EndPoint(DST_EP, row, index, cp_typ, [EndPointReference(cp_row, cp_idx)])
+                    cp_row: Row = castRow(c_point[CPI.ROW])
+                    cp_idx: EndPointIndex = castEndPointIndex(c_point[CPI.IDX])
+                    cp_typ: EndPointType = castEndPointType(c_point[CPI.TYP])
+                    dst_ep: EndPoint = EndPoint(row, index, cp_typ, DST_EP, [EndPointReference(cp_row, cp_idx)])
                     i_graph[dst_ep.key()] = dst_ep
                     src_ep_hash: EndPointHash = dst_ep.refs[0].key(SRC_EP)
                     if src_ep_hash in i_graph:
                         i_graph[src_ep_hash].refs.append(EndPointReference(row, index))
                     elif cp_row != 'C':
                         refs: list[EndPointReference] = [EndPointReference(row, index)] if row != 'U' else []
-                        i_graph[src_ep_hash] = EndPoint(SRC_EP, cp_row, cp_idx, cp_typ, refs)
+                        i_graph[src_ep_hash] = EndPoint(cp_row, cp_idx, cp_typ, SRC_EP, refs)
                 else:
-                    src_ep: EndPoint = EndPoint(SRC_EP, row, index, castEndPointType(cp[CPI.CTYP]), [], cp[CPI.CTYP])
+                    src_ep: EndPoint = EndPoint(row, index, castEndPointType(c_point[CPI.CTYP]), SRC_EP, [], c_point[CPI.CTYP])
                     i_graph[src_ep.key()] = src_ep
         return i_graph
 
@@ -440,7 +443,7 @@ class gc_graph():
                 src_row: SourceRow = ep.refs[0].row
                 if _LOG_DEBUG:
                     _logger.debug(f"Adding to gt_graph edge: {src_row}->{dst_row}")
-                edge: Edge = graph.add_edge(gtg[src_row], gtg[dst_row])  # type: Ignore
+                edge: Edge = graph.add_edge(gtg[src_row], gtg[dst_row])  # type: ignore
                 edge_p['pen_width'][edge] = _GT_EDGE_PEN_WIDTH
                 edge_p['marker_size'][edge] = _GT_EDGE_MARKER_SIZE
         return graph, node_p, edge_p
@@ -454,12 +457,12 @@ class gc_graph():
             size ((int, int)): Tuple of x, y output image dimensions.
         """
         graph_properties: tuple[Graph, dict[str, VertexPropertyMap], dict[str, EdgePropertyMap]] = self.gt_graph()
-        n: dict[str, VertexPropertyMap] = graph_properties[1]
-        e: dict[str, EdgePropertyMap] = graph_properties[2]
-        graph_draw(graph_properties[0], vertex_text=n['text'], vertex_shape=n['shape'],
-                   vertex_fill_color=n['fill_color'], vertex_size=n['size'],
-                   vertex_font_weight=n['font_weight'], vertex_font_size=n['font_size'],
-                   edge_pen_width=e['pen_width'], edge_marker_size=e['marker_size'],
+        node_p: dict[str, VertexPropertyMap] = graph_properties[1]
+        edge_p: dict[str, EdgePropertyMap] = graph_properties[2]
+        graph_draw(graph_properties[0], vertex_text=node_p['text'], vertex_shape=node_p['shape'],
+                   vertex_fill_color=node_p['fill_color'], vertex_size=node_p['size'],
+                   vertex_font_weight=node_p['font_weight'], vertex_font_size=node_p['font_size'],
+                   edge_pen_width=edge_p['pen_width'], edge_marker_size=edge_p['marker_size'],
                    output=path + ".png", output_size=size)
 
     def draw(self, path='./graph', size=(1600, 900)) -> None:
@@ -520,69 +523,64 @@ class gc_graph():
         ----
         ep_type: ep_type in integer format. If None a random real ep_type is chosen.
         """
-        if ep_type is None:
-            ep_type = choice(REAL_EP_TYPE_VALUES)
-        o_index = self.rows[DST_EP]['O']
-        ep = [DST_EP, 'O', o_index, ep_type, []]
-        self._add_ep(ep)
-        if self.has_f():
-            ep = [DST_EP, 'P', o_index, ep_type, []]
-            self._add_ep(ep)
+        nep_type: int = choice(REAL_EP_TYPE_VALUES) if ep_type is None else ep_type
+        o_index: int = self.rows[DST_EP].get('O', 0)
+        self._add_ep(DstEndPoint('O', o_index, nep_type))
+        if self.has_f:
+            self._add_ep(DstEndPoint('P', o_index, nep_type))
 
-    def remove_output(self, idx=None):
+    def remove_output(self, idx: int | None = None) -> None:
         """Remove output idx.
 
         No-op if there are no outputs.
 
         Args
         ----
-        idx (int): Index of output to remove. If None a random index is chosen.
+        idx: Index of output to remove. If None a random index is chosen.
         """
-        num_outputs = self.rows[DST_EP].get('O', 0)
+        num_outputs: int = self.rows[DST_EP].get('O', 0)
         if num_outputs:
-            if idx is None:
-                idx = randint(0, num_outputs - 1)
-            ep_ref = ['O', idx]
+            nidx: int = randint(0, num_outputs - 1) if idx is None else idx
+            ep_ref: DstEndPointReference = DstEndPointReference('O', nidx)
             if _LOG_DEBUG:
                 _logger.debug(f"Removing output {ep_ref}.")
-            ep = self.i_graph[hash_ref(ep_ref, DST_EP)]
+            ep: DstEndPoint = self.i_graph[ep_ref.key()]  # type: ignore
             self._remove_ep(ep, False)
             for ref in ep.refs:
-                self.i_graph[hash_ref(ref, SRC_EP)][ep_idx.REFERENCED_BY].remove(ep_ref)
+                self.i_graph[ref.key()].refs.remove(ep_ref)
 
             # If F exists then must deal with P
-            if self.has_f():
-                ep_ref = ['P', idx]
+            if self.has_f:
+                ep_ref: DstEndPointReference = DstEndPointReference('P', nidx)
                 if _LOG_DEBUG:
                     _logger.debug(f"Removing output {ep_ref}.")
-                ep = self.i_graph[hash_ref(ep_ref, DST_EP)]
-                self._remove_ep(ep, False)
-                for ref in ep.refs:
-                    self.i_graph[hash_ref(ref, SRC_EP)][ep_idx.REFERENCED_BY].remove(ep_ref)
+            ep: DstEndPoint = self.i_graph[ep_ref.key()]  # type: ignore
+            self._remove_ep(ep, False)
+            for ref in ep.refs:
+                self.i_graph[ref.key()].refs.remove(ep_ref)
 
             # Only re-index row O if it was not the last endpoint that was removed (optimisation)
             if idx != num_outputs - 1:
                 self.reindex_row('O')
-                if self.has_f():
+                if self.has_f:
                     self.reindex_row('P')
 
-    def remove_constant(self, idx=None):
+    def remove_constant(self, idx=None) -> None:
         """Remove constant idx.
 
         No-op if there are no constants.
 
         Args
         ----
-        idx (int): Index of constant to remove. If None a random index is chosen.
+        idx: Index of constant to remove. If None a random index is chosen.
         """
-        num_constants = self.rows[SRC_EP].get('C', 0)
+        num_constants: int = self.rows[SRC_EP].get('C', 0)
         if num_constants:
-            if idx is None:
-                idx = randint(0, num_constants - 1)
-            ep_ref = ['C', idx]
+            nidx: int = randint(0, num_constants - 1) if idx is None else idx
+            ep_ref: SrcEndPointReference = SrcEndPointReference('C', nidx)
             if _LOG_DEBUG:
                 _logger.debug(f"Removing constant {ep_ref}.")
-            ep = self.i_graph[hash_ref(ep_ref, SRC_EP)]
+            ep: SrcEndPoint = self.i_graph[ep_ref.key()]  # type: ignore
             self._remove_ep(ep, False)
             for ref in ep.refs:
                 self.i_graph[hash_ref(ref, DST_EP)][ep_idx.REFERENCED_BY].remove(ep_ref)
@@ -798,15 +796,6 @@ class gc_graph():
             (bool): True if row A exists.
         """
         return bool(self._num_eps('A', SRC_EP)) or bool(self._num_eps('A', DST_EP))
-
-    def has_f(self):
-        """Test if this is a flow control graph.
-
-        Returns
-        -------
-            (bool): True if row 'F' is defined.
-        """
-        return bool(self._num_eps('F', DST_EP))
 
     def has_b(self):
         """Test if row B is defined in the graph.

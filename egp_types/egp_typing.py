@@ -1,6 +1,6 @@
 """Common Erasmus GP Types."""
-from dataclasses import dataclass
-from typing import Callable, Iterable, Literal, Any, TypeGuard, Generator
+from dataclasses import dataclass, field
+from typing import Callable, Iterable, Literal, Any, TypeGuard, Generator, TypedDict
 from enum import IntEnum
 from graph_tool import Vertex as gt_vertex
 from graph_tool import Edge as gt_edge
@@ -165,29 +165,29 @@ class EndPoint(GenericEndPoint):
     """
     typ: EndPointType
     cls: EndPointClass
-    refs: list[EndPointReference] = []
+    refs: list[EndPointReference] = field(default_factory=list)
     val: Any = None
 
     def key(self, force_class: EndPointClass | None = None) -> EndPointHash:
         """Create a unique key to uise in the internal graph."""
         cls: str = 'ds'[self.cls] if force_class is None else 'ds'[force_class]
-        return self.key_base() + cls 
+        return self.key_base() + cls
 
 
 @dataclass(slots=True)
 class DstEndPoint(EndPoint):
     """Destination End Point."""
     row: DestinationRow
-    refs: list[SrcEndPointReference]
     cls: EndPointClass = DST_EP
+    refs: list[SrcEndPointReference] = field(default_factory=list)
 
 
 @dataclass(slots=True)
 class SrcEndPoint(EndPoint):
     """Source End Point."""
     row: SourceRow
-    refs: list[DstEndPointReference]
     cls: EndPointClass = SRC_EP
+    refs: list[DstEndPointReference] = field(default_factory=list)
 
 
 def isDstEndPoint(ep: EndPoint) -> TypeGuard[DstEndPoint]:
@@ -222,3 +222,30 @@ class InternalGraph(dict[EndPointHash, EndPoint]):
     def src_row_filter(self, row) -> Generator[SrcEndPoint, None, None]:
         """Return all the source end points in row."""
         return (ep for ep in self.values() if isSrcEndPoint(ep) and ep.row == row)
+
+
+class EndPointTypeLookupFile(TypedDict):
+    """Format of the egp_type.json file."""
+    n2v: dict[str, int]
+    v2n: dict[str, str]
+    instanciation: dict[str, list[str | bool | None]]
+
+
+def isInstanciationValue(obj) -> TypeGuard[tuple[str | None, str | None, str | None, str | None, bool]]:
+    """Is obj an instance of an instanciation definition."""
+    if not isinstance(obj, tuple):
+        return False
+    if not len(obj) == 5:
+        return False
+    if not all((isinstance(element, str) or element is None for element in obj[:4])):
+        return False
+    return isinstance(bool, obj[4])
+
+
+class EndPointTypeLookup(TypedDict):
+    """Format of the ep_type_lookup structure."""
+    n2v: dict[str, int]  # End point type name: End point type value
+    v2n: dict[int, str]  # End point type value: End point type name
+
+    # End point type value: package, version, module, name, can take parameters
+    instanciation: dict[int, tuple[str | None, str | None, str | None, str | None, bool]]
