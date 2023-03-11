@@ -11,30 +11,36 @@ from collections import Counter
 from copy import deepcopy
 from logging import DEBUG, Logger, NullHandler, getLogger
 from math import sqrt
-from random import choice, randint, sample
-from typing import Any, Literal, LiteralString
 from pprint import pformat
+from random import choice, randint, sample
+from typing import Any, Generator, Literal, LiteralString
 
 import gi
 from bokeh.io import output_file, save
-from bokeh.models import (BoxSelectTool, Circle, ColumnDataSource, HoverTool,
-                          LabelSet, MultiLine, NodesAndLinkedEdges, Range1d,
-                          TapTool, GraphRenderer)
+from bokeh.models import (BoxSelectTool, Circle, ColumnDataSource,
+                          GraphRenderer, HoverTool, LabelSet, MultiLine,
+                          NodesAndLinkedEdges, Range1d, TapTool)
 from bokeh.palettes import Category20_20, Greys9
 from bokeh.plotting import figure, from_networkx
 from cairo import FONT_WEIGHT_BOLD, FontWeight
 from egp_utils.text_token import register_token_code, text_token
-from graph_tool import Graph
+from graph_tool import EdgePropertyMap, Graph, VertexPropertyMap
 from graph_tool.draw import graph_draw
-from networkx import DiGraph, get_node_attributes, spring_layout, Graph
+from networkx import DiGraph, get_node_attributes, spring_layout
 
-from .egp_typing import Row, SourceRow, DestinationRow, EndPointType, EndPointClass, EndPointIndex, EndPointHash, SOURCE_ROWS, ROWS, castEndPointIndex, castEndPointType, CPI, VALID_ROW_SOURCES, DESTINATION_ROWS, DST_EP, SRC_EP, ConnectionPoint, ConnectionGraph, EndPoint, EndPointReference, InternalGraph, GCGraphRows, castRow, castDestinationRow, castSourceRow
+from .egp_typing import (CPI, DESTINATION_ROWS, DST_EP, ROWS, SOURCE_ROWS,
+                         SRC_EP, VALID_ROW_SOURCES, ConnectionGraph,
+                         ConnectionPoint, DestinationRow, EndPoint,
+                         EndPointClass, EndPointHash, EndPointIndex,
+                         EndPointReference, EndPointType, GCGraphRows,
+                         InternalGraph, Row, SourceRow, castDestinationRow,
+                         castEndPointIndex, castEndPointType, castRow,
+                         castSourceRow, Vertex, DstEndPoint, SrcEndPoint, DstEndPointReference, SrcEndPointReference, Edge)
 # Needed to prevent something pulling in GtK 4.0 and graph_tool complaining.
 from .ep_type import (EP_TYPE_NAMES, REAL_EP_TYPE_VALUES,
                       UNKNOWN_EP_TYPE_VALUE, asint, asstr, compatible,
                       import_str, type_str, validate)
 from .xgc_validator import graph_validator
-
 
 gi.require_version('Gtk', '3.0')
 
@@ -104,8 +110,8 @@ _NX_ROW_NODE_ATTR: dict[Row, dict[str, str]] = {
     'P': {'fill': Category20_20[5], 'select': Category20_20[4], 'hover': Category20_20[4], 'line': Greys9[0], 'label': 'P'},
     'U': {'fill': Category20_20[17], 'select': Category20_20[16], 'hover': Category20_20[16], 'line': Greys9[0], 'label': 'U'},
 }
-for k, v in _NX_ROW_NODE_ATTR.items():
-    v['font'] = _NX_NODE_FONT
+for _, _v in _NX_ROW_NODE_ATTR.items():
+    _v['font'] = _NX_NODE_FONT
 
 
 # Graph Tool parameters
@@ -211,7 +217,7 @@ class gc_graph():
     app_graph: Any
     status: Any
 
-    def __init__(self, c_graph: ConnectionGraph = dict(), i_graph: InternalGraph = dict()) -> None:
+    def __init__(self, c_graph: ConnectionGraph = dict(), i_graph: InternalGraph = InternalGraph()) -> None:
 
         self.i_graph = i_graph if i_graph else self._convert_to_internal(c_graph)
         self.rows = (dict(Counter([ep.row for ep in self.i_graph.values() if not ep.cls])),
@@ -234,7 +240,7 @@ class gc_graph():
         It maintains bi-directional references for quick manipulation.
         Types are stored in integer format for efficiency.
         """
-        i_graph: InternalGraph = {}
+        i_graph: InternalGraph = InternalGraph()
         for row, cps in c_graph.items():
             for index, cp in enumerate(cps):
                 if row != 'C':
@@ -357,39 +363,39 @@ class gc_graph():
                               title="Erasmus GP GC Internal Graph", x_range=Range1d(-110.1, 110.1), y_range=Range1d(-110.1, 110.1))
         plot.add_tools(HoverTool(tooltips=_NX_HOVER_TOOLTIPS, anchor='top_right'), TapTool(), BoxSelectTool())
         bk_graph: GraphRenderer = from_networkx(nx_graph, spring_layout, scale=100, center=(0, 0))
-        bk_graph.node_renderer.glyph = Circle(line_color='line', size='size', fill_color="fill")
-        bk_graph.node_renderer.selection_glyph = Circle(line_color='line', size='size', fill_color="select")
-        bk_graph.node_renderer.hover_glyph = Circle(line_color='line', size='size', fill_color="hover")
-        bk_graph.edge_renderer.glyph = MultiLine(line_color="line", line_alpha=0.8, line_width=2)
-        bk_graph.edge_renderer.selection_glyph = MultiLine(line_color="select", line_width=3)
-        bk_graph.edge_renderer.hover_glyph = MultiLine(line_color="hover", line_width=3)
-        bk_graph.selection_policy = NodesAndLinkedEdges()
-        bk_graph.inspection_policy = NodesAndLinkedEdges()
-        plot.renderers.append(bk_graph)
+        bk_graph.node_renderer.glyph = Circle(line_color='line', size='size', fill_color="fill")  # type: ignore
+        bk_graph.node_renderer.selection_glyph = Circle(line_color='line', size='size', fill_color="select")  # type: ignore
+        bk_graph.node_renderer.hover_glyph = Circle(line_color='line', size='size', fill_color="hover")  # type: ignore
+        bk_graph.edge_renderer.glyph = MultiLine(line_color="line", line_alpha=0.8, line_width=2)  # type: ignore
+        bk_graph.edge_renderer.selection_glyph = MultiLine(line_color="select", line_width=3)  # type: ignore
+        bk_graph.edge_renderer.hover_glyph = MultiLine(line_color="hover", line_width=3)  # type: ignore
+        bk_graph.selection_policy = NodesAndLinkedEdges()  # type: ignore
+        bk_graph.inspection_policy = NodesAndLinkedEdges()  # type: ignore
+        plot.renderers.append(bk_graph)  # type: ignore
 
-        x, y = zip(*bk_graph.layout_provider.graph_layout.values())
-        node_labels = get_node_attributes(nx_graph, 'text')
-        label_x_offsets = get_node_attributes(nx_graph, 'x_offset')
-        label_y_offsets = get_node_attributes(nx_graph, 'y_offset')
-        label_font_sizes = get_node_attributes(nx_graph, 'font_size')
-        label_font = get_node_attributes(nx_graph, 'font')
-        source = ColumnDataSource({
-            'x': x,
-            'y': y,
+        x_y: tuple[tuple[float, ...], tuple[float, ...]] = tuple(zip(*bk_graph.layout_provider.graph_layout.values()))  # pylint: disable=no-member, # type: ignore
+        node_labels: dict[str, str] = get_node_attributes(nx_graph, 'text')
+        label_x_offsets: dict[str, float] = get_node_attributes(nx_graph, 'x_offset')
+        label_y_offsets: dict[str, float] = get_node_attributes(nx_graph, 'y_offset')
+        label_font_sizes: dict[str, str] = get_node_attributes(nx_graph, 'font_size')
+        label_font: dict[str, str] = get_node_attributes(nx_graph, 'font')
+        source: ColumnDataSource = ColumnDataSource({
+            'x': x_y[0],
+            'y': x_y[1],
             'text': list(node_labels.values()),
             'x_offset': list(label_x_offsets.values()),
             'y_offset': list(label_y_offsets.values()),
             'font_size': list(label_font_sizes.values()),
             'font': list(label_font.values())
         })
-        labels = LabelSet(x='x', y='y', text='text',
+        labels: LabelSet = LabelSet(x='x', y='y', text='text',
                           source=source, text_font_size='font_size', x_offset='x_offset', y_offset='y_offset',
                           text_font='font', text_font_style='bold', text_color='black')
-        plot.renderers.append(labels)
+        plot.renderers.append(labels)  # type: ignore
         output_file(f"{path}.html", title="Erasmus GP GC Internal Graph")
         save(plot)
 
-    def gt_graph(self):
+    def gt_graph(self) -> tuple[Graph, dict[str, VertexPropertyMap], dict[str, EdgePropertyMap]]:
         """Create a graph_tool graph treating rows as nodes.
 
         graph_tool is used because its drawing capabilities allow for multiple edges between nodes (unlike Bokeh)
@@ -401,26 +407,27 @@ class gc_graph():
             (dict): Dict of vertex properties.
             (dict): Dict of edge properties.
         """
-        g = Graph()
-        node_p = {
-            'text': g.new_vertex_property('string'),
-            'shape': g.new_vertex_property('string'),
-            'fill_color': g.new_vertex_property('vector<float>'),
-            'size': g.new_vertex_property('int'),
-            'font_size': g.new_vertex_property('int'),
-            'font_weight': g.new_vertex_property('int')
+        graph: Graph = Graph()
+        node_p: dict[str, VertexPropertyMap] = {
+            'text': graph.new_vertex_property('string'),
+            'shape': graph.new_vertex_property('string'),
+            'fill_color': graph.new_vertex_property('vector<float>'),
+            'size': graph.new_vertex_property('int'),
+            'font_size': graph.new_vertex_property('int'),
+            'font_weight': graph.new_vertex_property('int')
         }
-        edge_p = {
-            'pen_width': g.new_edge_property('int'),
-            'marker_size': g.new_edge_property('int')
+        edge_p: dict[str, EdgePropertyMap] = {
+            'pen_width': graph.new_edge_property('int'),
+            'marker_size': graph.new_edge_property('int')
         }
-        gtg = {}
-        for row in gc_graph.rows:
-            dst_list = list(filter(self.dst_filter(self.row_filter(row)), self.i_graph.values()))
-            src_list = list(filter(self.src_filter(self.row_filter(row)), self.i_graph.values()))
-            size = max((len(dst_list), len(src_list)))
+
+        gtg: dict[Row, Vertex] = {}
+        for row in ROWS:
+            dst_list: tuple[DstEndPoint, ...] = tuple(self.i_graph.dst_row_filter(row))
+            src_list: tuple[SrcEndPoint, ...] = tuple(self.i_graph.src_row_filter(row))
+            size: int = max((len(dst_list), len(src_list)))
             if size:
-                node = g.add_vertex()
+                node: Vertex = graph.add_vertex()  # type: ignore
                 if _LOG_DEBUG:
                     _logger.debug(f"Adding to gt_graph node: {row}")
                 for k, v in _GT_ROW_NODE_ATTR[row].items():
@@ -429,16 +436,16 @@ class gc_graph():
                 node_p['font_size'][node] = round(node_p['font_size'][node] * sqrt(size))
                 gtg[row] = node
             for ep in dst_list:
-                dst_row = ep.row
-                src_row = ep.refs[0][ref_idx.ROW]
+                dst_row: DestinationRow = ep.row
+                src_row: SourceRow = ep.refs[0].row
                 if _LOG_DEBUG:
                     _logger.debug(f"Adding to gt_graph edge: {src_row}->{dst_row}")
-                edge = g.add_edge(gtg[src_row], gtg[dst_row])
+                edge: Edge = graph.add_edge(gtg[src_row], gtg[dst_row])  # type: Ignore
                 edge_p['pen_width'][edge] = _GT_EDGE_PEN_WIDTH
                 edge_p['marker_size'][edge] = _GT_EDGE_MARKER_SIZE
-        return g, node_p, edge_p
+        return graph, node_p, edge_p
 
-    def gt_draw(self, path="./gt_graph", size=(1600, 900)):
+    def gt_draw(self, path="./gt_graph", size=(1600, 900)) -> None:
         """Draw the graph_tool row node graph.
 
         Args
@@ -446,14 +453,16 @@ class gc_graph():
             path (str): folder plus base file name of the output image. '.png' will be appended.
             size ((int, int)): Tuple of x, y output image dimensions.
         """
-        g, n, e = self.gt_graph()
-        graph_draw(g, vertex_text=n['text'], vertex_shape=n['shape'],
+        graph_properties: tuple[Graph, dict[str, VertexPropertyMap], dict[str, EdgePropertyMap]] = self.gt_graph()
+        n: dict[str, VertexPropertyMap] = graph_properties[1]
+        e: dict[str, EdgePropertyMap] = graph_properties[2]
+        graph_draw(graph_properties[0], vertex_text=n['text'], vertex_shape=n['shape'],
                    vertex_fill_color=n['fill_color'], vertex_size=n['size'],
                    vertex_font_weight=n['font_weight'], vertex_font_size=n['font_size'],
                    edge_pen_width=e['pen_width'], edge_marker_size=e['marker_size'],
                    output=path + ".png", output_size=size)
 
-    def draw(self, path='./graph', size=(1600, 900)):
+    def draw(self, path='./graph', size=(1600, 900)) -> None:
         """Draw both the nx_graph & the gt_graph.
 
         Args
@@ -468,51 +477,48 @@ class gc_graph():
         self.gt_draw(path, size)
         self.nx_draw(path, size)
 
-    def add_input(self, ep_type=None):
+    def add_input(self, ep_type: int | None = None) -> None:
         """Create and append an unconnected row I endpoint.
 
         Args
         ----
-        ep_type (int): ep_type in integer format. If None a random
-            real ep_type is chosen.
+        ep_type: ep_type in integer format. If None a random real ep_type is chosen.
         """
         if ep_type is None:
-            ep_type = choice(REAL_EP_TYPE_VALUES)
-        i_index = self.rows[SRC_EP].get('I', 0)
-        self._add_ep([SRC_EP, 'I', i_index, ep_type, []])
+            self._add_ep(SrcEndPoint('I', self.rows[SRC_EP].get('I', 0), choice(REAL_EP_TYPE_VALUES)))
+        else:
+            self._add_ep(SrcEndPoint('I', self.rows[SRC_EP].get('I', 0), ep_type))
 
-    def remove_input(self, idx=None):
+    def remove_input(self, idx: int | None = None) -> None:
         """Remove input idx.
 
         No-op if there are no inputs.
 
         Args
         ----
-        idx (int): Index of input to remove. If None a random index is chosen.
+        idx: Index of input to remove. If None a random index is chosen.
         """
-        num_inputs = self.rows[SRC_EP].get('I', 0)
+        num_inputs: int = self.rows[SRC_EP].get('I', 0)
         if num_inputs:
-            if idx is None:
-                idx = randint(0, num_inputs - 1)
-            ep_ref = ['I', idx]
+            nidx: int = randint(0, num_inputs - 1) if idx is None else idx
+            ep_ref: SrcEndPointReference = SrcEndPointReference('I', nidx)
             if _LOG_DEBUG:
                 _logger.debug(f"Removing input {ep_ref}.")
-            ep = self.i_graph[hash_ref(ep_ref, SRC_EP)]
+            ep: SrcEndPoint = self.i_graph[ep_ref.key()]  # type: ignore
             self._remove_ep(ep, False)
             for ref in ep.refs:
-                self.i_graph[hash_ref(ref, DST_EP)][ep_idx.REFERENCED_BY].remove(ep_ref)
+                self.i_graph[ref.key()].refs.remove(ep_ref)
 
             # Only re-index row I if it was not the last endpoint that was removed (optimisation)
-            if idx != num_inputs - 1:
+            if nidx != num_inputs - 1:
                 self.reindex_row('I')
 
-    def add_output(self, ep_type=None):
+    def add_output(self, ep_type: int | None = None) -> None:
         """Create and append an unconnected row O endpoint.
 
         Args
         ----
-        ep_type (int): ep_type in integer format. If None a random
-            real ep_type is chosen.
+        ep_type: ep_type in integer format. If None a random real ep_type is chosen.
         """
         if ep_type is None:
             ep_type = choice(REAL_EP_TYPE_VALUES)
