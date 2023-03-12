@@ -28,16 +28,34 @@ DST_EP: Literal[False] = False
 DESTINATION_ROWS: tuple[DestinationRow, ...] = ('A', 'B', 'F', 'O', 'P', 'U')
 SOURCE_ROWS: tuple[SourceRow, ...] = ('I', 'C', 'A', 'B')
 ROWS: tuple[Row, ...] = tuple(sorted((*SOURCE_ROWS, *DESTINATION_ROWS)))
-VALID_ROW_SOURCES: dict[Row, tuple[SourceRow, ...]] = {
-    'I': tuple(),
-    'C': tuple(),
-    'A': ('I', 'C'),
-    'B': ('I', 'C', 'A'),
-    'U': ('I', 'C', 'A', 'B'),
-    'O': ('I', 'C', 'A', 'B'),
-    'P': ('I', 'C', 'B'),
-    'F': ('I',)
-}
+
+# Valid source rows for a given row.
+# The valid source rows depends on whether there is a row F
+VALID_ROW_SOURCES: tuple[dict[Row, tuple[SourceRow, ...]], dict[Row, tuple[SourceRow, ...]]] = (
+    # No row F
+    {
+        'I': tuple(),
+        'C': tuple(),
+        'A': ('I', 'C'),
+        'B': ('I', 'C', 'A'),
+        'U': ('I', 'C', 'A', 'B'),
+        'O': ('I', 'C', 'A', 'B'),
+        'P': ('I', 'C', 'B'),
+        'F': ('I',)
+    },
+    # Has row F
+    # F determines if the path through A or B is chosen
+    {
+        'I': tuple(),
+        'C': tuple(),
+        'A': ('I', 'C'),
+        'B': ('I', 'C'),
+        'O': ('I', 'C', 'A'),
+        'U': ('I', 'C', 'A', 'B'),
+        'P': ('I', 'C', 'B'),
+        'F': ('I',)
+    }
+)
 
 
 def isDestinationRow(obj) -> TypeGuard[DestinationRow]:
@@ -203,6 +221,10 @@ def isSrcEndPoint(ep: EndPoint) -> TypeGuard[SrcEndPoint]:
 class InternalGraph(dict[EndPointHash, EndPoint]):
     """Convinient structure for GC graph manipulation."""
 
+    def cls_filter(self, cls: EndPointClass) -> Generator[EndPoint, None, None]:
+        """Return all the end points in with cls cls."""
+        return (ep for ep in self.values() if ep.cls == cls)
+
     def dst_filter(self) -> Generator[DstEndPoint, None, None]:
         """Return all the destination end points."""
         return (ep for ep in self.values() if isDstEndPoint(ep))
@@ -211,17 +233,37 @@ class InternalGraph(dict[EndPointHash, EndPoint]):
         """Return all the source end points."""
         return (ep for ep in self.values() if isSrcEndPoint(ep))
 
-    def row_filter(self, row) -> Generator[EndPoint, None, None]:
+    def row_filter(self, row: Row) -> Generator[EndPoint, None, None]:
         """Return all the end points in row."""
         return (ep for ep in self.values() if ep.row == row)
 
-    def dst_row_filter(self, row) -> Generator[DstEndPoint, None, None]:
-        """Return all the destination end points in row."""
+    def dst_row_filter(self, row: Row) -> Generator[DstEndPoint, None, None]:
+        """Return all the destination end points in a row."""
         return (ep for ep in self.values() if isDstEndPoint(ep) and ep.row == row)
 
-    def src_row_filter(self, row) -> Generator[SrcEndPoint, None, None]:
-        """Return all the source end points in row."""
+    def src_row_filter(self, row: Row) -> Generator[SrcEndPoint, None, None]:
+        """Return all the source end points in a row."""
         return (ep for ep in self.values() if isSrcEndPoint(ep) and ep.row == row)
+
+    def dst_rows_filter(self, rows: Iterable[DestinationRow]) -> Generator[DstEndPoint, None, None]:
+        """Return all the destination end points in the specified rows."""
+        return (ep for ep in self.values() if isDstEndPoint(ep) and ep.row in rows)
+
+    def src_rows_filter(self, rows: Iterable[SourceRow]) -> Generator[SrcEndPoint, None, None]:
+        """Return all the source end points in the specified rows."""
+        return (ep for ep in self.values() if isSrcEndPoint(ep) and ep.row in rows)
+
+    def dst_unref_filter(self) -> Generator[DstEndPoint, None, None]:
+        """Return all the destination end points that are unreferenced."""
+        return (ep for ep in self.values() if isDstEndPoint(ep) and not ep.refs)
+
+    def src_unref_filter(self) -> Generator[SrcEndPoint, None, None]:
+        """Return all the source end points that are unreferenced."""
+        return (ep for ep in self.values() if isSrcEndPoint(ep) and not ep.refs)
+
+    def num_eps(self, row: Row, cls: EndPointClass) -> int:
+        """Count the endpoint of class cls in a specific row."""
+        return sum(ep.cls == cls and ep.row == row for ep in self.values())
 
 
 class EndPointTypeLookupFile(TypedDict):

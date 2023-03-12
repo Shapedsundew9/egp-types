@@ -13,7 +13,7 @@ from logging import DEBUG, Logger, NullHandler, getLogger
 from math import sqrt
 from pprint import pformat
 from random import choice, randint, sample
-from typing import Any, Generator, Literal, LiteralString
+from typing import Any, Generator, Literal, LiteralString, Iterable
 
 import gi
 from bokeh.io import output_file, save
@@ -73,18 +73,6 @@ def _OUT_FUNC(x):
     return x[ep_idx.ROW] == 'O' and x[ep_idx.EP_TYPE] == DST_EP
 
 
-def _ROW_U_FILTER(x):
-    return x[ep_idx.ROW] == 'U'
-
-
-def _SRC_UNREF_FILTER(x):
-    return x[ep_idx.EP_TYPE] == SRC_EP and not x[ep_idx.REFERENCED_BY]
-
-
-def _DST_UNREF_FILTER(x):
-    return x[ep_idx.EP_TYPE] == DST_EP and not x[ep_idx.REFERENCED_BY]
-
-
 # TODO: Make lambda function definitions static
 # TODO: Replace all the little filter functions with static lambda functions.
 # TODO: Use EP_TYPE consistently (i.e. not for both EP data type & SRC or DST)
@@ -140,10 +128,10 @@ _GT_EDGE_MARKER_SIZE: Literal[24] = 24
 
 
 register_token_code('E01000', 'A graph must have at least one output.')
-register_token_code('E01001', '{ep_type} endpoint {ref} is not connected to anything.')
-register_token_code('E01002', '{ep_type} endpoint {ref} does not have a valid type: {type_errors}.')
-register_token_code('E01003', 'Row {row} does not have contiguous indices starting at 0: {indices}.')
-register_token_code('E01004', 'The references to row {row} are not contiguous indices starting at 0: {indices}.')
+register_token_code('E01001', '{ep_hash} endpoint is not connected to anything.')
+register_token_code('E01002', '{ep_hash} endpoint does not have a valid type: {type_errors}.')
+register_token_code('E01003', '{cls_str} row {row} does not have contiguous indices starting at 0: {indices}.')
+register_token_code('E01004', 'The {cls_str} row {row} endpoint count ({row_count}) != i_graph count ({i_count})')
 register_token_code('E01005', 'Constant {ref} does not have a valid value ({value}) for type {type}.')
 register_token_code('E01006', 'If row "F" is defined then row "P" must be defined.')
 register_token_code('E01007', 'Endpoint {ref} must be a source.')
@@ -159,6 +147,8 @@ register_token_code('E01015', 'Row "U" endpoint {u_ep} references a constant tha
 register_token_code('E01016', 'Row "I" must contain at least one bool type source endpoint if "F" is defined.')
 register_token_code('E01017', 'Source endpoint {ref1} cannot be connected to destination endpoint {ref2}.')
 register_token_code('E01018', 'Destination endpoint {dupe} is connected to multiple sources {refs}.')
+register_token_code('E01019', 'Endpoint {ep_hash} references {ref_hash} but it does not exist.')
+register_token_code('E01020', 'Endpoint {ep_hash} references {ref_hash} but {ref_hash} does not reference it back.')
 
 register_token_code('I01000', '"I" row endpoint appended of UNKNOWN_EP_TYPE_VALUE.')
 register_token_code('I01001', '"I" row endpoint removed.')
@@ -343,7 +333,7 @@ class gc_graph():
                 data: tuple[str, str] = (ep.row, node) if ep.cls else (node, ep.row)
                 nx_graph.add_edge(*data, **_NX_ROW_EDGE_ATTR)
                 gtg[ep.row][ep.cls][ep.idx] = node
-        for ep in filter(self.dst_filter(), self.i_graph.values()):
+        for ep in self.i_graph.dst_filter():
             for ref in ep.refs:
                 dst_node: str = gtg[ep.row][DST_EP][ep.idx]
                 src_node: str = gtg[ref.row][SRC_EP][ref.idx]
@@ -583,248 +573,53 @@ class gc_graph():
             ep: SrcEndPoint = self.i_graph[ep_ref.key()]  # type: ignore
             self._remove_ep(ep, False)
             for ref in ep.refs:
-                self.i_graph[hash_ref(ref, DST_EP)][ep_idx.REFERENCED_BY].remove(ep_ref)
+                self.i_graph[ref.key()].refs.remove(ep_ref)
 
-            # Only re-index row C if it was not the last endpoint that was removed (optimisation)
-            if idx != num_constants - 1:
+            # Only re-index row I if it was not the last endpoint that was removed (optimisation)
+            if nidx != num_constants - 1:
                 self.reindex_row('C')
 
-    def add_inputs(self, inputs):
+    def add_inputs(self, inputs: Iterable[int]) -> None:
         """Create and add unconnected row I endpoints.
 
         Will replace any existing endpoints with the same index.
 
         Args
         ----
-        inputs (iterable): ep_types in integer format.
+        inputs: ep_types in integer format.
         """
         for index, i in enumerate(inputs):
-            self._add_ep([SRC_EP, 'I', index, i, []])
+            self._add_ep(SrcEndPoint('I', index, i))
 
-    def add_outputs(self, outputs):
+    def add_outputs(self, outputs: Iterable[int]) -> None:
         """Create and add unconnected row O endpoints.
 
         Will replace any existing endpoints with the same index.
 
         Args
         ----
-        outputs (iteratble): ep_types in integer format.
+        outputs: ep_types in integer format.
         """
         for index, i in enumerate(outputs):
-            self._add_ep([DST_EP, 'O', index, i, []])
+            self._add_ep(DstEndPoint('O', index, i))
 
-    def endpoint_filter(self, ep_type, filter_func=lambda x: True):
-        """Define a filter that only returns endpoints which have endpoint type == ep_type.
-
-        Args
-        ----
-            ep_type (bool): True == source, False == Destination
-            filter_func (func): A second filter to be applied. This allows *_filter methods
-            to be stacked.
-
-        Returns
-        -------
-            (func): A function for a filter() that will return only endpoints with a type == ep_type.
-        """
-        return lambda x: x[ep_idx.EP_TYPE] == ep_type and filter_func(x)
-
-    def src_filter(self, filter_func=lambda x: True):
-        """Define a filter that only returns endpoints of source type.
-
-        Args
-        ----
-            filter_func (func): A second filter to be applied. This allows *_filter methods
-            to be stacked.
-
-        Returns
-        -------
-            (func): A function for a filter() that will return only source endpoints.
-        """
-        return lambda x: x[ep_idx.EP_TYPE] and filter_func(x)
-
-    def dst_filter(self, filter_func=lambda x: True, include_U=True):
-        """Define a filter that only returns endpoints of destination type.
-
-        Args
-        ----
-            filter_func (func): A second filter to be applied. This allows *_filter methods
-            to be stacked.
-
-        Returns
-        -------
-            (func): A function for a filter() that will return only destination endpoints.
-        """
-        if include_U:
-            def retval(x): return not x[ep_idx.EP_TYPE] and filter_func(x)
-        else:
-            def retval(x): return not x[ep_idx.EP_TYPE] and x[ep_idx.ROW] != 'U' and filter_func(x)
-        return retval
-
-    def src_row_filter(self, row, filter_func=lambda x: True):
-        """Define a filter that only returns endpoints on source rows for the specified row.
-
-        Args
-        ----
-            row (string): A destination row i.e. one of ('A', 'B', 'F', 'O', 'P')
-            filter_func (func): A second filter to be applied. This allows *_filter methods
-            to be stacked.
-
-        Returns
-        -------
-            (func): A function for a filter() that will return only source endpoints.
-        """
-        if self.has_f():
-            if row == 'B':
-                src_rows = gc_graph.src_rows['A']
-            elif row == 'O':
-                src_rows = gc_graph.src_rows['B']
-            else:
-                src_rows = gc_graph.src_rows[row]
-        else:
-            src_rows = gc_graph.src_rows[row]
-
-        return lambda x: x[ep_idx.EP_TYPE] and x[ep_idx.ROW] in src_rows and filter_func(x)
-
-    def rows_filter(self, rows, filter_func=lambda x: True):
-        """Define a filter that only returns endpoints in that are in a row in rows.
-
-        Args
-        ----
-            rows (iter): An iterable of valid row labels i.e. in gc_graph.rows
-            filter_func (func): A second filter to be applied. This allows *_filter methods
-            to be stacked.
-
-        Returns
-        -------
-            (func): A function for a filter() that will return endpoints in 'rows'.
-        """
-        return lambda x: any(map(lambda p: p == x[ep_idx.ROW], rows)) and filter_func(x)
-
-    def row_filter(self, row, filter_func=lambda x: True):
-        """Define a filter that only returns endpoints in that are in a specific row.
-
-        Args
-        ----
-            row (string): A string from rows.
-            filter_func (func): A second filter to be applied. This allows *_filter methods
-            to be stacked.
-
-        Returns
-        -------
-            (func): A function for a filter() that will return endpoints in 'row'.
-        """
-        return lambda x: x[ep_idx.ROW] == row and filter_func(x)
-
-    def type_filter(self, ep_types, filter_func=lambda x: True, exact=True):
-        """Define a filter that only returns endpoints with a ep_type in 'ep_types'.
-
-        Args
-        ----
-            ep_types (iter): An iterable of valid ep_types
-            filter_func (func): A second filter to be applied. This allows *_filter methods
-            to be stacked.
-            exact: If True only endpoints with types exactly matching 'ep_types'. If False types
-            that have a non-zero affinity will also be returned.
-
-        Returns
-        -------
-            (func): A function for a filter() that will return endpoints with qualifying 'ep_types'.
-        """
-        return lambda x: any(map(lambda p: p == x[ep_idx.TYPE], ep_types)) and filter_func(x)
-
-    def unreferenced_filter(self, filter_func=lambda x: True):
-        """Define a filter that only returns unreferenced endpoints.
-
-        Returns
-        -------
-            (func): A function for a filter() that will return unreferenced endpoints.
-        """
-        return lambda x: not x[ep_idx.REFERENCED_BY] and filter_func(x)
-
-    def referenced_filter(self, filter_func=lambda x: True):
-        """Define a filter that only returns referenced endpoints.
-
-        Returns
-        -------
-            (func): A function for a filter() that will return referenced endpoints.
-        """
-        return lambda x: x[ep_idx.REFERENCED_BY] and filter_func(x)
-
-    def ref_filter(self, ref):
-        """Define a filter that only returns the endpoint at ref.
-
-        Args
-        ----
-            ref ([row, index]): A genetic code graph endpoint reference.
-
-        Returns
-        -------
-            (func): A function for a filter() that will return the endpoint 'ref'.
-        """
-        return lambda x: x[ep_idx.ROW] == ref.row and x[ep_idx.INDEX] == ref.idx
-
-    def _num_eps(self, row, ep_type):
+    def _num_eps(self, row: Row, ep_cls: EndPointClass) -> int:
         """Return the number of ep_type endpoints in row.
 
         If the effective logger level is DEBUG then a self consistency check is done.
 
         Args
         ----
-        row (str): One of gc_graph.rows.
-        ep_type (bool): DST_EP or SRC_EP
+        row: One of gc_graph.rows.
+        ep_cls: DST_EP or SRC_EP
 
         Returns
         -------
-        (int): Count of the specified endpoints.
+        Count of the specified endpoints.
         """
-        if _LOG_DEBUG:
-            count = len(list(filter(self.row_filter(row, self.endpoint_filter(ep_type)), self.i_graph.values())))
-            record = self.rows[ep_type].get(row, 0)
-            if count != record:
-                _logger.warning(
-                    'Number of endpoints in {} row "{}" of gc_graph inconsistent: Counted {} recorded {}.'.format(
-                        ('destination', 'source')[ep_type], row, count, record))
-        return self.rows[ep_type].get(row, 0)
+        return self.rows[ep_cls].get(row, 0)
 
-    def has_a(self):
-        """Test if row A is defined in the graph.
-
-        If not then this graph is for a codon.
-
-        Returns
-        -------
-            (bool): True if row A exists.
-        """
-        return bool(self._num_eps('A', SRC_EP)) or bool(self._num_eps('A', DST_EP))
-
-    def has_b(self):
-        """Test if row B is defined in the graph.
-
-        Returns
-        -------
-            (bool): True if row B exists.
-        """
-        return bool(self._num_eps('B', SRC_EP)) or bool(self._num_eps('B', DST_EP))
-
-    def num_inputs(self):
-        """Return the number of inputs to the graph.
-
-        Returns
-        -------
-            (int): The number of graph inputs.
-        """
-        return self._num_eps('I', SRC_EP)
-
-    def num_outputs(self):
-        """Return the number of outputs from the graph.
-
-        Returns
-        -------
-            (int): The number of graph outputs.
-        """
-        return self._num_eps('O', DST_EP)
-
-    def reindex_row(self, row):
+    def reindex_row(self, row: Literal['I', 'C', 'P', 'U', 'O']) -> None:
         """Re-index row.
 
         If end points have been removed from a row the row will need
@@ -835,29 +630,26 @@ class gc_graph():
 
         Args
         ----
-        row (str): One of 'ICPUO'
+        row: One of 'ICPUO'
         """
-        # Make a list of all the indices in row
-        def row_filter(x): return x[ep_idx.ROW] == row
-        c_set = [ep.idx for ep in filter(row_filter, self.i_graph.values())]
         # Map the indices to a contiguous integer sequence starting at 0
-        r_map = {idx: i for i, idx in enumerate(c_set)}
+        r_map: dict[int, int] = {idx: i for i, idx in enumerate((ep.idx for ep in self.i_graph.row_filter(row)))}
         # For each row select all the endpoints and iterate through the references to them
         # For each reference update: Find the reverse reference and update it with the new index
         # Finally update the index in the endpoint
         # TODO: Do we need to re-create this filter?
-        for ep in filter(row_filter, tuple(self.i_graph.values())):
+        for ep in tuple(self.i_graph.row_filter(row)):
             if _LOG_DEBUG:
                 _logger.debug(f"References to re-index: {ep.refs}")
-            for refs in ep.refs:
-                for refd in self.i_graph[hash_ref(refs, not ep.cls)][ep_idx.REFERENCED_BY]:
-                    if refd[ref_idx.ROW] == row and refd[ref_idx.INDEX] == ep.idx:
-                        refd[ref_idx.INDEX] = r_map[ep.idx]
-            del self.i_graph[hash_ep(ep)]
+            for ref in ep.refs:
+                for refd in self.i_graph[ref.key(not ep.cls)].refs:
+                    if refd.row == row and refd.idx == ep.idx:
+                        refd.idx = r_map[ep.idx]
+            del self.i_graph[ep.key()]
             ep.idx = r_map[ep.idx]
-            self.i_graph[hash_ep(ep)] = ep
+            self.i_graph[ep.key()] = ep
 
-    def normalize(self, removed=False):
+    def normalize(self) -> bool:
         """Make the graph consistent.
 
         The make the graph consistent the following operations are performed:
@@ -871,14 +663,12 @@ class gc_graph():
         _logger.debug("Normalising...")
 
         # Remove all references to U before starting
-        row_u_tuple = tuple(filter(_ROW_U_FILTER, self.i_graph.values()))
-        for ep in row_u_tuple:
+        for ep in tuple(self.i_graph.row_filter('U')):
             self._remove_ep(ep, check=False)
         for ep in self.i_graph.values():
-            references = ep.refs
-            for idx, ref in enumerate(references):
-                if ref.row == 'U':
-                    del references[idx]
+            victims: reversed[int] = reversed(tuple(idx for idx, ref in enumerate(ep.refs) if ref.row == 'U'))
+            for idx in victims:
+                del ep.refs[idx]
 
         # 1 Connect all destinations to existing sources if possible
         self.connect_all()
@@ -887,10 +677,9 @@ class gc_graph():
         # First remove all existing row U endpoints
         # Then any references to them
         # Finally add the new unreferenced connections.
-        unref = tuple(filter(_SRC_UNREF_FILTER, self.i_graph.values()))
-        for i, ep in enumerate(unref):
-            self._add_ep([DST_EP, 'U', i, ep.typ, [[*ep[1:3]]]])
-            ep.refs = [['U', i]]
+        for idx, ep in enumerate(self.i_graph.src_unref_filter()):
+            self._add_ep(DstEndPoint('U', idx, ep.typ, refs=[SrcEndPointReference(ep.row, ep.idx)]))
+            ep.refs = [DstEndPointReference('U', idx)]
 
         # 5 self.app_graph is regenerated
         self.app_graph = self.connection_graph()
@@ -898,7 +687,7 @@ class gc_graph():
         # 6 Check a valid steady state has been achieved
         return self.is_stable()
 
-    def is_stable(self):
+    def is_stable(self) -> bool:
         """Determine if the graph is in a stable state.
 
         A stable state is when no destination endpoints (GC inputs) are
@@ -907,28 +696,26 @@ class gc_graph():
 
         Returns
         -------
-            (bool): True if the graph is in a steady state.
+        True if the graph is in a steady state.
         """
-        return not tuple(filter(_DST_UNREF_FILTER, self.i_graph.values()))
+        return not tuple(self.i_graph.dst_unref_filter())
 
-    def validate(self, codon=False):   # noqa: C901
+    def validate(self) -> bool:  # noqa: C901
         """Check if the graph is valid.
 
         The graph should be in a steady state before calling.
 
         This function is not intended to be fast.
         Genetic code graphs MUST obey the following rules:
-            1. DEPRECATED: Have at least 1 output in 'O'.
-            2. a. All sources are connected or referenced by the unconnected 'U' row.
-               b. 'U' row endpoints may only be referenced once
-               c. 'U' row cannot reference a non-existent constant
+            1. All connections are referenced at source and destination.
+            2. All sources are connected or referenced by the unconnected 'U' row.
             3a. All destinations are connected.
             3b. All destinations are only connected once.
             4. Types are valid.
             5. Indexes within are contiguous and start at 0.
             6. Constant values are valid.
             7. Row "P" is only defined if "F" is defined.
-            8. Row A is defined if the graph is not for a codon.
+            8. The rows structure is consistent with the i_graph
             9. Row A is not defined if the graph is for a codon.
             10. All row 'I' endpoints are sources.
             11. All row 'O' & 'P' endpoints are destinations.
@@ -945,86 +732,68 @@ class gc_graph():
 
         Args
         ----
-            codon (bool): Set to True if the graph is for a codon genetic code.
+        Set to True if the graph is for a codon genetic code.
 
         Returns
         -------
-            (bool): True if the graph is valid else False.
-            If False is returned details of the errors found are in the errors member.
+        True if the graph is valid else False.
+        If False is returned details of the errors found are in the errors member.
         """
         self.status = []
 
-        # 1
-        # if self.num_outputs() == 0:
-        #    self.status.append(text_token({'E01000': {}}))
+        # 1.
+        for ep in self.i_graph.values():
+            for ref in ep.refs:
+                ref_hash: EndPointHash = ref.key(not ep.cls)
+                if ref_hash not in self.i_graph:
+                    self.status.append(text_token({'E1019': {'ep_hash': ep.key(), 'ref_hash': ref_hash}}))
+                elif EndPointReference(ep.row, ep.idx) not in self.i_graph[ref_hash].refs:
+                    self.status.append(text_token({'E1020': {'ep_hash': ep.key(), 'ref_hash': ref_hash}}))
+ 
+        # 2.
+        for ep in self.i_graph.src_unref_filter():
+            self.status.append(text_token({'E01001': {'ep_hash': ep.key()}}))
 
-        # 2a.
-        for row in filter(self.src_filter(self.unreferenced_filter()), self.i_graph.values()):
-            refs = [ep.refs[0] for ep in filter(self.row_filter('U'), self.i_graph.values())]
-            if not any([row[ep_idx.ROW] == r and row[ep_idx.INDEX] == i for r, i in refs]):
-                self.status.append(text_token({'E01001': {'ep_type': ['Destination', 'Source'][row[ep_idx.EP_TYPE]],
-                                                          'ref': [row[ep_idx.ROW], row[ep_idx.INDEX]]}}))
+        # 3a.
+        for ep in self.i_graph.dst_unref_filter():
+            self.status.append(text_token({'E01001': {'ep_hash': ep.key()}}))
 
-        # 2b.
-        for ep in filter(self.row_filter('U'), self.i_graph.values()):
+        # 3b.
+        for ep in self.i_graph.dst_filter():
             if len(ep.refs) > 1:
-                self.status.append(text_token({'E01014': {'u_ep': [*ep[1:3]], 'refs': ep.refs}}))
-
-        # 2c.
-        for ep in filter(self.row_filter('U'), self.i_graph.values()):
-            if ep.refs[0][ref_idx.ROW] == 'C':
-                if 'C' not in self.app_graph or ep.refs[0][ref_idx.INDEX] >= len(self.app_graph['C']):
-                    self.status.append(text_token({'E01015': {'u_ep': [*ep[1:3]], 'refs': ep.refs}}))
-
-        # 3a
-        for row in filter(self.dst_filter(self.unreferenced_filter()), self.i_graph.values()):
-            self.status.append(text_token({'E01001': {'ep_type': ['Destination', 'Source'][row[ep_idx.EP_TYPE]],
-                                                      'ref': [row[ep_idx.ROW], row[ep_idx.INDEX]]}}))
-
-        # 3b
-        references = [hash_ref(ref, DST_EP) for ep in filter(self.src_filter(), self.i_graph.values()) for ref in ep.refs]
-        for dupe, _ in filter(lambda x: x[1] > 1, Counter(references).items()):
-            referencing_eps = []
-            for ep in filter(self.src_filter(), self.i_graph.values()):
-                if dupe in (hash_ref(ref, DST_EP) for ref in ep.refs):
-                    referencing_eps.append(ep)
-            self.status.append(text_token({'E01018': {'dupe': dupe, 'refs': referencing_eps}}))
+                self.status.append(text_token({'E01018': {'dupe': ep.key(), 'refs': ep.refs}}))
 
         # 4
-        for row in filter(lambda x: not validate(x[ep_idx.TYPE]), self.i_graph.values()):
-            self.status.append(text_token({'E01002': {'ep_type': ['Destination', 'Source'][row[ep_idx.EP_TYPE]],
-                                                      'ref': [row[ep_idx.ROW], row[ep_idx.INDEX]],
-                                                      'type_errors': 'Does not exist.'}}))
+        for ep in filter(lambda x: not validate(x.typ), self.i_graph.values()):
+            self.status.append(text_token({'E01002': {'ep_hash': ep.key(), 'type_errors': 'Does not exist.'}}))
 
         # 5
-        ref_dict = {k: [] for k in gc_graph.rows}
-        ep_dict = deepcopy(ref_dict)
-        for row in self.i_graph.values():
-            for ref in row[ep_idx.REFERENCED_BY]:
-                ref_dict[ref.row].append(ref.idx)
-            ep_dict[row[ep_idx.ROW]].append(row[ep_idx.INDEX])
-        for k, v in ref_dict.items():
-            ep = ep_dict[k]
-            if ep:
-                if not (min(ep) == 0 and max(ep) == len(set(ep)) - 1):
-                    self.status.append(text_token({'E01003': {'row': k, 'indices': sorted(ep)}}))
-            if v:
-                if not (min(v) == 0 and max(v) == len(set(v)) - 1):
-                    _logger.debug(f'{ref_dict}')
-                    self.status.append(text_token({'E01004': {'row': k, 'indices': sorted(v)}}))
+        for row in ROWS:
+            for cls_row, cls_str in ((self.i_graph.src_row_filter(row), 'Src'), (self.i_graph.dst_row_filter(row), 'Dst')):
+                indices: list[int] = sorted((ep.idx for ep in cls_row))
+                if [idx for idx in indices if idx not in range(indices[-1] + 1)]:
+                    self.status.append(text_token({'E1003': {'cls_str': cls_str, 'row': row, 'indices': indices}}))
 
         # 6
-        for row in filter(lambda x: x[ep_idx.ROW] == 'C' and not validate_value(x[ep_idx.VALUE],
-                          x[ep_idx.TYPE]), self.i_graph.values()):
-            self.status.append(text_token({'E01005': {'ref': [row[ep_idx.ROW], row[ep_idx.INDEX]],
-                                                      'value': row[ep_idx.VALUE],
-                                                      'type': asstr(row[ep_idx.TYPE])}}))
+        for ep in filter(lambda x: validate_value(x.val, x.typ), self.i_graph.row_filter('C')):
+            self.status.append(text_token({'E01005': {'ref': ep.key(), 'value': ep.val, 'type': asstr(ep.typ)}}))
 
         # 7
-        if self.has_f() != bool(len(list(filter(self.row_filter('P'), self.i_graph.values())))):
+        if self.has_f != 'P' in self.rows[DST_EP]:
             self.status.append(text_token({'E01006': {}}))
 
-        # 8 & 9
+        # 8
+        for row in ROWS:
+            for count, cls in ((self.i_graph.num_eps(row, SRC_EP), SRC_EP), (self.i_graph.num_eps(row, DST_EP), DST_EP)):
+                if self.rows[cls][row] != count:
+                    self.status.append(text_token({'E1004': {
+                        'cls_str': ('source', 'desintation')[cls],
+                        'row': row,
+                        'row_count': self.rows[cls][row],
+                        'i_count': count
+                    }}))
+
+        #  & 9
         # FIXME: It is not possible to tell from the graph whether this is a codon or not
 
         # 10
