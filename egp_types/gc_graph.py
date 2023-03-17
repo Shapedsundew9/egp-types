@@ -13,7 +13,7 @@ from logging import DEBUG, Logger, NullHandler, getLogger
 from math import sqrt
 from pprint import pformat
 from random import choice, randint, sample
-from typing import Any, Generator, Literal, LiteralString, Iterable
+from typing import Any, Generator, Literal, LiteralString, Iterable, Callable, Sequence
 
 import gi
 from bokeh.io import output_file, save
@@ -28,14 +28,14 @@ from graph_tool import EdgePropertyMap, Graph, VertexPropertyMap
 from graph_tool.draw import graph_draw
 from networkx import DiGraph, get_node_attributes, spring_layout
 
-from .egp_typing import (CPI, DESTINATION_ROWS, DST_EP, ROWS, SOURCE_ROWS,
+from .egp_typing import (CPI, CVI, DESTINATION_ROWS, DST_EP, ROWS, SOURCE_ROWS,
                          SRC_EP, VALID_ROW_SOURCES, ConnectionGraph,
-                         ConnectionPoint, DestinationRow, EndPoint,
-                         EndPointClass, EndPointHash, EndPointIndex,
+                         ConnectionPoint, ConnectionRow, ConstantExecStr, ConstantRow, ConstantValue, DestinationRow, EndPoint, isConstantPair, isConnectionPair, ConstantPair, ConnectionGraphPair, ConnectionPair,
+                         EndPointClass, EndPointHash, EndPointIndex, PairIdx, SrcEndPointHash, DstEndPointHash,
                          EndPointReference, EndPointType, GCGraphRows,
                          InternalGraph, Row, SourceRow, castDestinationRow,
                          castEndPointIndex, castEndPointType, castRow,
-                         castSourceRow, Vertex, DstEndPoint, SrcEndPoint, DstEndPointReference, SrcEndPointReference, Edge)
+                         castSourceRow, Vertex, DstEndPoint, SrcEndPoint, DstEndPointReference, SrcEndPointReference, Edge, isDestinationRow)
 # Needed to prevent something pulling in GtK 4.0 and graph_tool complaining.
 from .ep_type import (EP_TYPE_NAMES, REAL_EP_TYPE_VALUES,
                       UNKNOWN_EP_TYPE_VALUE, asint, asstr, compatible,
@@ -234,22 +234,24 @@ class gc_graph():
         Types are stored in integer format for efficiency.
         """
         i_graph: InternalGraph = InternalGraph()
-        for row, c_points in c_graph.items():
-            for index, c_point in enumerate(c_points):
-                if row != 'C':
-                    cp_row: Row = castRow(c_point[CPI.ROW])
-                    cp_idx: EndPointIndex = castEndPointIndex(c_point[CPI.IDX])
-                    cp_typ: EndPointType = castEndPointType(c_point[CPI.TYP])
-                    dst_ep: EndPoint = EndPoint(row, index, cp_typ, DST_EP, [EndPointReference(cp_row, cp_idx)])
+        for connection_graph_pair in c_graph.items():
+            if isConnectionPair(connection_graph_pair):
+                row: DestinationRow = connection_graph_pair[PairIdx.ROW.value]
+                for index, c_point in enumerate(connection_graph_pair[PairIdx.VALUES.value]):
+                    cp_row: SourceRow = c_point[CPI.ROW.value]
+                    cp_idx: EndPointIndex = c_point[CPI.IDX.value]
+                    cp_typ: EndPointType = c_point[CPI.TYP.value]
+                    dst_ep: DstEndPoint = DstEndPoint(row, index, cp_typ, refs=[SrcEndPointReference(cp_row, cp_idx)])
                     i_graph[dst_ep.key()] = dst_ep
-                    src_ep_hash: EndPointHash = dst_ep.refs[0].key(SRC_EP)
+                    src_ep_hash: SrcEndPointHash = dst_ep.refs[0].key()
                     if src_ep_hash in i_graph:
-                        i_graph[src_ep_hash].refs.append(EndPointReference(row, index))
+                        i_graph[src_ep_hash].refs.append(DstEndPointReference(row, index))
                     elif cp_row != 'C':
-                        refs: list[EndPointReference] = [EndPointReference(row, index)] if row != 'U' else []
-                        i_graph[src_ep_hash] = EndPoint(cp_row, cp_idx, cp_typ, SRC_EP, refs)
-                else:
-                    src_ep: EndPoint = EndPoint(row, index, castEndPointType(c_point[CPI.CTYP]), SRC_EP, [], c_point[CPI.CTYP])
+                        refs: list[DstEndPointReference] = [DstEndPointReference(row, index)] if row != 'U' else []
+                        i_graph[src_ep_hash] = SrcEndPoint(cp_row, cp_idx, cp_typ, refs=refs)
+            elif isConstantPair(connection_graph_pair):
+                for index, c_point in enumerate(connection_graph_pair[PairIdx.VALUES.value]):
+                    src_ep: EndPoint = SrcEndPoint('C', index, c_point[CVI.TYP.value], val=c_point[CVI.VAL.value])
                     i_graph[src_ep.key()] = src_ep
         return i_graph
 
@@ -277,16 +279,13 @@ class gc_graph():
     def connection_graph(self) -> ConnectionGraph:
         """Convert graph to GMS graph (Connection Graph) format."""
         graph: ConnectionGraph = {}
-        for ep in sorted(filter(_DST_FILTER, self.i_graph.values()), key=_GET_INDEX):
-            row: Row = ep.row
-            if row not in graph:
-                graph[row] = []
-            if ep.refs:
-                graph[row].append([ep.refs[0].row, ep.refs[0].idx, ep.typ])
-        for ep in sorted(filter(_ROW_C_FILTER, self.i_graph.values()), key=_GET_INDEX):
+        for ep in sorted(self.i_graph.dst_filter(), key=_GET_INDEX):
+            row: DestinationRow = ep.row
+            graph.setdefault(row, []).append((ep.refs[0].row, ep.refs[0].idx, ep.typ))
+        for ep in sorted(self.i_graph.row_filter('C'), key=_GET_INDEX):
             if 'C' not in graph:
                 graph['C'] = []
-            graph['C'].append([ep.typ, ep.val])
+            graph.setdefault('C', []).append((ep.typ, ep.val))
         if _LOG_DEBUG and not graph_validator.validate({'graph': graph}):
             raise ValueError(f"Connection graph is not valid:\n{pformat(graph, indent=4)}\n\n{graph_validator.error_str()}")
         return graph
@@ -642,7 +641,7 @@ class gc_graph():
             if _LOG_DEBUG:
                 _logger.debug(f"References to re-index: {ep.refs}")
             for ref in ep.refs:
-                for refd in self.i_graph[ref.key(not ep.cls)].refs:
+                for refd in self.i_graph[ref.force_key(not ep.cls)].refs:
                     if refd.row == row and refd.idx == ep.idx:
                         refd.idx = r_map[ep.idx]
             del self.i_graph[ep.key()]
@@ -666,7 +665,7 @@ class gc_graph():
         for ep in tuple(self.i_graph.row_filter('U')):
             self._remove_ep(ep, check=False)
         for ep in self.i_graph.values():
-            victims: reversed[int] = reversed(tuple(idx for idx, ref in enumerate(ep.refs) if ref.row == 'U'))
+            victims = reversed(tuple(idx for idx, ref in enumerate(ep.refs) if ref.row == 'U'))
             for idx in victims:
                 del ep.refs[idx]
 
@@ -725,10 +724,8 @@ class gc_graph():
             13b. Rows sources may not be connected to the same row or any row in
                  gc_graph.src_rows.
             14. If row 'F' is defined:
-                a. Row 'B' cannot reference row A.
-                b. Row 'B' cannot be referenced in row 'O'.
-                c. Row 'P' must have the same number & type of elements as row 'O'.
-                d. Row 'I' must have at least 1 bool source
+                a. Row 'P' must have the same number & type of elements as row 'O'.
+                b. Row 'I' must have at least 1 bool source
 
         Args
         ----
@@ -744,12 +741,12 @@ class gc_graph():
         # 1.
         for ep in self.i_graph.values():
             for ref in ep.refs:
-                ref_hash: EndPointHash = ref.key(not ep.cls)
+                ref_hash: EndPointHash = ref.force_key(not ep.cls)
                 if ref_hash not in self.i_graph:
                     self.status.append(text_token({'E1019': {'ep_hash': ep.key(), 'ref_hash': ref_hash}}))
                 elif EndPointReference(ep.row, ep.idx) not in self.i_graph[ref_hash].refs:
                     self.status.append(text_token({'E1020': {'ep_hash': ep.key(), 'ref_hash': ref_hash}}))
- 
+
         # 2.
         for ep in self.i_graph.src_unref_filter():
             self.status.append(text_token({'E01001': {'ep_hash': ep.key()}}))
@@ -797,241 +794,63 @@ class gc_graph():
         # FIXME: It is not possible to tell from the graph whether this is a codon or not
 
         # 10
-        for row in filter(self.row_filter('I', self.dst_filter()), self.i_graph.values()):
-            self.status.append(text_token({'E01007': {'ref': [row[ep_idx.ROW], row[ep_idx.INDEX]]}}))
+        for ep in self.i_graph.row_filter('I'):
+            if ep.cls != SRC_EP:
+                self.status.append(text_token({'E01007': {'ref': ep.key()}}))
 
         # 11
-        for row in filter(self.rows_filter(('O', 'P'), self.src_filter()), self.i_graph.values()):
-            self.status.append(text_token({'E01008': {'ref': [row[ep_idx.ROW], row[ep_idx.INDEX]]}}))
+        for ep in self.i_graph.rows_filter(('O', 'P')):
+            if ep.cls != DST_EP:
+                self.status.append(text_token({'E01008': {'ref': ep.key()}}))
 
         # 12
-        for row in filter(self.dst_filter(), self.i_graph.values()):
-            for ref in row[ep_idx.REFERENCED_BY]:
-                try:
-                    src = next(filter(self.src_filter(self.ref_filter(ref)), self.i_graph.values()))
-                    if not compatible(src[ep_idx.TYPE], row[ep_idx.TYPE]):
-                        self.status.append(text_token({'E01009': {'ref1': [src[ep_idx.ROW], src[ep_idx.INDEX]],
-                                                                  'type1': asstr(src[ep_idx.TYPE]),
-                                                                  'ref2': [row[ep_idx.ROW], row[ep_idx.INDEX]],
-                                                                  'type2': asstr(row[ep_idx.TYPE])}}))
-                except StopIteration:
-                    pass
+        for dst_ep in self.i_graph.dst_filter():
+            for ref in dst_ep.refs:
+                src_ep: EndPoint = self.i_graph[ref.key()]
+                if not compatible(src_ep.typ, dst_ep.typ):
+                    self.status.append(text_token({'E01009': {'ref1': src_ep.key(),
+                                                              'type1': asstr(src_ep.typ),
+                                                              'ref2': dst_ep.key(),
+                                                              'type2': asstr(dst_ep.typ)}}))
 
         # 13a
-        for row in filter(self.dst_filter(), self.i_graph.values()):
-            for ref in row[ep_idx.REFERENCED_BY]:
-                if ref.row not in gc_graph.src_rows[row[ep_idx.ROW]]:
-                    self.status.append(text_token({'E01010': {'ref1': [row[ep_idx.ROW], row[ep_idx.INDEX]],
-                                                              'ref2': [ref.row, ref.idx]}}))
+        for ep in self.i_graph.dst_filter():
+            for ref in ep.refs:
+                if ref.row not in VALID_ROW_SOURCES[self.has_f][ep.row]:
+                    self.status.append(text_token({'E01010': {'ref1': ep.key(), 'ref2': ref.key()}}))
 
         # 13b
-        for row in filter(self.src_filter(), self.i_graph.values()):
-            for ref in row[ep_idx.REFERENCED_BY]:
-                if ref.row in gc_graph.src_rows[row[ep_idx.ROW]] or ref.row == row:
-                    self.status.append(text_token({'E01017': {'ref1': [row[ep_idx.ROW], row[ep_idx.INDEX]],
-                                                              'ref2': [ref.row, ref.idx]}}))
+        for ep in self.i_graph.src_filter():
+            for ref in ep.refs:
+                if ref.row in SOURCE_ROWS or ref.row == ep.row:
+                    self.status.append(text_token({'E01017': {'ref1': ep.key(), 'ref2': ref.key()}}))
 
         # 14a
-        if self.has_f():
-            for row in filter(self.row_filter('B', self.dst_filter()), self.i_graph.values()):
-                for ref in filter(lambda x: x[ref_idx.ROW] == 'A', row[ep_idx.REFERENCED_BY]):
-                    self.status.append(text_token({'E01011': {'ref1': [row[ep_idx.ROW], row[ep_idx.INDEX]],
-                                                              'ref2': [ref.row, ref.idx]}}))
+        if self.has_f:
+            len_p: int = self.i_graph.num_eps('P', DST_EP)
+            len_o: int = self.i_graph.num_eps('O', DST_EP)
+            if len_p != len_o:
+                self.status.append(text_token({'E01013': {'len_p': len_p, 'len_o': len_o}}))
 
         # 14b
-        if self.has_f() and self.has_b():
-            for row in filter(self.row_filter('O'), self.i_graph.values()):
-                for ref in row[ep_idx.REFERENCED_BY]:
-                    if ref.row == 'B':
-                        self.status.append(text_token({'E01012': {'ref1': [row[ep_idx.ROW],
-                                                                  row[ep_idx.INDEX]], 'ref2': ref}}))
-
-        # 14c
-        if self.has_f():
-            len_row_p = len(list(filter(self.row_filter('P'), self.i_graph.values())))
-            if len_row_p != self.num_outputs():
-                self.status.append(text_token({'E01013': {'len_p': len_row_p, 'len_o': self.num_outputs()}}))
-
-        # 14d
-        if self.has_f():
-            bools = [ep.typ == asint('bool') for ep in filter(self.row_filter('I'), self.i_graph.values())]
-            if not bools:
+        if self.has_f:
+            if not [ep.typ == asint('bool') for ep in self.i_graph.row_filter('I')]:
                 self.status.append(text_token({'E01016': {}}))
 
         if _LOG_DEBUG:
             if self.status:
-                _logger.debug("Graph internal format:\n{}".format(self))
-            for m in self.status:
-                _logger.debug(m)
-            # Self consistency check.
-            str(self)
+                _logger.debug(f'Graph internal format:\n{self}')
+            for status in self.status:
+                _logger.debug(status)
 
         return not self.status
 
-    def random_mutation(self):
-        """Randomly selects a way to mutate the graph and executes it.
-
-        Mutations are single steps e.g. a disconnection of a source endpoint. The
-        reconnection is a repair(). Compound changes are only permitted when
-        there is only one possible repair option (excluding undoing the change) e.g.
-        adding row 'F' requires that row 'P' must be added however, both rows endpoints
-        may be connected many ways.
-
-        Changes are likely to break the graph but they may not. For example,
-        disconnecting a source end point will break it but change the type
-        of an input source or the value of a constant may not.
-
-        Each random change has the same probability:
-            1. Add/remove a source end point.
-            2. Add/remove a destination endpoint.
-            3. Mutate the type of an endpoint.
-            4. Mutate a constant.
-            5. Add/remove 'F' (and 'P')
-
-        """
-        change_functions = (
-            self.random_add_src_ep,
-            self.random_remove_src_ep,
-            self.random_add_dst_ep,
-            self.random_remove_dst_ep
-        )
-        choice(change_functions)()
-
-    def random_add_src_ep(self):
-        """Randomly choose a source row and add an endpoint of unknown type."""
-        src_rows = ['I', 'C', 'A']
-        if self.has_b():
-            src_rows.append('B')
-        self.add_src_ep(choice(src_rows))
-
-    def add_src_ep(self, row):
-        """Add an endpoint to row of UNKNOWN_EP_TYPE_VALUE."""
-        self._add_ep([SRC_EP, row, None, UNKNOWN_EP_TYPE_VALUE, []])
-        if row == 'I':
-            self.status.append(text_token({'I01000': {}}))
-        elif row == 'A':
-            self.status.append(text_token({'I01100': {}}))
-        elif row == 'B':
-            self.status.append(text_token({'I01200': {}}))
-
-    def random_remove_src_ep(self):
-        """Randomly choose a source row and randomly remove an endpoint."""
-        src_rows = [r for r in gc_graph.src_rows['O'] if r in self.rows[SRC_EP]]
-        ep_list = self.unreferenced_filter(self.row_filter(choice(src_rows), self.src_filter()))
-        self.remove_src_ep(tuple(choice(ep_list)))
-
-    def remove_src_ep(self, ep_list):
-        """Remove a source endpoint."""
-        if ep_list:
-            ep = ep_list[0]
-            ep_row = ep.row
-            self._remove_ep(ep)
-            if ep_row == 'I':
-                self.status.append(text_token({'I01001': {}}))
-            elif ep_row == 'A':
-                self.status.append(text_token({'I01101': {}}))
-            elif ep_row == 'B':
-                self.status.append(text_token({'I01201': {}}))
-        else:
-            self.status.append(text_token({'I01900': {}}))
-
-    def random_add_dst_ep(self):
-        """Randomly choose a destination row and add an endpoint of unknown type."""
-        dst_rows = ['A', 'O']
-        if self.has_b():
-            dst_rows.append('B')
-        self.add_dst_ep(choice(dst_rows))
-
-    def add_dst_ep(self, row):
-        """Add an endpoint to row of UNKNOWN_EP_TYPE_VALUE."""
-        self._add_ep([DST_EP, row, None, UNKNOWN_EP_TYPE_VALUE, []])
-        if row == 'O':
-            self.status.append(text_token({'I01302': {}}))
-            if self.has_f():
-                self._add_ep([DST_EP, 'P', None, UNKNOWN_EP_TYPE_VALUE, []])
-                self.status.append(text_token({'I01402': {}}))
-        elif row == 'A':
-            self.status.append(text_token({'I01102': {}}))
-        elif row == 'B':
-            self.status.append(text_token({'I01202': {}}))
-
-    def remove_rows(self, rows):
-        """Remove rows from the graph."""
-        # FIXME: This does not make sense. Removing a row is a bigger operation than just in the graph
-        # Find all endpoints from the rows to delete, collect the endpoints that reference them
-        # and delete the row endpoints.
-        ref_list = []
-        for k in tuple(filter(lambda x: x[0] in rows, self.i_graph.keys())):
-            ref_list.extend([hash_ref(ref, not self.i_graph[k][ep_idx.EP_TYPE]) for ref in self.i_graph[k][ep_idx.REFERENCED_BY]])
-            if _LOG_DEBUG:
-                _logger.debug(f'Deleting endpoint {k}')
-            del self.i_graph[k]
-
-        # Update the row endpoint count tracking
-        for row in rows:
-            if row in self.rows[SRC_EP]:
-                del self.rows[SRC_EP][row]
-            if row in self.rows[DST_EP]:
-                del self.rows[DST_EP][row]
-
-        # Find all the references to deleted rows and delete them
-        for ep_hash in ref_list:
-            refs = self.i_graph[ep_hash][ep_idx.REFERENCED_BY]
-            self.i_graph[ep_hash][ep_idx.REFERENCED_BY] = [ref for ref in refs if ref.row not in rows]
-            if _LOG_DEBUG:
-                _logger.debug(f'Refactoring endpoint references from {refs} to {self.i_graph[ep_hash][ep_idx.REFERENCED_BY]}')
-
-        # If row A is removed and there is a row B, B becomes A.
-        if 'A' in rows and self.has_b() and 'B' not in rows:
-            self.i_graph.update({'A' + k[1:]: v for k, v in self.i_graph.items() if k[0] == 'B'})
-            for ref in (ref for ep in self.i_graph.values() for ref in ep.refs if ref.row == 'B'):
-                ref.row = 'A'
-            if 'B' in self.rows[SRC_EP]:
-                self.rows[SRC_EP]['A'] = self.rows[SRC_EP]['B']
-                del self.rows[SRC_EP]['B']
-            if 'B' in self.rows[DST_EP]:
-                self.rows[DST_EP]['A'] = self.rows[DST_EP]['B']
-                del self.rows[DST_EP]['B']
-
-    def random_remove_dst_ep(self):
-        """Randomly choose a destination row and randomly remove an endpoint."""
-        dst_rows = ['A', 'O']
-        if self.has_b():
-            dst_rows.append('B')
-        ep_list = self.unreferenced_filter(self.row_filter(choice(dst_rows), self.dst_filter))
-        self.remove_dst_ep(tuple(choice(ep_list)))
-
-    def remove_dst_ep(self, ep_list):
-        """Remove a destination endpoint.
-
-        Args
-        ----
-            ep_list (list): A list of destination endpoints. Only the first endpoint
-                            in the list will be removed.
-        """
-        if ep_list:
-            ep = ep_list[0]
-            ep_row = ep.row
-            self._remove_ep(ep)
-            if ep_row == 'O':
-                self.status.append(text_token({'I01303': {}}))
-                if self.has_f():
-                    ep.row = 'P'
-                    self._remove_ep(ep)
-                    self.status.append(text_token({'I01403': {}}))
-            elif ep_row == 'A':
-                self.status.append(text_token({'I01103': {}}))
-            elif ep_row == 'B':
-                self.status.append(text_token({'I01203': {}}))
-        else:
-            self.status.append(text_token({'I01900': {}}))
-
-    def remove_all_connections(self):
+    def remove_all_connections(self) -> None:
         """Remove all connections."""
         for ep in self.i_graph.values():
             ep.refs.clear()
 
-    def random_remove_connection(self, n=1):
+    def random_remove_connection(self, num: int = 1) -> None:
         """Randomly choose n connections and remove them.
 
         n is the number of connections to remove and must be >=0 (0 is
@@ -1039,52 +858,49 @@ class gc_graph():
 
         Args
         ----
-            n (int): Number of connections to remove.
+        n: Number of connections to remove.
 
         This is done by selecting all of the connected destination endpoint not in row U and
         randomly sampling n.
         """
-        dst_ep_tuple = tuple(filter(self.dst_filter(self.referenced_filter(), False), self.i_graph.values()))
+        dst_ep_tuple = tuple(self.i_graph.dst_ref_filter())
         if _LOG_DEBUG:
-            _logger.debug("Selecting connection to remove from destination endpoint tuple: {}".format(dst_ep_tuple))
+            _logger.debug(f'Selecting connection to remove from destination endpoint tuple: {dst_ep_tuple}')
         if dst_ep_tuple:
-            self.remove_connection(sample(dst_ep_tuple, min((len(dst_ep_tuple), n))))
+            self.remove_connection(sample(dst_ep_tuple, min((len(dst_ep_tuple), num))))
 
-    def remove_connection(self, dst_ep_tuple):
-        """Remove connections to all the destination endpoints.
+    def remove_connection(self, dst_ep_iter: Iterable[DstEndPoint]) -> None:
+        """Remove connections to the specified destination endpoints.
 
         Args
         ----
-            dst_ep_seq (tuple): A list of destination endpoints to disconnect.
+        dst_ep_seq: An iterable of destination endpoints to disconnect.
         """
-        src_ep_tuple = (self.i_graph[hash_ref(dst_ep.refs[0], SRC_EP)] for dst_ep in dst_ep_tuple)
-        for src_ep, dst_ep in zip(src_ep_tuple, dst_ep_tuple):
-            dst_ep.refs = []
-            src_ep.refs.remove([dst_ep.row, dst_ep.idx])
+        for dst_ep in dst_ep_iter:
+            self.i_graph[dst_ep.refs[0].key()].refs.remove(DstEndPointReference(dst_ep.row, dst_ep.idx))
 
-    def random_add_connection(self):
+    def random_add_connection(self) -> None:
         """Randomly choose two endpoints to connect.
 
         This is done by first selecting an unconnected destination endpoint then
         randomly (no filtering) choosing a viable source endpoint.
         """
-        dst_ep_list = list(filter(self.unreferenced_filter(self.dst_filter()), self.i_graph.values()))
+        dst_ep_tuple = tuple(self.i_graph.dst_unref_filter())
         if _LOG_DEBUG:
-            _logger.debug("Selecting connection to add to destination endpoint list: {}".format(dst_ep_list))
-        if dst_ep_list:
-            self.add_connection([choice(dst_ep_list)])
+            _logger.debug(f'Selecting connection to add to destination endpoint list: {dst_ep_tuple}')
+        if dst_ep_tuple:
+            self.add_connection([choice(dst_ep_tuple)])
 
-    def connect_all(self):
+    def connect_all(self) -> None:
         """Connect all unconnected destination endpoints.
 
         Find all the unreferenced destination endpoints and connect them to a random viable source.
         If there is no viable source endpoint the destination endpoint will remain unconnected.
         """
-        dst_ep_list = list(filter(self.unreferenced_filter(self.dst_filter()), self.i_graph.values()))
-        for dst_ep in dst_ep_list:
+        for dst_ep in self.i_graph.dst_unref_filter():
             self.add_connection([dst_ep])
 
-    def add_connection(self, dst_ep_list, src_ep_filter_func=lambda x: True):
+    def add_connection(self, dst_ep_seq: Sequence[DstEndPoint], src_ep_filter_func=lambda x: True):
         """Add a connection to source from destination specified by src_ep_filter.
 
         Args
@@ -1095,8 +911,8 @@ class gc_graph():
                 single argument and returns a filtered & sorted endpoint list from which
                 one source endpoint will be randomly chosen.
         """
-        if dst_ep_list:
-            dst_ep = dst_ep_list[0]
+        if dst_ep_seq:
+            dst_ep = dst_ep_seq[0]
             if _LOG_DEBUG:
                 _logger.debug("The destination endpoint requiring a connection: {}".format(dst_ep))
             src_ep_list = list(filter(self.src_filter(self.src_row_filter(dst_ep.row,
