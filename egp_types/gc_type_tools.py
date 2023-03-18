@@ -1,18 +1,18 @@
-from logging import DEBUG, NullHandler, getLogger
-from random import choice, getrandbits
+""" GC type tools."""
 from hashlib import sha256
+from logging import DEBUG, Logger, NullHandler, getLogger
 from pprint import pformat
+from typing import Literal, LiteralString
 
-
-_logger = getLogger(__name__)
+_logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
-_LOG_DEBUG = _logger.isEnabledFor(DEBUG)
+_LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
 
 # Evolve a pGC after this many 'uses'.
 # MUST be a power of 2
-M_CONSTANT = 1 << 4
-M_MASK = M_CONSTANT - 1
+M_CONSTANT: int = 1 << 4
+M_MASK: int = M_CONSTANT - 1
 NUM_PGC_LAYERS = 16
 # With M_CONSTANT = 16 & NUM_PGC_LAYERS = 16 it will take 16**16 (== 2**64 == 18446744073709551616)
 # population individual evolutions to require a 17th layer (and that is assuming all PGC's are
@@ -25,7 +25,7 @@ NUM_PGC_LAYERS = 16
 # field definitions.
 # PROPERTIES must define the bit position of all the properties listed in
 # the "properties" field of the entry_format.json definition.
-PROPERTIES = {
+PROPERTIES: dict[str, int] = {
     "extended": 1 << 0,
     "constant": 1 << 1,
     "conditional": 1 << 2,
@@ -39,19 +39,19 @@ PROPERTIES = {
     "boolean": 1 << 19,
     "sequence": 1 << 20
 }
-PHYSICAL_PROPERTY = PROPERTIES['physical']
-LAYER_COLUMNS = (
+PHYSICAL_PROPERTY: int = PROPERTIES['physical']
+LAYER_COLUMNS: tuple[LiteralString, ...] = (
     "evolvability",
     "fitness",
     "e_count",
     "f_count",
     "if"
 )
-LAYER_COLUMNS_RESET = {
+LAYER_COLUMNS_RESET: dict[str, int] = {
     "e_count": 1,
     "f_count": 1
 }
-_GL_EXCLUDE_COLUMNS = (
+_GL_EXCLUDE_COLUMNS: tuple[LiteralString, ...] = (
     'signature',
     'gca',
     'gcb',
@@ -60,10 +60,10 @@ _GL_EXCLUDE_COLUMNS = (
     'ancestor_b',
     'creator'
 )
-_SIGN = (1, -1)
+_SIGN: tuple[Literal[1], Literal[-1]] = (1, -1)
 
 
-def is_pgc(gc):
+def is_pgc(genetic_code: dict) -> bool:
     """Determine if a GC is a PGC.
 
     Args
@@ -78,17 +78,18 @@ def is_pgc(gc):
         # More juicy test for consistency
         # TODO: More conditions can be added
         # Check the physical property?
-        it = gc.get('input_types', [])
-        i = gc.get('inputs', [])
-        ot = gc.get('output_types', [])
-        o = gc.get('outputs', [])
-        pgc_inputs = bool(it) and it[0] == -3 and len(i) == 1
-        pgc_outputs = bool(ot) and ot[0] == -3 and len(o) == 1
-        check = (pgc_inputs and pgc_outputs) == (gc.get('pgc_fitness', None) is not None)
+        it: list[int] = genetic_code.get('input_types', [])
+        i: list[int] = genetic_code.get('inputs', [])
+        ot: list[int] = genetic_code.get('output_types', [])
+        o: list[int] = genetic_code.get('outputs', [])
+        pgc_inputs: bool = bool(it) and it[0] == -3 and len(i) == 1
+        pgc_outputs: bool = bool(ot) and ot[0] == -3 and len(o) == 1
+        check: bool = (pgc_inputs and pgc_outputs) == (genetic_code.get('pgc_fitness', None) is not None)
         if not check:
-            ValueError(f"PGC is not a PGC!: {gc['ref']}\n\t{pgc_inputs}, {pgc_outputs}, {gc.get('pgc_fitness', None)},"
-                          f" {(pgc_inputs and pgc_outputs)}, {(gc.get('pgc_fitness', None) is not None)}")
-    return gc.get('pgc_fitness', None) is not None
+            raise ValueError(
+                f"PGC is not a PGC!: {genetic_code['ref']}\n\t{pgc_inputs}, {pgc_outputs}, {genetic_code.get('pgc_fitness', None)},"
+                f" {(pgc_inputs and pgc_outputs)}, {(genetic_code.get('pgc_fitness', None) is not None)}")
+    return genetic_code.get('pgc_fitness', None) is not None
 
 
 def define_signature(gc) -> bytes:

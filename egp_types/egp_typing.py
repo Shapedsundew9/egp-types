@@ -1,6 +1,5 @@
 """Common Erasmus GP Types."""
-from dataclasses import dataclass, field
-from typing import Callable, Iterable, Literal, Any, TypeGuard, Generator, TypedDict, NotRequired
+from typing import Callable, Iterable, Literal, Any, TypeGuard, TypedDict, NotRequired
 from enum import IntEnum
 from graph_tool import Vertex as gt_vertex
 from graph_tool import Edge as gt_edge
@@ -60,56 +59,6 @@ VALID_ROW_SOURCES: tuple[dict[Row, tuple[SourceRow, ...]], dict[Row, tuple[Sourc
 )
 
 
-def isDestinationRow(obj) -> TypeGuard[DestinationRow]:
-    """Test if obj is of DestinationRow type."""
-    return obj in DESTINATION_ROWS
-
-
-def isSourceRow(obj) -> TypeGuard[SourceRow]:
-    """Test if obj is of SourceRow type."""
-    return obj in SOURCE_ROWS
-
-
-def isRow(obj) -> TypeGuard[Row]:
-    """Test if obj is of Row type."""
-    return obj in ROWS
-
-
-def castDestinationRow(obj) -> DestinationRow:
-    """Force obj to DestinationRow type or raise a type exception."""
-    if isDestinationRow(obj):
-        return obj
-    raise TypeError('obj should always be type DestinationRow compatible.')
-
-
-def castSourceRow(obj) -> SourceRow:
-    """Force obj to SourceRow type or raise a type exception."""
-    if isSourceRow(obj):
-        return obj
-    raise TypeError('obj should always be type SourceRow compatible.')
-
-
-def castRow(obj) -> Row:
-    """Force obj to Row type or raise a type exception."""
-    if isRow(obj):
-        return obj
-    raise TypeError('obj should always be type Row compatible.')
-
-
-def castEndPointIndex(obj) -> EndPointIndex:
-    """Force obj to EndPointIndex type or raise a type exception."""
-    if isinstance(obj, EndPointIndex):
-        return obj
-    raise TypeError('obj should always be type EndPointIndex compatible.')
-
-
-def castEndPointType(obj) -> EndPointType:
-    """Force obj to EndPointType type or raise a type exception."""
-    if isinstance(obj, EndPointType):
-        return obj
-    raise TypeError('obj should always be type EndPointType compatible.')
-
-
 class CPI(IntEnum):
     """Indices into a ConnectionPoint."""
     ROW = 0
@@ -143,6 +92,7 @@ ConstantPair = tuple[Literal['C'], ConstantRow]
 
 
 class ConnectionGraph(TypedDict):
+    """The structure of the connection graph (the graph defined in a GMS)."""
     A: NotRequired[ConnectionRow]
     B: NotRequired[ConnectionRow]
     C: NotRequired[ConstantRow]
@@ -153,204 +103,21 @@ class ConnectionGraph(TypedDict):
 
 
 def isConstantPair(obj: tuple[str, Any]) -> TypeGuard[ConstantPair]:
-    """Narrow a connection graph key:value pair to either a constant row."""
+    """Narrow a connection graph key:value pair to a constant row."""
     return obj[0] == 'C'
 
 
 def isConnectionPair(obj: tuple[str, Any]) -> TypeGuard[ConnectionPair]:
-    """Narrow a connection graph key:value pair to either a connection row."""
+    """Narrow a connection graph key:value pair to a connection row."""
     return obj[0] != 'C'
 
 
-class Vertex(gt_vertex):
+class vertex(gt_vertex):
     """Static type checking cannot follow the graph_tool Vertex class."""
 
 
-class Edge(gt_edge):
+class edge(gt_edge):
     """Static type checking cannot follow the graph_tool Edge class."""
-
-
-@dataclass(slots=True)
-class GenericEndPoint():
-    """Lowest common denominator end point class """
-    row: Row
-    idx: EndPointIndex
-
-    def key_base(self) -> str:
-        """Base end point hash."""
-        return f"{self.row}{self.idx:03d}"
-
-
-@dataclass(slots=True)
-class EndPointReference(GenericEndPoint):
-    """Defines the connection to a row in an InternalGraph."""
-
-    def force_key(self, cls: EndPointClass) -> EndPointHash:
-        """Create a unique key to use in the internal graph."""
-        return self.key_base() + 'ds'[cls]
-
-
-@dataclass(slots=True)
-class DstEndPointReference(EndPointReference):
-    """Refers to a destination end point"""
-    row: DestinationRow
-
-    def key(self) -> DstEndPointHash:
-        """Create a unique key to use in the internal graph."""
-        return self.key_base() + 'd'
-
-    def invert_key(self) -> SrcEndPointHash:
-        """Invert hash. Return a hash for the source endpoint equivilent."""
-        return self.key_base() + 's'
-
-
-@dataclass(slots=True)
-class SrcEndPointReference(EndPointReference):
-    """Refers to a source endpoint"""
-    row: SourceRow
-
-    def key(self) -> SrcEndPointHash:
-        """Create a unique key to use in the internal graph."""
-        return self.key_base() + 's'
-
-    def invert_key(self) -> DstEndPointHash:
-        """Invert hash. Return a hash for the destination endpoint equivilent."""
-        return self.key_base() + 'd'
-
-
-@dataclass(slots=True)
-class EndPoint(GenericEndPoint):
-    """Defines a end point in a gc_graph.
-
-    If row == 'C', the constants row, then val is set to the constant.
-    """
-    typ: EndPointType
-    cls: EndPointClass
-    refs: list[EndPointReference] = field(default_factory=list)
-    val: Any = None
-
-    def key(self) -> EndPointHash:
-        """Create a unique key to use in the internal graph."""
-        return self.key_base() + 'ds'[self.cls]
-
-    def force_key(self, force_class: EndPointClass | None = None) -> EndPointHash:
-        """Create a unique key to use in the internal graph forcing the class type."""
-        cls: str = 'ds'[self.cls] if force_class is None else 'ds'[force_class]
-        return self.key_base() + cls
-    
-    def as_ref(self) -> EndPointReference:
-        """Return a reference to this end point."""
-        return EndPointReference(self.row, self.idx)
-
-
-@dataclass(slots=True)
-class DstEndPoint(EndPoint):
-    """Destination End Point."""
-    row: DestinationRow
-    cls: EndPointClass = DST_EP
-    refs: list[SrcEndPointReference] = field(default_factory=list)
-
-    def key(self) -> DstEndPointHash:
-        """Create a unique key to use in the internal graph."""
-        return self.key_base() + 'd'
-
-    def invert_key(self) -> SrcEndPointHash:
-        """Invert hash. Return a hash for the source endpoint equivilent."""
-        return self.key_base() + 's'
-
-    def as_ref(self) -> DstEndPointReference:
-        """Return a reference to this end point."""
-        return DstEndPointReference(self.row, self.idx)
-
-
-@dataclass(slots=True)
-class SrcEndPoint(EndPoint):
-    """Source End Point."""
-    row: SourceRow
-    cls: EndPointClass = SRC_EP
-    refs: list[DstEndPointReference] = field(default_factory=list)
-
-    def key(self) -> SrcEndPointHash:
-        """Create a unique key to use in the internal graph."""
-        return self.key_base() + 's'
-
-    def invert_key(self) -> DstEndPointHash:
-        """Invert hash. Return a hash for the source endpoint equivilent."""
-        return self.key_base() + 'd'
-
-    def as_ref(self) -> SrcEndPointReference:
-        """Return a reference to this end point."""
-        return SrcEndPointReference(self.row, self.idx)
-
-
-def isDstEndPoint(ep: EndPoint) -> TypeGuard[DstEndPoint]:
-    """Identifies an end point as a destination endpoint."""
-    return not ep.cls
-
-
-def isSrcEndPoint(ep: EndPoint) -> TypeGuard[SrcEndPoint]:
-    """Identifies an end point as a source endpoint."""
-    return ep.cls
-
-
-class InternalGraph(dict[EndPointHash, EndPoint]):
-    """Convinient structure for GC graph manipulation."""
-
-    def cls_filter(self, cls: EndPointClass) -> Generator[EndPoint, None, None]:
-        """Return all the end points in with cls cls."""
-        return (ep for ep in self.values() if ep.cls == cls)
-
-    def dst_filter(self) -> Generator[DstEndPoint, None, None]:
-        """Return all the destination end points."""
-        return (ep for ep in self.values() if isDstEndPoint(ep))
-
-    def src_filter(self) -> Generator[SrcEndPoint, None, None]:
-        """Return all the source end points."""
-        return (ep for ep in self.values() if isSrcEndPoint(ep))
-
-    def row_filter(self, row: Row) -> Generator[EndPoint, None, None]:
-        """Return all the end points in row."""
-        return (ep for ep in self.values() if ep.row == row)
-
-    def rows_filter(self, rows: Iterable[Row]) -> Generator[EndPoint, None, None]:
-        """Return all the end points in row."""
-        return (ep for ep in self.values() if ep.row in rows)
-
-    def dst_row_filter(self, row: Row) -> Generator[DstEndPoint, None, None]:
-        """Return all the destination end points in a row."""
-        return (ep for ep in self.values() if isDstEndPoint(ep) and ep.row == row)
-
-    def src_row_filter(self, row: Row) -> Generator[SrcEndPoint, None, None]:
-        """Return all the source end points in a row."""
-        return (ep for ep in self.values() if isSrcEndPoint(ep) and ep.row == row)
-
-    def dst_rows_filter(self, rows: Iterable[DestinationRow]) -> Generator[DstEndPoint, None, None]:
-        """Return all the destination end points in the specified rows."""
-        return (ep for ep in self.values() if isDstEndPoint(ep) and ep.row in rows)
-
-    def src_rows_filter(self, rows: Iterable[SourceRow]) -> Generator[SrcEndPoint, None, None]:
-        """Return all the source end points in the specified rows."""
-        return (ep for ep in self.values() if isSrcEndPoint(ep) and ep.row in rows)
-
-    def dst_unref_filter(self) -> Generator[DstEndPoint, None, None]:
-        """Return all the destination end points that are unreferenced."""
-        return (ep for ep in self.values() if isDstEndPoint(ep) and not ep.refs)
-
-    def src_unref_filter(self) -> Generator[SrcEndPoint, None, None]:
-        """Return all the source end points that are unreferenced."""
-        return (ep for ep in self.values() if isSrcEndPoint(ep) and not ep.refs)
-
-    def dst_ref_filter(self) -> Generator[DstEndPoint, None, None]:
-        """Return all the destination end points that are referenced."""
-        return (ep for ep in self.values() if isDstEndPoint(ep) and ep.refs)
-
-    def src_ref_filter(self) -> Generator[SrcEndPoint, None, None]:
-        """Return all the source end points that are referenced."""
-        return (ep for ep in self.values() if isSrcEndPoint(ep) and ep.refs)
-
-    def num_eps(self, row: Row, cls: EndPointClass) -> int:
-        """Count the endpoint of class cls in a specific row."""
-        return sum(ep.cls == cls and ep.row == row for ep in self.values())
 
 
 class EndPointTypeLookupFile(TypedDict):

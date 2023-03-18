@@ -31,9 +31,9 @@ class xGC():
     """xGC is a dict-like object."""
 
     # _gpc must be bound before casting dict/eGC's to xGC's.
-    _gpc: Any = None
+    gpc: dict = {}
 
-    def __init__(self, gc: dict | eGC = {}) -> None:
+    def __init__(self, genetic_code: dict | eGC | None = None) -> None:
         """xGC is a dict-like object with some specialisations for the GPC.
 
         Casting a dictionary or eGC to an xGC pushes it to the bound GPC.
@@ -43,13 +43,13 @@ class xGC():
         ----
         gc: GC data to put in bound GPC cache.
         """
-        if gc:
-            xGC._gpc[gc['ref']] = gc
+        if genetic_code is not None and xGC.gpc is not None:
+            xGC.gpc[genetic_code['ref']] = genetic_code
         else:
-            self.bind_entry(xGC._gpc._ggc_cache._data, 0, 0, xGC._gpc._ggc_cache.fields)
+            self.bind_entry(xGC.gpc._ggc_cache._data, 0, 0, xGC.gpc._ggc_cache.fields)
 
     def bind_entry(self, _data: dict[str, list[Any]], allocation: int, idx: int, fields: dict[str, Field]) -> Self:
-        """ Bind the xGOC to an entry in a GPC.
+        """ Bind the xGC to an entry in a GPC.
 
         NOTE: The GPC does not need to be the same as bound in _gpc as the _data
         store object is passed in.
@@ -93,7 +93,7 @@ class xGC():
         """Make sure we do not copy gGCs. This is for performance."""
         assert False, f"Shallow copy of xGC ref {self['ref']:016X}."
 
-    def __deepcopy__(self, obj: Self) -> NoReturn:
+    def __deepcopy__(self, _: Self) -> NoReturn:
         """Make sure we do not copy gGCs. This is for performance."""
         assert False, f"Deep copy of xGC ref {self['ref']:016X}."
 

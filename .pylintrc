@@ -208,7 +208,7 @@ module-naming-style=snake_case
 
 # Regular expression matching correct module names. Overrides module-naming-
 # style. If left empty, module names will be checked with the set naming style.
-#module-rgx=
+module-rgx=(([a-z_][a-z0-9_]{2,30})|[a-z]GC)
 
 # Colon-delimited sets of names that determine each other's naming style when
 # the name regexes allow several styles.
@@ -415,7 +415,8 @@ disable=raw-checker-failed,
         useless-suppression,
         deprecated-pragma,
         use-symbolic-message-instead,
-        logging-fstring-interpolation,
+        logging-fstring-interpolation,   # Due to Gtk dependency
+        wrong-import-position,
         fixme
 
 # Enable the message, report, category or checker with the given id(s). You can

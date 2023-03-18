@@ -3,7 +3,7 @@ from itertools import count
 from typing import Callable, Literal
 
 _REFERENCE_MASK: Literal[9223372036854775807] = 0x7FFFFFFFFFFFFFFF
-_GL_GC: Literal[9223372036854775808] = 0x8000000000000000  # type: ignore
+_GL_GC: Literal[9223372036854775808] = 0x8000000000000000
 
 
 # Pretty print for references
@@ -12,7 +12,7 @@ _MASK: int = _OVER_MAX - 1
 ref_str: Callable[[int], str] = lambda x: 'None' if x is None else f"{((_OVER_MAX + x) & _MASK):016x}"
 
 
-def is_GLGC(ref: int) -> bool:
+def isGLGC(ref: int) -> bool:
     """Test if a reference is for a GC loaded from the GL."""
     return bool(ref < 0)
 

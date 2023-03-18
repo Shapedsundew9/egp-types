@@ -1,3 +1,4 @@
+"""The embryonic GC (eGC) class."""
 from logging import DEBUG, Logger, NullHandler, getLogger
 from typing import Any, LiteralString, Iterable, Sequence
 
@@ -26,7 +27,7 @@ class eGC(dict):
 
     def __init__(
             self,
-            gc: dict = {},
+            gc: dict | None = None,
             inputs: Iterable[Any] | None = None,
             outputs: Iterable[Any] | None = None,
             vt: vtype = vtype.OBJECT) -> None:
@@ -41,7 +42,10 @@ class eGC(dict):
         outputs: GC outputs. Object is of the type defined by vt.
         vt: The interpretation of the object. See vtype definition.
         """
-        dict.__init__(gc)
+        if gc is not None:
+            super().__init__(gc)
+        else:
+            super().__init__()
 
         graph_inputs: Sequence[int] | None = None
         graph_outputs: Sequence[int] | None = None

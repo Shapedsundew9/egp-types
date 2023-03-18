@@ -97,7 +97,7 @@ def compress_json(obj) -> bytes | memoryview | bytearray | None:
         return obj
     if obj is None:
         return None
-    raise TypeError("Un-encodeable type '{}': Expected 'dict' or byte type.".format(type(obj)))
+    raise TypeError(f"Un-encodeable type '{type(obj)}': Expected 'dict' or byte type.")
 
 
 def decompress_json(obj) -> dict | list | None:
@@ -145,10 +145,10 @@ def str_to_sha256(obj) -> bytearray | memoryview | bytes | None:
         return obj
     if obj is None:
         return None
-    raise TypeError("Un-encodeable type '{}': Expected 'str' or byte type.".format(type(obj)))
+    raise TypeError(f"Un-encodeable type '{type(obj)}': Expected 'str' or byte type.")
 
 
-def str_to_UUID(obj) -> UUID | None:
+def str_to_uuid(obj) -> UUID | None:
     """Convert a UUID formated string to a UUID object.
 
     Args
@@ -165,7 +165,7 @@ def str_to_UUID(obj) -> UUID | None:
         return obj
     if obj is None:
         return None
-    raise TypeError("Un-encodeable type '{}': Expected 'str' or UUID type.".format(type(obj)))
+    raise TypeError(f"Un-encodeable type '{type(obj)}': Expected 'str' or UUID type.")
 
 
 def str_to_datetime(obj) -> datetime | None:
@@ -185,7 +185,7 @@ def str_to_datetime(obj) -> datetime | None:
         return obj
     if obj is None:
         return None
-    raise TypeError("Un-encodeable type '{}': Expected 'str' or datetime type.".format(type(obj)))
+    raise TypeError(f"Un-encodeable type '{type(obj)}': Expected 'str' or datetime type.")
 
 
 def sha256_to_str(obj: bytes) -> str | None:
@@ -202,7 +202,7 @@ def sha256_to_str(obj: bytes) -> str | None:
     return None if obj is None else obj.hex()
 
 
-def UUID_to_str(obj: UUID) -> str | None:
+def uuid_to_str(obj: UUID) -> str | None:
     """Convert a UUID to its lowercase hexadecimal string representation.
 
     Args
@@ -247,12 +247,12 @@ def encode_properties(obj: dict | int) -> int:
     """
     if isinstance(obj, dict):
         bitfield: int = 0
-        for k, v in filter(lambda x: x[1], obj.items()):
+        for k, _ in filter(lambda x: x[1], obj.items()):
             bitfield |= PROPERTIES[k]
         return bitfield
     if isinstance(obj, int):
         return obj
-    raise TypeError("Un-encodeable type '{}': Expected 'dict' or integer type.".format(type(obj)))
+    raise TypeError(f"Un-encodeable type '{type(obj)}': Expected 'dict' or integer type.")
 
 
 def decode_properties(obj: int) -> dict[str, bool]:

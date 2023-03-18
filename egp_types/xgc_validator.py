@@ -11,8 +11,8 @@ from egp_utils.base_validator import base_validator
 from egp_utils.common import merge
 
 from .conversions import (encode_properties, str_to_datetime, str_to_sha256,
-                          str_to_UUID, decode_properties, datetime_to_str,
-                          sha256_to_str, UUID_to_str)
+                          str_to_uuid, decode_properties, datetime_to_str,
+                          sha256_to_str, uuid_to_str)
 from .ep_type import validate
 from .gc_graph import gc_graph
 from .gc_type_tools import PROPERTIES, define_signature
@@ -303,8 +303,8 @@ class _LGC_json_load_entry_validator(_LGC_entry_validator):
     def _normalize_coerce_datetime_str_to_datetime(self, value) -> datetime | None:
         return str_to_datetime(value)
 
-    def _normalize_coerce_UUID_str_to_UUID(self, value) -> UUID | None:
-        return str_to_UUID(value)
+    def _normalize_coerce_uuid_str_to_uuid(self, value) -> UUID | None:
+        return str_to_uuid(value)
 
     def _normalize_coerce_properties_dict_to_int(self, value) -> int:
         return encode_properties(value)
@@ -324,8 +324,8 @@ class _LGC_json_dump_entry_validator(_LGC_entry_validator):
     def _normalize_coerce_datetime_to_datetime_str(self, value) -> str | None:
         return datetime_to_str(value)
 
-    def _normalize_coerce_UUID_to_UUID_str(self, value) -> str | None:
-        return UUID_to_str(value)
+    def _normalize_coerce_uuid_to_uuid_str(self, value) -> str | None:
+        return uuid_to_str(value)
 
     def _normalize_coerce_properties_int_to_dict(self, value) -> dict[str, bool]:
         return decode_properties(value)

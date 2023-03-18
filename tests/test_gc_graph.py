@@ -5,7 +5,8 @@ from json import load
 from os.path import dirname, join
 from random import randint, random
 from numpy.random import choice
-from logging import DEBUG, NullHandler, getLogger
+from logging import DEBUG, NullHandler, getLogger, Logger
+from typing import LiteralString, Any
 
 import pytest
 from egp_types.ep_type import EP_TYPE_VALUES, INVALID_EP_TYPE_VALUE, asint
@@ -13,13 +14,13 @@ from egp_types.gc_graph import (DESTINATION_ROWS, DST_EP, SOURCE_ROWS,
                                   SRC_EP, conn_idx, const_idx, gc_graph)
 
 
-_logger = getLogger(__name__)
+_logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
-_LOG_DEBUG = _logger.isEnabledFor(DEBUG)
+_LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
 
 _TEST_RESULTS_JSON = 'data/test_gc_graph_results.json'
-_VALID_STRUCTURES = (
+_VALID_STRUCTURES: tuple[tuple[LiteralString, ...], ...] = (
     ('A', 'O'),
     ('C', 'O'),     # TODO: Is this valid?
     ('I', 'O'),     # TODO: Is this valid?
@@ -50,8 +51,8 @@ _VALID_STRUCTURES = (
 
 
 # Types are in string format for readability in the results file.
-with open(join(dirname(__file__), _TEST_RESULTS_JSON), "r") as results_file:
-    results = load(results_file)
+with open(join(dirname(__file__), _TEST_RESULTS_JSON), 'r', encoding='utf-8') as results_file:
+    results: dict[str, Any] = load(results_file)
 
 
 def random_type(p=0.0):
@@ -69,7 +70,7 @@ def random_type(p=0.0):
     (str) The selected type string.
     """
     if random() < p:
-        value = choice(tuple(EP_TYPE_VALUES))
+        value: int = choice(tuple(EP_TYPE_VALUES))
         if value != INVALID_EP_TYPE_VALUE:
             return value
     return asint('builtins_int')
