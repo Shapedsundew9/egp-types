@@ -8,12 +8,11 @@ defines the rules of the connectivity (the "physics") i.e. what is possible to o
 """
 
 from collections import Counter
-from copy import deepcopy
 from logging import DEBUG, Logger, NullHandler, getLogger
 from math import sqrt
 from pprint import pformat
 from random import choice, randint, sample
-from typing import Any, Generator, Literal, LiteralString, Iterable, Callable, Sequence
+from typing import Any, Iterable, Literal, LiteralString, Sequence
 
 import gi
 from bokeh.io import output_file, save
@@ -22,26 +21,25 @@ from bokeh.models import (BoxSelectTool, Circle, ColumnDataSource,
                           NodesAndLinkedEdges, Range1d, TapTool)
 from bokeh.palettes import Category20_20, Greys9
 from bokeh.plotting import figure, from_networkx
-from cairo import FONT_WEIGHT_BOLD, FontWeight
+from cairo import FONT_WEIGHT_BOLD, FontWeight  # pylint: disable=no-name-in-module
 from egp_utils.text_token import register_token_code, text_token
 from graph_tool import EdgePropertyMap, Graph, VertexPropertyMap
 from graph_tool.draw import graph_draw
 from networkx import DiGraph, get_node_attributes, spring_layout
 
-from .egp_typing import (CPI, CVI, DESTINATION_ROWS, DST_EP, ROWS, SOURCE_ROWS,
-                         SRC_EP, VALID_ROW_SOURCES, ConnectionGraph,
-                         ConnectionPoint, ConnectionRow, ConstantExecStr, ConstantRow, ConstantValue, DestinationRow, EndPoint, isConstantPair, isConnectionPair, ConstantPair, ConnectionGraphPair, ConnectionPair,
-                         EndPointClass, EndPointHash, EndPointIndex, PairIdx, SrcEndPointHash, DstEndPointHash,
+from .egp_typing import (CPI, CVI, DST_EP, ROWS, SOURCE_ROWS, SRC_EP,
+                         VALID_ROW_SOURCES, ConnectionGraph, DestinationRow,
+                         DstEndPoint, DstEndPointReference, Edge, EndPoint,
+                         EndPointClass, EndPointHash, EndPointIndex,
                          EndPointReference, EndPointType, GCGraphRows,
-                         InternalGraph, Row, SourceRow, castDestinationRow,
-                         castEndPointIndex, castEndPointType, castRow,
-                         castSourceRow, Vertex, DstEndPoint, SrcEndPoint, DstEndPointReference, SrcEndPointReference, Edge, isDestinationRow)
-# Needed to prevent something pulling in GtK 4.0 and graph_tool complaining.
-from .ep_type import (EP_TYPE_NAMES, REAL_EP_TYPE_VALUES,
-                      UNKNOWN_EP_TYPE_VALUE, asint, asstr, compatible,
+                         InternalGraph, PairIdx, Row, SourceRow, SrcEndPoint,
+                         SrcEndPointHash, SrcEndPointReference, Vertex,
+                         isConnectionPair, isConstantPair)
+from .ep_type import (REAL_EP_TYPE_VALUES, asint, asstr, compatible,
                       import_str, type_str, validate)
 from .xgc_validator import graph_validator
 
+# Needed to prevent something pulling in GtK 4.0 and graph_tool complaining.
 gi.require_version('Gtk', '3.0')
 
 
@@ -49,33 +47,6 @@ _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
 _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
-
-def _REPR_LAMBDA(x: tuple[EndPointHash, EndPoint]) -> EndPointIndex:
-    """Extra the end point index from the internal graph dict key,value entry."""
-    return x[1].idx
-
-
-def _DST_FILTER(x: EndPoint) -> bool:
-    """True if x is a destination endpoint."""
-    return not x.cls
-
-
-def _ROW_C_FILTER(x: EndPoint) -> bool:
-    """True if x is a constant row endpoint."""
-    return x.row == 'C'
-
-
-def _GET_INDEX(x: EndPoint) -> EndPointIndex:
-    return x.idx
-
-
-def _OUT_FUNC(x):
-    return x[ep_idx.ROW] == 'O' and x[ep_idx.EP_TYPE] == DST_EP
-
-
-# TODO: Make lambda function definitions static
-# TODO: Replace all the little filter functions with static lambda functions.
-# TODO: Use EP_TYPE consistently (i.e. not for both EP data type & SRC or DST)
 
 # NetworkX & Bokeh parameters
 _NX_NODE_RADIUS: Literal[30] = 30
@@ -86,8 +57,6 @@ _NX_ROW_EDGE_ATTR: dict[str, str] = {
     'select': Greys9[0],
     'hover': Greys9[0]
 }
-_NX_CODON_NODE_ATTR: dict[str, str] = {'fill': Category20_20[15], 'select': Category20_20[14],
-                                       'hover': Category20_20[14], 'line': Greys9[0], 'label': 'Codon'}
 _NX_ROW_NODE_ATTR: dict[Row, dict[str, str]] = {
     'I': {'fill': Greys9[8], 'select': Greys9[7], 'hover': Greys9[7], 'line': Greys9[0], 'label': 'I'},
     'C': {'fill': Category20_20[11], 'select': Category20_20[10], 'hover': Category20_20[10], 'line': Greys9[0], 'label': 'C'},
@@ -223,7 +192,7 @@ class gc_graph():
         for row in ROWS:
             for ep_class in (False, True):
                 row_dict: dict[str, EndPoint] = {k: v for k, v in self.i_graph.items() if v.cls == ep_class and v.row == row}
-                str_list.extend(["'" + k + "': " + str(v) for k, v in sorted(row_dict.items(), key=_REPR_LAMBDA)])
+                str_list.extend(["'" + k + "': " + str(v) for k, v in sorted(row_dict.items(), key=lambda x: x[1].idx)])
         return ', '.join(str_list)
 
     def _convert_to_internal(self, c_graph: ConnectionGraph) -> InternalGraph:
@@ -279,10 +248,10 @@ class gc_graph():
     def connection_graph(self) -> ConnectionGraph:
         """Convert graph to GMS graph (Connection Graph) format."""
         graph: ConnectionGraph = {}
-        for ep in sorted(self.i_graph.dst_filter(), key=_GET_INDEX):
+        for ep in sorted(self.i_graph.dst_filter(), key=lambda x: x.idx):
             row: DestinationRow = ep.row
             graph.setdefault(row, []).append((ep.refs[0].row, ep.refs[0].idx, ep.typ))
-        for ep in sorted(self.i_graph.row_filter('C'), key=_GET_INDEX):
+        for ep in sorted(self.i_graph.row_filter('C'), key=lambda x: x.idx):
             if 'C' not in graph:
                 graph['C'] = []
             graph.setdefault('C', []).append((ep.typ, ep.val))
@@ -365,7 +334,8 @@ class gc_graph():
         bk_graph.inspection_policy = NodesAndLinkedEdges()  # type: ignore
         plot.renderers.append(bk_graph)  # type: ignore
 
-        x_y: tuple[tuple[float, ...], tuple[float, ...]] = tuple(zip(*bk_graph.layout_provider.graph_layout.values()))  # pylint: disable=no-member, # type: ignore
+        x_y: tuple[tuple[float, ...], tuple[float, ...]] = tuple(
+            zip(*bk_graph.layout_provider.graph_layout.values()))  # pylint: disable=no-member, # type: ignore
         node_labels: dict[str, str] = get_node_attributes(nx_graph, 'text')
         label_x_offsets: dict[str, float] = get_node_attributes(nx_graph, 'x_offset')
         label_y_offsets: dict[str, float] = get_node_attributes(nx_graph, 'y_offset')
@@ -381,8 +351,8 @@ class gc_graph():
             'font': list(label_font.values())
         })
         labels: LabelSet = LabelSet(x='x', y='y', text='text',
-                          source=source, text_font_size='font_size', x_offset='x_offset', y_offset='y_offset',
-                          text_font='font', text_font_style='bold', text_color='black')
+                                    source=source, text_font_size='font_size', x_offset='x_offset', y_offset='y_offset',
+                                    text_font='font', text_font_style='bold', text_color='black')
         plot.renderers.append(labels)  # type: ignore
         output_file(f"{path}.html", title="Erasmus GP GC Internal Graph")
         save(plot)
@@ -889,7 +859,7 @@ class gc_graph():
         if _LOG_DEBUG:
             _logger.debug(f'Selecting connection to add to destination endpoint list: {dst_ep_tuple}')
         if dst_ep_tuple:
-            self.add_connection([choice(dst_ep_tuple)])
+            self.add_connection(choice(dst_ep_tuple))
 
     def connect_all(self) -> None:
         """Connect all unconnected destination endpoints.
@@ -898,128 +868,61 @@ class gc_graph():
         If there is no viable source endpoint the destination endpoint will remain unconnected.
         """
         for dst_ep in self.i_graph.dst_unref_filter():
-            self.add_connection([dst_ep])
+            self.add_connection(dst_ep)
 
-    def add_connection(self, dst_ep_seq: Sequence[DstEndPoint], src_ep_filter_func=lambda x: True):
-        """Add a connection to source from destination specified by src_ep_filter.
-
-        Args
-        ----
-            dst_ep_list (list): A list of destination endpoints. Only the first endpoint
-                in the list that is unconnected will be connected.
-            src_ep_filter_func (func): A function that takes an endpoint list as the
-                single argument and returns a filtered & sorted endpoint list from which
-                one source endpoint will be randomly chosen.
-        """
-        if dst_ep_seq:
-            dst_ep = dst_ep_seq[0]
-            if _LOG_DEBUG:
-                _logger.debug("The destination endpoint requiring a connection: {}".format(dst_ep))
-            src_ep_list = list(filter(self.src_filter(self.src_row_filter(dst_ep.row,
-                                                                          self.type_filter([dst_ep.typ],
-                                                                          src_ep_filter_func, exact=False))),
-                                      self.i_graph.values()))
-            if src_ep_list:
-                src_ep = choice(src_ep_list)
-                if _LOG_DEBUG:
-                    _logger.debug("The source endpoint to make the connection: {}".format(src_ep))
-                dst_ep.refs = [src_ep[1:3]]
-                src_ep.refs.append(dst_ep[1:3])
-                return True
-            if _LOG_DEBUG:
-                _logger.debug("No viable source endpoints for destination endpoint: {}".format(dst_ep))
-        return False
-
-    def stack(self, gB):
-        """Stack this graph on top of graph gB.
-
-        Graph gA (self) is stacked on gB to make gC i.e. gC inputs are gA's inputs
-        and gC's outputs are gB's outputs:
-            1. gC's inputs directly connect to gA's inputs, 1:1 in order
-            2. gB's inputs preferentially connect to gA's outputs 1:1
-            3. gB's outputs directly connect to gC's outputs, 1:1 in order
-            4. Any gA's outputs that are not connected to gB inputs create new gC outputs
-            5. Any gBs input that are not connected to gA outputs create new gC inputs
-
-        Stacking only works if there is at least 1 connection from gA's outputs to gB's inputs.
+    def add_connection(self, dst_ep: DstEndPoint,
+                       allowed_rows: Sequence[SourceRow] = SOURCE_ROWS,
+                       unreferenced: bool = False) -> bool:
+        """Add a connection to a random valid source endpoint from the specified destination.
 
         Args
         ----
-        gB (gc_graph): Graph to sit on top of.
+        dst_ep: The destination endpoint to connect. Must be unconnected (unreferenced)
+        allowed_rows: Further contrain the potential source endpoints to one of these rows.
+        unreferenced: Further constrain the source endpoints to consider only unreferenced ones.
 
         Returns
         -------
-        (gc_graph): gC.
+        True if the dst_ep was connected to a source else False.
         """
-        # TODO: Stacking is inserting under row O which changes the output interface
-        # that means it cannot be done on a sub-GC - but to what end?
+        # NB: Considered moving VALID_SOURCE_ROWS and related to sets but not worth it.
+        # Noting here for when I forget and consider it again (python 3.11.2)
+        # (venv) shapedsundew9@Jammy:~/Projects$ python3 -m timeit -s "aset = set('ABC')" "'A' in aset"
+        # 5000000 loops, best of 5: 85.4 nsec per loop
+        # (venv) shapedsundew9@Jammy:~/Projects$ python3 -m timeit -s "atuple = tuple('ABC')" "'A' in atuple"
+        # 5000000 loops, best of 5: 85.9 nsec per loop
 
-        # Create all the end points
-        ep_list = []
-        for ep in filter(gB.rows_filter(('I', 'O')), gB.graph.values()):
-            row, idx, typ = ep.row, ep.idx, ep.typ
-            if row == 'I':
-                ep_list.append([False, 'B', idx, typ, []])
-            elif row == 'O':
-                ep_list.append([True, 'B', idx, typ, [['O', idx]]])
-                ep_list.append([False, 'O', idx, typ, [['B', idx]]])
+        if _LOG_DEBUG:
+            _logger.debug(f'The destination endpoint requiring a connection: {dst_ep}')
 
-        for ep in filter(self.rows_filter(('I', 'O')), self.i_graph.values()):
-            row, idx, typ = ep.row, ep.idx, ep.typ
-            if row == 'I':
-                ep_list.append([True, 'I', idx, typ, [['A', idx]]])
-                ep_list.append([False, 'A', idx, typ, [['I', idx]]])
-            elif row == 'O':
-                ep_list.append([True, 'A', idx, typ, []])
+        filter_func = self.i_graph.src_unref_filter if unreferenced else self.i_graph.src_filter
+        eligible_rows = tuple(row for row in VALID_ROW_SOURCES[self.has_f] if row in allowed_rows)
+        src_eps = tuple(src_ep for src_ep in filter_func() if src_ep.row in eligible_rows)
+        if src_eps:
+            src_ep: SrcEndPoint = choice(src_eps)
+            if _LOG_DEBUG:
+                _logger.debug(f'The source endpoint to make the connection: {src_ep}')
+            dst_ep.refs = [src_ep.as_ref()]
+            src_ep.refs.append(dst_ep.as_ref())
+            return True
+        if _LOG_DEBUG:
+            _logger.debug(f'No viable source endpoints for destination endpoint: {dst_ep}')
+        return False
 
-        # Make a gC gc_graph object
-        gC = gc_graph()
-        for ep in ep_list:
-            gC._add_ep(ep)
-
-        # Preferentially connect A --> B but only 1:1
-        gA_gB_connection = False
-        for ep in filter(gC.dst_filter(gC.row_filter('B')), gC.graph.values()):
-            gA_gB_connection = gA_gB_connection or gC.add_connection([ep], gC.row_filter('A', gC.unreferenced_filter()))
-
-        if gA_gB_connection:
-            # Extend O with any remaining A src's
-            for ep in tuple(filter(gC.src_filter(gC.row_filter('A', gC.unreferenced_filter())), gC.graph.values())):
-                idx = gC.num_outputs()
-                gC._add_ep([DST_EP, 'O', idx, ep.typ, [['A', ep.idx]]])
-                ep.refs.append(['O', idx])
-
-            # Extend I with any remaining B dst's
-            for ep in tuple(filter(gC.dst_filter(gC.row_filter('B', gC.unreferenced_filter())), gC.graph.values())):
-                idx = gC.num_inputs()
-                gC._add_ep([SRC_EP, 'I', idx, ep.typ, [['B', ep.idx]]])
-                ep.refs.append(['I', idx])
-
-            return gC
-        return None
-
-    def input_if(self):
+    def input_if(self) -> list[int]:
         """Return the input interface definition.
 
         Returns
         -------
-        inputs (list(int)): Integers are ep_type_ints in the order defined in the graph.
+        A list of integers which are ep_type_ints in the order defined in the graph.
         """
-        eps = (ep for ep in filter(lambda x: x[ep_idx.ROW] == 'I', self.i_graph.values()))
-        sorted_eps = sorted(eps, key=lambda x: x[ep_idx.INDEX])
-        previous = -1
-        inputs = []
-        for ep in filter(lambda x: x[ep_idx.INDEX] != previous, sorted_eps):
-            previous = ep.idx
-            inputs.append(ep.typ)
-        return inputs
+        return [ep.typ for ep in sorted(self.i_graph.row_filter('I'), key=lambda x: x.idx)]
 
-    def output_if(self):
+    def output_if(self) -> list[int]:
         """Return the output interface definition.
 
         Returns
         -------
-        outputs (list(int)): Integers are ep_type_ints in the order defined in the graph.
+        A list of integers which are ep_type_ints in the order defined in the graph.
         """
-        outputs = sorted((ep for ep in filter(_OUT_FUNC, self.i_graph.values())), key=lambda x: x[ep_idx.INDEX])
-        return [ep.typ for ep in outputs]
+        return [ep.typ for ep in sorted(self.i_graph.row_filter('O'), key=lambda x: x.idx)]

@@ -29,7 +29,7 @@ SRC_EP: Literal[True] = True
 DST_EP: Literal[False] = False
 DESTINATION_ROWS: tuple[DestinationRow, ...] = ('A', 'B', 'F', 'O', 'P', 'U')
 SOURCE_ROWS: tuple[SourceRow, ...] = ('I', 'C', 'A', 'B')
-ROWS: tuple[Row, ...] = tuple(sorted((*SOURCE_ROWS, *DESTINATION_ROWS)))
+ROWS: tuple[Row, ...] = tuple(sorted({*SOURCE_ROWS, *DESTINATION_ROWS}))
 
 # Valid source rows for a given row.
 # The valid source rows depends on whether there is a row F
@@ -237,6 +237,10 @@ class EndPoint(GenericEndPoint):
         """Create a unique key to use in the internal graph forcing the class type."""
         cls: str = 'ds'[self.cls] if force_class is None else 'ds'[force_class]
         return self.key_base() + cls
+    
+    def as_ref(self) -> EndPointReference:
+        """Return a reference to this end point."""
+        return EndPointReference(self.row, self.idx)
 
 
 @dataclass(slots=True)
@@ -254,6 +258,10 @@ class DstEndPoint(EndPoint):
         """Invert hash. Return a hash for the source endpoint equivilent."""
         return self.key_base() + 's'
 
+    def as_ref(self) -> DstEndPointReference:
+        """Return a reference to this end point."""
+        return DstEndPointReference(self.row, self.idx)
+
 
 @dataclass(slots=True)
 class SrcEndPoint(EndPoint):
@@ -269,6 +277,10 @@ class SrcEndPoint(EndPoint):
     def invert_key(self) -> DstEndPointHash:
         """Invert hash. Return a hash for the source endpoint equivilent."""
         return self.key_base() + 'd'
+
+    def as_ref(self) -> SrcEndPointReference:
+        """Return a reference to this end point."""
+        return SrcEndPointReference(self.row, self.idx)
 
 
 def isDstEndPoint(ep: EndPoint) -> TypeGuard[DstEndPoint]:
