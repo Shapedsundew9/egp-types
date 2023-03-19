@@ -215,6 +215,7 @@
             },
             "B": {
                 "required": false,
+                "dependencies": "A",
                 "schema": {
                     "items": [
                         {
@@ -265,6 +266,7 @@
                 "type": "list"
             },
             "F": {
+                "dependencies": "P",
                 "maxlength": 1,
                 "minlength": 1,
                 "required": false,
@@ -326,6 +328,7 @@
             },
             "P": {
                 "required": false,
+                "dependencies": "F",
                 "schema": {
                     "items": [
                         {
@@ -656,17 +659,17 @@
     "properties": {
         "check_with": "valid_properties",
         "default": 0,
-        "max": 9223372036854776000,
+        "max": 9223372036854775807,
         "meta": {
             "description": "The properties of the inputs & outputs"
         },
-        "min": -9223372036854776000,
+        "min": -9223372036854775808,
         "type": "integer"
     },
     "reference_count": {
         "check_with": "valid_reference_count",
         "default": 0,
-        "max": 9223372036854776000,
+        "max": 9223372036854775807,
         "meta": {
             "description": "The number of times this code is referenced in other codes. If this code is referenced by code A once and no other then the reference count is 1. If genetic code X is then referenced by genetic code Y this code is referenced by both X & Y (through X) and the count is 2."
         },

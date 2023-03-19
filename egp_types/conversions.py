@@ -128,7 +128,7 @@ def memoryview_to_bytes(obj) -> bytes | None:
     return None if obj is None else bytes(obj)
 
 
-def str_to_sha256(obj) -> bytearray | memoryview | bytes | None:
+def str_to_sha256(obj: str | bytearray | memoryview | bytes | None) -> bytearray | memoryview | bytes | None:
     """Convert a hexidecimal string to a bytearray.
 
     Args
@@ -148,7 +148,7 @@ def str_to_sha256(obj) -> bytearray | memoryview | bytes | None:
     raise TypeError(f"Un-encodeable type '{type(obj)}': Expected 'str' or byte type.")
 
 
-def str_to_uuid(obj) -> UUID | None:
+def str_to_uuid(obj: str | UUID | None) -> UUID | None:
     """Convert a UUID formated string to a UUID object.
 
     Args
@@ -168,7 +168,7 @@ def str_to_uuid(obj) -> UUID | None:
     raise TypeError(f"Un-encodeable type '{type(obj)}': Expected 'str' or UUID type.")
 
 
-def str_to_datetime(obj) -> datetime | None:
+def str_to_datetime(obj: str | datetime | None) -> datetime | None:
     """Convert a datetime formated string to a datetime object.
 
     Args
@@ -188,7 +188,7 @@ def str_to_datetime(obj) -> datetime | None:
     raise TypeError(f"Un-encodeable type '{type(obj)}': Expected 'str' or datetime type.")
 
 
-def sha256_to_str(obj: bytes) -> str | None:
+def sha256_to_str(obj: bytearray | bytes | str | None) -> str | None:
     """Convert a bytearray to its lowercase hexadecimal string representation.
 
     Args
@@ -199,10 +199,16 @@ def sha256_to_str(obj: bytes) -> str | None:
     -------
     (str): Lowercase hexadecimal string.
     """
-    return None if obj is None else obj.hex()
+    if isinstance(obj, (bytes, bytearray)):
+        return obj.hex()
+    if isinstance(obj, str):
+        return obj
+    if obj is None:
+        return None
+    raise TypeError(f"Un-encodeable type '{type(obj)}': Expected bytes, bytearray or str type.")
 
 
-def uuid_to_str(obj: UUID) -> str | None:
+def uuid_to_str(obj: UUID | str | None) -> str | None:
     """Convert a UUID to its lowercase hexadecimal string representation.
 
     Args
@@ -213,10 +219,16 @@ def uuid_to_str(obj: UUID) -> str | None:
     -------
     (str): Lowercase hexadecimal UUID string.
     """
-    return None if obj is None else str(obj)
+    if isinstance(obj, UUID):
+        return str(obj)
+    if isinstance(obj, str):
+        return obj
+    if obj is None:
+        return None
+    raise TypeError(f"Un-encodeable type '{type(obj)}': Expected UUID or str type.")
 
 
-def datetime_to_str(obj: datetime) -> str | None:
+def datetime_to_str(obj: datetime | str | None) -> str | None:
     """Convert a datetime to its string representation.
 
     Args
@@ -227,10 +239,16 @@ def datetime_to_str(obj: datetime) -> str | None:
     -------
     (str): datetime string.
     """
-    return None if obj is None else obj.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    if isinstance(obj, datetime):
+        return obj.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    if isinstance(obj, str):
+        return obj
+    if obj is None:
+        return None
+    raise TypeError(f"Un-encodeable type '{type(obj)}': Expected bytes, bytearray or str type.")
 
 
-def encode_properties(obj: dict | int) -> int:
+def encode_properties(obj: dict[str, bool] | int | None) -> int:
     """Encode the properties dictionary into its integer representation.
 
     The properties field is a dictionary of properties to boolean values. Each
@@ -252,10 +270,12 @@ def encode_properties(obj: dict | int) -> int:
         return bitfield
     if isinstance(obj, int):
         return obj
+    if obj is None:
+        return 0
     raise TypeError(f"Un-encodeable type '{type(obj)}': Expected 'dict' or integer type.")
 
 
-def decode_properties(obj: int) -> dict[str, bool]:
+def decode_properties(obj: int | dict[str, bool] | None) -> dict[str, bool]:
     """Decode the properties dictionary from its integer representation.
 
     The properties field is a dictionary of properties to boolean values. Each
@@ -270,4 +290,10 @@ def decode_properties(obj: int) -> dict[str, bool]:
     -------
     (dict): Properties dictionary.
     """
-    return {b: bool(f & obj) for b, f in PROPERTIES.items()}
+    if isinstance(obj, dict):
+        return obj
+    if isinstance(obj, int):
+        return {b: bool(f & obj) for b, f in PROPERTIES.items()}
+    if obj is None:
+        return {b: False for b, f in PROPERTIES.items()}
+    raise TypeError(f"Un-encodeable type '{type(obj)}': Expected 'dict' or integer type.")

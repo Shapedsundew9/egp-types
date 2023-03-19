@@ -9,7 +9,7 @@
         "coerce": "datetime_str_to_datetime"
     },
     "creator": {
-        "coerce": "UUID_str_to_UUID"
+        "coerce": "uuid_str_to_uuid"
     },
     "gca": {
         "coerce": "signature_str_to_binary"

@@ -25,24 +25,24 @@ with open(join(dirname(__file__), "formats/gms_entry_format.json"), "r", encodin
 # LGC is the storage schema for the Genomic Libray
 LGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GMS_ENTRY_SCHEMA)
 with open(join(dirname(__file__), "formats/LGC_entry_format.json"), "r", encoding="utf8") as file_ptr:
-    merge(LGC_ENTRY_SCHEMA, load(file_ptr))
+    merge(LGC_ENTRY_SCHEMA, load(file_ptr), update=True)
 
 LGC_JSON_LOAD_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(LGC_ENTRY_SCHEMA)
 with open(join(dirname(__file__), "formats/LGC_json_load_entry_format.json"), "r", encoding="utf8") as file_ptr:
-    merge(LGC_JSON_LOAD_ENTRY_SCHEMA, load(file_ptr))
+    merge(LGC_JSON_LOAD_ENTRY_SCHEMA, load(file_ptr), update=True)
 
 LGC_JSON_DUMP_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(LGC_ENTRY_SCHEMA)
 with open(join(dirname(__file__), "formats/LGC_json_dump_entry_format.json"), "r", encoding="utf8") as file_ptr:
-    merge(LGC_JSON_DUMP_ENTRY_SCHEMA, load(file_ptr))
+    merge(LGC_JSON_DUMP_ENTRY_SCHEMA, load(file_ptr), update=True)
 
 # GGC is the storage schema for the Gene Pool
 GGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GMS_ENTRY_SCHEMA)
 with open(join(dirname(__file__), "formats/gGC_entry_format.json"), "r", encoding="utf8") as file_ptr:
-    merge(GGC_ENTRY_SCHEMA, load(file_ptr))
+    merge(GGC_ENTRY_SCHEMA, load(file_ptr), update=True)
 
 # XGC_ENTRY_SCHEMA is the superset schema from which transient xGC's can be validated
 XGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GGC_ENTRY_SCHEMA)
-merge(XGC_ENTRY_SCHEMA, LGC_ENTRY_SCHEMA)
+merge(XGC_ENTRY_SCHEMA, LGC_ENTRY_SCHEMA, update=True)
 
 # Pull the grpah schema out of the GMS schema to create a standalone validator.
 GRAPH_SCHEMA: dict[str, dict[str, Any]] = {'graph': deepcopy(GMS_ENTRY_SCHEMA['graph'])}

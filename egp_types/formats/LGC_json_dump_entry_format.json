@@ -1,35 +1,119 @@
 {
     "ancestor_a": {
-        "coerce": "signature_binary_to_str"
+        "coerce": "signature_binary_to_str",
+        "minlength": 64,
+        "maxlength": 64,
+        "type": "string"
     },
     "ancestor_b": {
-        "coerce": "signature_binary_to_str"
+        "coerce": "signature_binary_to_str",
+        "minlength": 64,
+        "maxlength": 64,
+        "type": "string"
     },
     "created": {
-        "coerce": "datetime_to_datetime_str"
+        "coerce": "datetime_to_datetime_str",
+        "type": "string",
+        "minlength": 27,
+        "maxlength": 27,
+        "regex": "20[2-9][0-9]-(1[0-2]|0[1-9])-([0-2][0-9]|3[01])T[0-2][0-9](:[0-5][0-9]){2}\\.[0-9]{6}Z"
     },
     "creator": {
-        "coerce": "UUID_to_UUID_str"
+        "coerce": "uuid_to_uuid_str",
+        "minlength": 36,
+        "maxlength": 36,
+        "regex": "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+        "type": "string"
     },
     "gca": {
-        "coerce": "signature_binary_to_str"
+        "coerce": "signature_binary_to_str",
+        "minlength": 64,
+        "maxlength": 64,
+        "type": "string"
     },
     "gcb": {
-        "coerce": "signature_binary_to_str"
+        "coerce": "signature_binary_to_str",
+        "minlength": 64,
+        "maxlength": 64,
+        "type": "string"
     },
     "pgc": {
-        "coerce": "signature_binary_to_str"
+        "coerce": "signature_binary_to_str",
+        "minlength": 64,
+        "maxlength": 64,
+        "type": "string"
     },
     "properties": {
-        "coerce": "properties_int_to_dict"
+        "coerce": "properties_int_to_dict",
+        "type": "dict",
+        "schema": {
+            "extended": {
+                "type": "boolean",
+                "default": false
+            },
+            "constant": {
+                "type": "boolean",
+                "default": false
+            },
+            "conditional": {
+                "type": "boolean",
+                "default": false
+            },
+            "deterministic": {
+                "type": "boolean",
+                "default": false
+            },
+            "memory_modify": {
+                "type": "boolean",
+                "default": false
+            },
+            "object_modify": {
+                "type": "boolean",
+                "default": false
+            },
+            "physical": {
+                "type": "boolean",
+                "default": false
+            },
+            "arithmetic": {
+                "type": "boolean",
+                "default": false
+            },
+            "logical": {
+                "type": "boolean",
+                "default": false
+            },
+            "bitwise": {
+                "type": "boolean",
+                "default": false
+            },
+            "boolean": {
+                "type": "boolean",
+                "default": false
+            },
+            "sequence": {
+                "type": "boolean",
+                "default": false
+            }
+        }        
     },
     "signature": {
-        "coerce": "signature_binary_to_str"
+        "coerce": "signature_binary_to_str",
+        "minlength": 64,
+        "maxlength": 64,
+        "type": "string"
     },
     "sms": {
-        "coerce": "signature_binary_to_str"
+        "coerce": "signature_binary_to_str",
+        "minlength": 64,
+        "maxlength": 64,
+        "type": "string"
     },
     "updated": {
-        "coerce": "datetime_to_datetime_str"
+        "coerce": "datetime_to_datetime_str",
+        "type": "string",
+        "minlength": 27,
+        "maxlength": 27,
+        "regex": "20[2-9][0-9]-(1[0-2]|0[1-9])-([0-2][0-9]|3[01])T[0-2][0-9](:[0-5][0-9]){2}\\.[0-9]{6}Z"
     }
 }

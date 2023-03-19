@@ -10,8 +10,8 @@ from typing import LiteralString, Any
 
 import pytest
 from egp_types.ep_type import EP_TYPE_VALUES, INVALID_EP_TYPE_VALUE, asint
-from egp_types.gc_graph import (DESTINATION_ROWS, DST_EP, SOURCE_ROWS,
-                                  SRC_EP, conn_idx, const_idx, gc_graph)
+from egp_types.egp_typing import DESTINATION_ROWS, VALID_ROW_SOURCES, SOURCE_ROWS, SRC_EP, DST_EP
+from egp_types.gc_graph import gc_graph
 
 
 _logger: Logger = getLogger(__name__)
@@ -55,7 +55,7 @@ with open(join(dirname(__file__), _TEST_RESULTS_JSON), 'r', encoding='utf-8') as
     results: dict[str, Any] = load(results_file)
 
 
-def random_type(p=0.0):
+def random_type(probability: float = 0.0) -> int:
     """Choose a random type.
 
     If a random type is selected the probability of each type is even.
@@ -63,20 +63,20 @@ def random_type(p=0.0):
 
     Args
     ----
-    p (float): Probablity that the type is random (otherwise it is an 'int')
+    probability: Probablity that the type is random (otherwise it is an 'int')
 
     Returns
     -------
-    (str) The selected type string.
+    The selected type integer value.
     """
-    if random() < p:
+    if random() < probability:
         value: int = choice(tuple(EP_TYPE_VALUES))
         if value != INVALID_EP_TYPE_VALUE:
             return value
     return asint('builtins_int')
 
 
-def random_graph(p=0.0, must_be_valid=False):  # noqa: C901
+def random_graph(probability: float = 0.0, must_be_valid: bool = False):  # noqa: C901
     """Create a random graph.
 
     The graph is not guaranteed to be valid when p > 0.0. If a destination row requires a type that
@@ -84,7 +84,7 @@ def random_graph(p=0.0, must_be_valid=False):  # noqa: C901
 
     Args
     ----
-    p (float): 0.0 <= p <= 1.0 probability of choosing a random type on each type selection.
+    probability: 0.0 <= p <= 1.0 probability of choosing a random type on each type selection.
 
     Returns
     -------
@@ -93,17 +93,17 @@ def random_graph(p=0.0, must_be_valid=False):  # noqa: C901
     valid = False
     while not valid:
         graph = gc_graph()
-        structure = choice(_VALID_STRUCTURES)
+        structure: tuple[LiteralString, ...] = choice(_VALID_STRUCTURES)
         valid = False
         while not valid:
-            destinations = {row: randint(1, 10) for row in structure if row in DESTINATION_ROWS and row not in ('F', 'U', 'P')}
+            destinations: dict[str, int] = {row: randint(1, 10) for row in structure if row in DESTINATION_ROWS and row not in ('F', 'U', 'P')}
             if 'F' in structure:
                 destinations['F'] = 1
-            sources = {row: randint(1, 8) for row in structure if row in SOURCE_ROWS and row not in ('U', 'P')}
-            destination_types = [random_type(p) for row in destinations.values() for _ in range(row)]
+            sources: dict[str, int] = {row: randint(1, 8) for row in structure if row in SOURCE_ROWS and row not in ('U', 'P')}
+            destination_types: list[int] = [random_type(probability) for row in destinations.values() for _ in range(row)]
             type_set = set(destination_types)
             valid = sum(sources.values()) >= len(type_set)
-        source_types = [random_type(p) for _ in range(sum(sources.values()))]
+        source_types: list[int] = [random_type(probability) for _ in range(sum(sources.values()))]
         indices = choice(sum(sources.values()), len(type_set), replace=False)
         for idx in indices:
             source_types[idx] = type_set.pop()

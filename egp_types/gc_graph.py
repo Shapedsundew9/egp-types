@@ -10,7 +10,6 @@ defines the rules of the connectivity (the "physics") i.e. what is possible to o
 from collections import Counter
 from logging import DEBUG, Logger, NullHandler, getLogger
 from math import sqrt
-from pprint import pformat
 from random import choice, randint, sample
 from typing import Any, Iterable, Literal, LiteralString, Sequence
 
@@ -43,7 +42,6 @@ from .end_point import (dst_end_point, dst_end_point_ref, end_point,
 from .ep_type import (REAL_EP_TYPE_VALUES, asint, asstr, compatible,
                       import_str, type_str, validate)
 from .internal_graph import internal_graph
-from .xgc_validator import graph_validator
 
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
@@ -257,8 +255,9 @@ class gc_graph():
             if 'C' not in graph:
                 graph['C'] = []
             graph.setdefault('C', []).append((ep.typ, ep.val))
-        if _LOG_DEBUG and not graph_validator.validate({'graph': graph}):
-            raise ValueError(f"Connection graph is not valid:\n{pformat(graph, indent=4)}\n\n{graph_validator.error_str()}")
+        # FIXME: Validation would be useful here but a cirtcular reference at the moment.
+        # if _LOG_DEBUG and not graph_validator.validate({'graph': graph}):
+        #    raise ValueError(f"Connection graph is not valid:\n{pformat(graph, indent=4)}\n\n{graph_validator.error_str()}")
         return graph
 
     def nx_graph(self) -> DiGraph:
