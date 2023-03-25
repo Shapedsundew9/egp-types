@@ -51,9 +51,15 @@ def _real_type_filter(v) -> bool:
     return v < _EGP_TYPE_LIMIT and v >= _EGP_REAL_TYPE_LIMIT
 
 
-SPECIAL_EP_TYPE_VALUES: tuple[int, ...] = tuple((v for v in filter(_special_type_filter, ep_type_lookup['n2v'].values())))
-PHYSICAL_EP_TYPE_VALUES: tuple[int, ...] = tuple((v for v in filter(_physical_type_filter, ep_type_lookup['n2v'].values())))
-REAL_EP_TYPE_VALUES: tuple[int, ...] = tuple((v for v in filter(_real_type_filter, ep_type_lookup['n2v'].values())))
+SPECIAL_EP_TYPE_VALUES: tuple[int, ...] = tuple((v for v in filter(_special_type_filter, ep_type_lookup['v2n'])))
+PHYSICAL_EP_TYPE_VALUES: tuple[int, ...] = tuple((v for v in filter(_physical_type_filter, ep_type_lookup['v2n'])))
+REAL_EP_TYPE_VALUES: tuple[int, ...] = tuple((v for v in filter(_real_type_filter, ep_type_lookup['v2n'])))
+_EP_TYPE_VALUES: tuple[int, ...] = (*PHYSICAL_EP_TYPE_VALUES, *REAL_EP_TYPE_VALUES)
+MIN_EP_TYPE_VALUE: int = min(_EP_TYPE_VALUES)
+MAX_EP_TYPE_VALUE: int = max(_EP_TYPE_VALUES)
+assert len(set(_EP_TYPE_VALUES)) == len(_EP_TYPE_VALUES), "Duplicate end point types detected!"
+assert max(_EP_TYPE_VALUES) - min(_EP_TYPE_VALUES) == len(_EP_TYPE_VALUES) - 1, "End point types must be contiguous!"
+
 _logger.info(f"{len(SPECIAL_EP_TYPE_VALUES)} special endpoint types identified.")
 _logger.info(f"{len(PHYSICAL_EP_TYPE_VALUES)} physical endpoint types identified.")
 _logger.info(f"{len(REAL_EP_TYPE_VALUES)} real endpoint types identified.")

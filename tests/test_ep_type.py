@@ -5,7 +5,7 @@ from logging import NullHandler, getLogger, Logger
 import pytest
 
 from egp_types.eGC import eGC
-from egp_types.ep_type import (EP_TYPE_VALUES, INVALID_EP_TYPE_NAME,
+from egp_types.ep_type import (_EP_TYPE_VALUES, INVALID_EP_TYPE_NAME,
                                INVALID_EP_TYPE_VALUE, UNKNOWN_EP_TYPE_NAME,
                                UNKNOWN_EP_TYPE_VALUE, asint, asstr, compatible,
                                import_str, instance_str, type_str, validate,
@@ -213,7 +213,7 @@ def test_asstr_ep_type_str() -> None:
 
 def test_import_str() -> None:
     """Check 'None' is returned in at least some cases."""
-    assert 'None' in (import_str(eptv) for eptv in EP_TYPE_VALUES)
+    assert 'None' in (import_str(eptv) for eptv in _EP_TYPE_VALUES)
 
 
 def test_compatible() -> None:
@@ -233,7 +233,7 @@ def test_type_str(ep_type_int, string) -> None:
     assert type_str(ep_type_int) == string
 
 
-@pytest.mark.parametrize("ep_type_int", EP_TYPE_VALUES)
+@pytest.mark.parametrize("ep_type_int", _EP_TYPE_VALUES)
 def test_instance_str(ep_type_int) -> None:
     """Confirm all types can be instanciated."""
     # FIXME: -3 id gGC which is excluded as it has moved to egp_population and wouldcause a circular import

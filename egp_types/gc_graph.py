@@ -11,7 +11,7 @@ from collections import Counter
 from logging import DEBUG, Logger, NullHandler, getLogger
 from math import sqrt
 from random import choice, randint, sample
-from typing import Any, Iterable, Literal, LiteralString, Sequence
+from typing import Any, Iterable, Literal, LiteralString, Sequence, Self
 
 import gi
 
@@ -29,7 +29,7 @@ from cairo import (FONT_WEIGHT_BOLD,  # pylint: disable=no-name-in-module
 from egp_utils.text_token import register_token_code, text_token
 from graph_tool import EdgePropertyMap, Graph, VertexPropertyMap
 from graph_tool.draw import graph_draw
-from networkx import DiGraph, get_node_attributes, spring_layout
+from networkx import DiGraph, get_node_attributes, spring_layout  # type: ignore
 
 from .egp_typing import (CPI, CVI, DST_EP, ROWS, SOURCE_ROWS, SRC_EP,
                          VALID_ROW_SOURCES, ConnectionGraph, DestinationRow,
@@ -589,14 +589,16 @@ class gc_graph():
         """
         return self.rows[ep_cls].get(row, 0)
 
-    def reindex_row(self, row: Literal['I', 'C', 'P', 'U', 'O']) -> None:
+    def reindex_row(self, row: Row) -> None:
         """Re-index row.
 
         If end points have been removed from a row the row will need
         reindexing so the indicies are contiguous (starting at 0).
 
-        Rows A & B cannot be reindexed as their interfaces are bound to
+        Rows A & B cannot be reindexed in normal operation as their interfaces are bound to
         a GC definition.
+
+        All rows are supported for re-indexing to generate test cases.
 
         Args
         ----
@@ -618,6 +620,20 @@ class gc_graph():
             del self.i_graph[ep.key()]
             ep.idx = r_map[ep.idx]
             self.i_graph[ep.key()] = ep
+
+    def purge_unconnectable_types(self) -> None:
+        """This is a test case function.
+
+        Remove any destination endpoints that do not have compatible source endpoints.
+        This is not a useful function in normal operation.
+        """
+        for row in self.rows[DST_EP]:
+            src_types: set[int] = {ep.typ for ep in self.i_graph.src_rows_filter(VALID_ROW_SOURCES[self.has_f][row])}
+            dst_types: set[int] = {ep.typ for ep in self.i_graph.dst_row_filter(row)}
+            unconnectable_types: set[int] = dst_types - src_types
+            for unconnectable_type in unconnectable_types:
+                for ep in filter(lambda x, uct=unconnectable_type: x.typ == uct, self.i_graph.dst_row_filter(row)):
+                    self._remove_ep(ep)
 
     def normalize(self) -> bool:
         """Make the graph consistent.
@@ -927,3 +943,6 @@ class gc_graph():
         A list of integers which are ep_type_ints in the order defined in the graph.
         """
         return [ep.typ for ep in sorted(self.i_graph.row_filter('O'), key=lambda x: x.idx)]
+
+    def stack(self, _: Self) -> Self:
+        return self

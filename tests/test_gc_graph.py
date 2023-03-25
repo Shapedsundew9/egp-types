@@ -2,52 +2,24 @@
 
 from copy import deepcopy
 from json import load
+from logging import DEBUG, Logger, NullHandler, getLogger
 from os.path import dirname, join
 from random import randint, random
-from numpy.random import choice
-from logging import DEBUG, NullHandler, getLogger, Logger
-from typing import LiteralString, Any
+from typing import Any
 
 import pytest
-from egp_types.ep_type import EP_TYPE_VALUES, INVALID_EP_TYPE_VALUE, asint
-from egp_types.egp_typing import DESTINATION_ROWS, VALID_ROW_SOURCES, SOURCE_ROWS, SRC_EP, DST_EP
-from egp_types.gc_graph import gc_graph
+from numpy.random import choice
+from surebrec.surebrec import generate
 
+from egp_types.egp_typing import DST_EP, SRC_EP, ConnectionGraph
+from egp_types.ep_type import EP_TYPE_VALUES, INVALID_EP_TYPE_VALUE, asint
+from egp_types.gc_graph import gc_graph
+from egp_types.xgc_validator import LGC_entry_validator
 
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
 _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
-
-
 _TEST_RESULTS_JSON = 'data/test_gc_graph_results.json'
-_VALID_STRUCTURES: tuple[tuple[LiteralString, ...], ...] = (
-    ('A', 'O'),
-    ('C', 'O'),     # TODO: Is this valid?
-    ('I', 'O'),     # TODO: Is this valid?
-    ('A', 'O', 'U'),
-    ('C', 'O', 'U'),
-    ('I', 'O', 'U'),     # TODO: Is this valid?
-    ('A', 'C', 'O'),
-    ('A', 'I', 'O'),
-    ('A', 'B', 'O'),
-    ('I', 'C', 'O'),     # TODO: Is this valid?
-    ('A', 'C', 'O', 'U'),
-    ('A', 'I', 'O', 'U'),
-    ('A', 'B', 'O', 'U'),
-    ('I', 'C', 'O', 'U'),     # TODO: Is this valid?
-    ('A', 'C', 'O', 'B'),
-    ('A', 'I', 'O', 'B'),
-    ('I', 'O', 'F', 'P'),
-    ('A', 'C', 'O', 'B', 'U'),
-    ('A', 'I', 'O', 'B', 'U'),
-    ('I', 'O', 'F', 'P', 'U'),
-    ('A', 'I', 'O', 'F', 'P'),
-    ('I', 'C', 'O', 'F', 'P'),
-    ('A', 'I', 'O', 'F', 'P', 'U'),
-    ('I', 'C', 'O', 'F', 'P', 'U'),
-    ('A', 'I', 'O', 'B', 'F', 'P'),
-    ('A', 'I', 'O', 'B', 'F', 'P', 'U')
-)
 
 
 # Types are in string format for readability in the results file.
@@ -76,7 +48,7 @@ def random_type(probability: float = 0.0) -> int:
     return asint('builtins_int')
 
 
-def random_graph(probability: float = 0.0, must_be_valid: bool = False):  # noqa: C901
+def random_graph(probability: float = 0.0) -> gc_graph:
     """Create a random graph.
 
     The graph is not guaranteed to be valid when p > 0.0. If a destination row requires a type that
@@ -85,60 +57,17 @@ def random_graph(probability: float = 0.0, must_be_valid: bool = False):  # noqa
     Args
     ----
     probability: 0.0 <= p <= 1.0 probability of choosing a random type on each type selection.
-
-    Returns
-    -------
-    graph
     """
-    valid = False
-    while not valid:
-        graph = gc_graph()
-        structure: tuple[LiteralString, ...] = choice(_VALID_STRUCTURES)
-        valid = False
-        while not valid:
-            destinations: dict[str, int] = {row: randint(1, 10) for row in structure if row in DESTINATION_ROWS and row not in ('F', 'U', 'P')}
-            if 'F' in structure:
-                destinations['F'] = 1
-            sources: dict[str, int] = {row: randint(1, 8) for row in structure if row in SOURCE_ROWS and row not in ('U', 'P')}
-            destination_types: list[int] = [random_type(probability) for row in destinations.values() for _ in range(row)]
-            type_set = set(destination_types)
-            valid = sum(sources.values()) >= len(type_set)
-        source_types: list[int] = [random_type(probability) for _ in range(sum(sources.values()))]
-        indices = choice(sum(sources.values()), len(type_set), replace=False)
-        for idx in indices:
-            source_types[idx] = type_set.pop()
-        for _ in range(len(type_set)):
-            source_types[randint(len(source_types))] = type_set
-
-        for row in structure:
-            if row not in ('U', 'P'):
-                if row in DESTINATION_ROWS and any([src_row in structure for src_row in gc_graph.src_rows[row]]):
-                    for i in range(destinations[row]):
-                        rtype = destination_types.pop()
-                        graph._add_ep([DST_EP, row, i, rtype, []])
-                        if row == 'O' and 'P' in structure:
-                            graph._add_ep([DST_EP, 'P', i, rtype, []])
-
-                if row in SOURCE_ROWS:
-                    for i in range(sources[row]):
-                        ep = [SRC_EP, row, i, source_types.pop(), []]
-                        if row == 'C':
-                            ep.append('int(' + str(randint(-1000, 1000)) + ')')
-                            ep[3] = asint('builtins_int')
-                        graph._add_ep(ep)
-
-        for _ in range(len(list(filter(graph.dst_filter(), graph.graph.values())))):
-            graph.random_add_connection()
-        # graph.reindex_row('C')
-        graph.normalize()
-        valid = graph.validate() or not must_be_valid
-        if _LOG_DEBUG:
-            _logger.debug(f"Random graph generated:\n{graph}")
-    return graph
+    rc_graph: ConnectionGraph = generate(LGC_entry_validator, 1)[0]['graph']  # type: ignore
+    gcg = gc_graph(rc_graph)
+    gcg.remove_all_connections()
+    gcg.purge_unconnectable_types()
+    gcg.normalize()
+    return gcg
 
 
 @pytest.mark.parametrize("i, case", enumerate(results))
-def test_graph_validation(i, case):
+def test_graph_validation(i, case) -> None:
     """Verification the validate() method correctly functions."""
     gcg = gc_graph(case['graph'])
     assert i == case['i']
@@ -148,14 +77,14 @@ def test_graph_validation(i, case):
 
 
 @pytest.mark.parametrize("i, case", enumerate(results))
-def test_graph_str(i, case):
+def test_graph_str(i, case) -> None:
     """Verification the __repr__() method is not broken."""
     gcg = gc_graph(case['graph'])
     assert str(gcg)
 
 
 @pytest.mark.parametrize("i, case", enumerate(results))
-def test_graph_draw(i, case):
+def test_graph_draw(i, case) -> None:
     """Verification the draw() method is not broken."""
     gcg = gc_graph(case['graph'])
     if case['valid']:
@@ -163,40 +92,37 @@ def test_graph_draw(i, case):
 
 
 @pytest.mark.parametrize("i, case", enumerate(results))
-def test_graph_internal(i, case):
-    """Verification initializing with an internal representation is self consdistent."""
+def test_graph_internal(i, case) -> None:
+    """Verification initializing with an internal representation is self consistent."""
     gcg = gc_graph(case['graph'])
-    assert gcg.connection_graph() == gc_graph(internal=deepcopy(gcg.save())).connection_graph()
-    assert gcg.graph == gc_graph(internal=deepcopy(gcg.save())).graph
+    _logger.debug(f'Case {i}')
+    assert gcg.connection_graph() == gc_graph(i_graph=deepcopy(gcg.i_graph)).connection_graph()
 
 
 @pytest.mark.parametrize("i, case", enumerate(results))
-def test_graph_conversion(i, case):
+def test_graph_conversion(i, case) -> None:
     """Verification that converting to internal format and back again is the identity operation."""
     gcg = gc_graph(case['graph'])
     assert i == case['i']
     if case['valid']:
-        for k, v in case['graph'].items():
-            idx = const_idx.TYPE if k == 'C' else conn_idx.TYPE
-            for r in v:
-                r[idx] = r[idx]
         assert case['graph'] == gcg.connection_graph()
 
 
 @pytest.mark.parametrize("test", range(100))
-def test_remove_connection_simple(test):
+def test_remove_connection_simple(test) -> None:
     """Verify adding connections makes valid graphs.
 
     Create a random graph remove some connections & re-normalise.
-    To keep it simple all the endpoints have the same type ("int").
+    To keep it simple all the endpoints -> None have the same type ("int").
     """
     # TODO: These random test cases need to be made static when we are confident in them.
     # Generate them into a JSON file.
-    graph = random_graph()
+    _logger.debug(f'Case {test}')
+    graph: gc_graph = random_graph()
     assert graph.validate()
 
-    # TODO: Split this out into its own test case when the graphs are staticly defined in a JSON file.
-    for _ in range(int(len(list(filter(graph.dst_filter(), graph.graph.values()))) / 2)):
+    # TOD: gc_graphO: Split this out into its own test case when the graphs are staticly defined in a JSON file.
+    for _ in range(int(sum(graph.rows[DST_EP].values()) / 2)):
         graph.random_remove_connection()
     graph.normalize()
     assert graph.validate()
@@ -204,7 +130,7 @@ def test_remove_connection_simple(test):
 
 
 @pytest.mark.parametrize("test", range(100))
-def test_add_connection(test):
+def test_add_connection(test) -> None:
     """Verify adding connections makes valid graphs.
 
     In this version multiple types endpoint types are used. This can lead to a legitimate invalid
@@ -212,7 +138,8 @@ def test_add_connection(test):
     """
     # TODO: These random test cases need to be made static when we are confident in them.
     # Generate them into a JSON file.
-    gc = random_graph(0.5)
+    _logger.debug(f'Case {test}')
+    gc: gc_graph = random_graph(0.5)
     if not gc.validate():
         codes = set([t.code for t in gc.status])
         codes.discard('E01001')
@@ -268,8 +195,8 @@ def test_stack(test):
     if not test:
         none_limit = 500
 
-    gA = random_graph(0.5, True)
-    gB = random_graph(0.5, True)
+    gA = random_graph(0.5)
+    gB = random_graph(0.5)
     gC = gA.stack(gB)
 
     if gC is None:
@@ -298,10 +225,10 @@ def test_add_input_simple(test):
     graph = random_graph()
     assert graph.validate()
 
-    before = graph.num_inputs()
+    before = graph.rows[SRC_EP]['I']
     graph.add_input()
     graph.normalize()
-    after = graph.num_inputs()
+    after = graph.rows[SRC_EP]['I']
     assert graph.validate()
     assert after == before + 1
     # graph.draw(join(_log_location, 'graph_' + str(test)))
@@ -319,10 +246,10 @@ def test_remove_input_simple(test):
     graph = random_graph()
     assert graph.validate()
 
-    before = graph.num_inputs()
+    before = graph.rows[SRC_EP]['I']
     graph.remove_input()
     graph.normalize()
-    after = graph.num_inputs()
+    after = graph.rows[SRC_EP]['I']
 
     # E1001 & E01016 are a legit error when removing an input.
     if not graph.validate():
@@ -346,10 +273,10 @@ def test_add_output_simple(test):
     graph = random_graph()
     assert graph.validate()
 
-    before = graph.num_outputs()
+    before = graph.rows[DST_EP]['O']
     graph.add_output(asint('builtins_int'))
     graph.normalize()
-    after = graph.num_outputs()
+    after = graph.rows[DST_EP]['O']
     assert graph.validate()
     assert after == before + 1
     # graph.draw(join(_log_location, 'graph_' + str(test)))
@@ -367,16 +294,16 @@ def test_remove_output_simple(test):
     graph = random_graph()
     assert graph.validate()
 
-    before = graph.num_outputs()
+    before = graph.rows[DST_EP]['O']
     graph.remove_output()
     graph.normalize()
-    after = graph.num_outputs()
+    after = graph.rows[DST_EP]['O']
 
     # E1000 is a legit error when removing an output (no row O).
     if not graph.validate():
         codes = set([t.code for t in graph.status])
 
-        # E1006 (F with no P) can occur 
+        # E1006 (F with no P) can occur
         codes.discard('E01006')
         assert not codes
     if before:

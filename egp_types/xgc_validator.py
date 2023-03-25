@@ -9,13 +9,38 @@ from uuid import UUID
 
 from egp_utils.base_validator import base_validator
 from egp_utils.common import merge
+from cerberus import rules_set_registry
 
 from .conversions import (encode_properties, str_to_datetime, str_to_sha256,
                           str_to_uuid, decode_properties, datetime_to_str,
                           sha256_to_str, uuid_to_str)
-from .ep_type import validate
+from .ep_type import validate, MIN_EP_TYPE_VALUE, MAX_EP_TYPE_VALUE
 from .gc_graph import gc_graph
 from .gc_type_tools import PROPERTIES, define_signature
+
+# End point type values are used in may places. Making a rule
+# helps keep things consistent.
+rules_set_registry.extend(
+    (
+        (
+            'ep_type',
+            {
+                'type': 'integer',
+                'min': MIN_EP_TYPE_VALUE,
+                'max': MAX_EP_TYPE_VALUE,
+                'check_with': 'valid_ep_type'
+            }
+        ),
+        (
+            'ep_idx',
+            {
+                'type': 'integer',
+                'min': 0,
+                'max': 255,
+            }
+        )
+    )
+)
 
 # Storage types schemas
 # The Genetic Material Store (GMS) is the abstract common base schema for LGC & GGC
@@ -120,7 +145,7 @@ class _gms_entry_validator(base_validator):
         if not graph.validate():
             self._error(field, f'graph is invalid: {graph.status}')
 
-    def _check_with_valid_type(self, field: str, value: Any) -> None:
+    def _check_with_valid_ep_type(self, field: str, value: Any) -> None:
         if not validate(value):
             self._error(field, f'ep_type {value} does not exist.')
 

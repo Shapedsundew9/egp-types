@@ -195,17 +195,8 @@
                             ],
                             "type": "string"
                         },
-                        {
-                            "max": 255,
-                            "min": 0,
-                            "type": "integer"
-                        },
-                        {
-                            "check_with": "valid_type",
-                            "max": 32767,
-                            "min": -32768,
-                            "type": "integer"
-                        }
+                        "ep_idx",
+                        "ep_type"
                     ],
                     "maxlength": 3,
                     "minlength": 3,
@@ -226,17 +217,8 @@
                             ],
                             "type": "string"
                         },
-                        {
-                            "max": 255,
-                            "min": 0,
-                            "type": "integer"
-                        },
-                        {
-                            "check_with": "valid_type",
-                            "max": 32767,
-                            "min": -32768,
-                            "type": "integer"
-                        }
+                        "ep_idx",
+                        "ep_type"
                     ],
                     "maxlength": 3,
                     "minlength": 3,
@@ -248,12 +230,7 @@
                 "required": false,
                 "schema": {
                     "items": [
-                        {
-                            "check_with": "valid_type",
-                            "max": 32767,
-                            "min": -32768,
-                            "type": "integer"
-                        },
+                        "ep_type",
                         {
                             "regex": "[a-zA-Z][a-zA-Z0-9_]{1,64}",
                             "type": "string"
@@ -266,7 +243,6 @@
                 "type": "list"
             },
             "F": {
-                "dependencies": "P",
                 "maxlength": 1,
                 "minlength": 1,
                 "required": false,
@@ -278,11 +254,7 @@
                             ],
                             "type": "string"
                         },
-                        {
-                            "max": 255,
-                            "min": 0,
-                            "type": "integer"
-                        },
+                        "ep_idx",
                         {
                             "allowed": [
                                 1
@@ -308,17 +280,8 @@
                             ],
                             "type": "string"
                         },
-                        {
-                            "max": 255,
-                            "min": 0,
-                            "type": "integer"
-                        },
-                        {
-                            "check_with": "valid_type",
-                            "max": 32767,
-                            "min": -32768,
-                            "type": "integer"
-                        }
+                        "ep_idx",
+                        "ep_type"
                     ],
                     "maxlength": 3,
                     "minlength": 3,
@@ -340,17 +303,8 @@
                             ],
                             "type": "string"
                         },
-                        {
-                            "max": 255,
-                            "min": 0,
-                            "type": "integer"
-                        },
-                        {
-                            "check_with": "valid_type",
-                            "max": 32767,
-                            "min": -32768,
-                            "type": "integer"
-                        }
+                        "ep_idx",
+                        "ep_type"
                     ],
                     "maxlength": 3,
                     "minlength": 3,
@@ -371,17 +325,8 @@
                             ],
                             "type": "string"
                         },
-                        {
-                            "max": 255,
-                            "min": 0,
-                            "type": "integer"
-                        },
-                        {
-                            "check_with": "valid_type",
-                            "max": 32767,
-                            "min": -32768,
-                            "type": "integer"
-                        }
+                        "ep_idx",
+                        "ep_type"
                     ],
                     "maxlength": 3,
                     "minlength": 3,
@@ -399,12 +344,7 @@
         "meta": {
             "description": "The set of types of the inputs in ascending order of type number."
         },
-        "schema": {
-            "check_with": "valid_type",
-            "max": 32767,
-            "min": -32768,
-            "type": "integer"
-        },
+        "schema": "ep_type",
         "type": "list"
     },
     "inputs": {
@@ -576,12 +516,7 @@
         "meta": {
             "description": "The set of types of the outputs in ascending order of type number."
         },
-        "schema": {
-            "check_with": "valid_type",
-            "max": 32767,
-            "min": -32768,
-            "type": "integer"
-        },
+        "schema": "ep_type",
         "type": "list"
     },
     "outputs": {
