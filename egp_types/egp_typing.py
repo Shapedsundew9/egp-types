@@ -59,6 +59,22 @@ VALID_ROW_SOURCES: tuple[dict[Row, tuple[SourceRow, ...]], dict[Row, tuple[Sourc
 )
 
 
+def isDestinationRow(row: Row) -> TypeGuard[DestinationRow]:
+    """Narrow a row to a destination row."""
+    return row in DESTINATION_ROWS
+
+
+# Valid destination rows for a given row.
+# The valid destination rows depends on whether there is a row F
+VALID_ROW_DESTINATIONS: tuple[dict[Row, tuple[DestinationRow, ...]], dict[Row, tuple[DestinationRow, ...]]] = (
+    # No row F
+    {k: tuple(d for d, s in VALID_ROW_SOURCES[False].items() if k in s and isDestinationRow(d)) for k in ROWS},
+    # Has row F
+    # F determines if the path through A or B is chosen
+    {k: tuple(d for d, s in VALID_ROW_SOURCES[True].items() if k in s and isDestinationRow(d)) for k in ROWS},
+)
+
+
 class CPI(IntEnum):
     """Indices into a ConnectionPoint."""
     ROW = 0
@@ -68,8 +84,8 @@ class CPI(IntEnum):
 
 class CVI(IntEnum):
     """Indices into a ConstantValue."""
-    TYP = 0
-    VAL = 1
+    VAL = 0
+    TYP = 1
 
 
 class PairIdx(IntEnum):
@@ -84,7 +100,7 @@ class PairIdx(IntEnum):
 ConnectionPoint = tuple[SourceRow, EndPointIndex, EndPointType]
 ConnectionRow = list[ConnectionPoint]
 ConstantExecStr = str
-ConstantValue = tuple[EndPointType, ConstantExecStr]
+ConstantValue = tuple[ConstantExecStr, EndPointType]
 ConstantRow = list[ConstantValue]
 ConnectionGraphPair = tuple[DestinationRow | Literal['C'], ConnectionRow | ConstantRow]
 ConnectionPair = tuple[DestinationRow, ConnectionRow]
@@ -129,13 +145,13 @@ class EndPointTypeLookupFile(TypedDict):
 
 def isInstanciationValue(obj) -> TypeGuard[tuple[str | None, str | None, str | None, str | None, bool]]:
     """Is obj an instance of an instanciation definition."""
-    if not isinstance(obj, tuple):
+    if not isinstance(obj, (tuple, list)):
         return False
     if not len(obj) == 5:
         return False
     if not all((isinstance(element, str) or element is None for element in obj[:4])):
         return False
-    return isinstance(bool, obj[4])
+    return isinstance(obj[4], bool)
 
 
 class EndPointTypeLookup(TypedDict):

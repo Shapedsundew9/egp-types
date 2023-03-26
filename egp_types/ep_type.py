@@ -13,7 +13,7 @@ All other types values are > 0
 from enum import IntEnum
 from hashlib import blake2b
 from json import load
-from logging import Logger, NullHandler, getLogger
+from logging import Logger, NullHandler, getLogger, DEBUG
 from os.path import dirname, join
 from typing import Any, Iterable, Literal
 
@@ -22,6 +22,7 @@ from .egp_typing import (EndPointTypeLookup, EndPointTypeLookupFile,
 
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
+_LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
 
 # Load type data
@@ -132,16 +133,16 @@ def func1(i11n) -> bool:
     return i11n[1][inst.PACKAGE] is not None and i11n[1][inst.PACKAGE] != 'egp_types'
 
 
-for ep_type_int, instn in tuple(filter(func1, ep_type_lookup['instanciation'].items())):
+for _ep_type_int, instn in tuple(filter(func1, ep_type_lookup['instanciation'].items())):
     try:
-        exec(import_str(ep_type_int))  # pylint: disable=exec-used
+        exec(import_str(_ep_type_int))  # pylint: disable=exec-used
     except ModuleNotFoundError:
         _logger.warning(f"Module '{instn[inst.MODULE]}' was not found. '{instn[inst.NAME]}' will be treated as an INVALID type.")
-        del ep_type_lookup['n2v'][ep_type_lookup['v2n'][ep_type_int]]
-        del ep_type_lookup['instanciation'][ep_type_int]
-        del ep_type_lookup['v2n'][ep_type_int]
+        del ep_type_lookup['n2v'][ep_type_lookup['v2n'][_ep_type_int]]
+        del ep_type_lookup['instanciation'][_ep_type_int]
+        del ep_type_lookup['v2n'][_ep_type_int]
     else:
-        _logger.info(import_str(ep_type_int))
+        _logger.info(import_str(_ep_type_int))
 
 
 def func2(i11n) -> bool:
@@ -329,7 +330,7 @@ def instance_str(ep_type_i: int, param_str: str = '') -> str:
     -------
     The instanciation e.g. numpy_float32(<param_str>)
     """
-    inst_str: str = type_str(ep_type_int)
+    inst_str: str = type_str(_ep_type_int)
     if ep_type_lookup['instanciation'][ep_type_i][inst.PARAM]:
         inst_str += f'({param_str})'
     return inst_str
@@ -408,3 +409,37 @@ def ordered_interface_hash(input_types: Iterable[int], output_types: Iterable[in
     ihash.update(outputs)
     ihash_val: int = int.from_bytes(ihash.digest(), 'big')
     return (0x7FFFFFFFFFFFFFFF & ihash_val) - (ihash_val & (1 << 63))
+
+
+def validate_value(value_str: str, ep_type_int: int) -> bool:
+    """Validate the executable string is a valid ep_type value.
+
+    Args
+    ----
+    value_str: As string that when executed as the RHS of an assignment returns a value of ep_type
+    ep_type_int: An Endpoint Type Definition (see ref).
+
+    Returns
+    -------
+    True if valid else False
+    """
+    # Is it even a valid end point type value?
+    if not validate(ep_type_int):
+        return False
+
+    # If it is try ti instanciate the string representation
+    tstr: str = type_str(ep_type_int)
+    try:
+        eval(tstr)  # pylint: disable=eval-used
+    except NameError:
+        if _LOG_DEBUG:
+            _logger.debug(f'Importing {tstr}.')
+        exec(import_str(ep_type_int))  # pylint: disable=exec-used
+
+    if _LOG_DEBUG:
+        _logger.debug(f'retval = isinstance({value_str}, {tstr})')
+    try:
+        retval: bool = eval(f'isinstance({value_str}, {tstr})')  # pylint: disable=eval-used
+    except (NameError, SyntaxError):
+        return False
+    return retval

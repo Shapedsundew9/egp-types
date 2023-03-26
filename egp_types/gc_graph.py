@@ -32,7 +32,7 @@ from graph_tool.draw import graph_draw
 from networkx import DiGraph, get_node_attributes, spring_layout  # type: ignore
 
 from .egp_typing import (CPI, CVI, DST_EP, ROWS, SOURCE_ROWS, SRC_EP,
-                         VALID_ROW_SOURCES, ConnectionGraph, DestinationRow,
+                         VALID_ROW_SOURCES, VALID_ROW_DESTINATIONS, ConnectionGraph, DestinationRow,
                          EndPointClass, EndPointHash, EndPointIndex,
                          EndPointType, GCGraphRows, PairIdx, Row, SourceRow,
                          SrcEndPointHash, isConnectionPair, isConstantPair,
@@ -40,7 +40,7 @@ from .egp_typing import (CPI, CVI, DST_EP, ROWS, SOURCE_ROWS, SRC_EP,
 from .end_point import (dst_end_point, dst_end_point_ref, end_point,
                         end_point_ref, src_end_point, src_end_point_ref)
 from .ep_type import (REAL_EP_TYPE_VALUES, asint, asstr, compatible,
-                      import_str, type_str, validate)
+                      validate_value, validate)
 from .internal_graph import internal_graph
 
 _logger: Logger = getLogger(__name__)
@@ -98,7 +98,7 @@ _GT_EDGE_MARKER_SIZE: Literal[24] = 24
 
 register_token_code('E01000', 'A graph must have at least one output.')
 register_token_code('E01001', '{ep_hash} endpoint is not connected to anything.')
-register_token_code('E01002', '{ep_hash} endpoint does not have a valid type: {type_errors}.')
+register_token_code('E01002', '{ep_hash} endpoint does not have a valid type: {type_errors}')
 register_token_code('E01003', '{cls_str} row {row} does not have contiguous indices starting at 0: {indices}.')
 register_token_code('E01004', 'The {cls_str} row {row} endpoint count ({row_count}) != i_graph count ({i_count})')
 register_token_code('E01005', 'Constant {ref} does not have a valid value ({value}) for type {type}.')
@@ -118,9 +118,12 @@ register_token_code('E01017', 'Source endpoint {ref1} cannot be connected to des
 register_token_code('E01018', 'Destination endpoint {dupe} is connected to multiple sources {refs}.')
 register_token_code('E01019', 'Endpoint {ep_hash} references {ref_hash} but it does not exist.')
 register_token_code('E01020', 'Endpoint {ep_hash} references {ref_hash} but {ref_hash} does not reference it back.')
+register_token_code('E01021', 'Source row endpoint {ep_hash} has no references but is not referenced by row "U".')
+register_token_code('E01022', 'Row "U" endpoint {ep_hash} references a source that does not exist or is connected.')
 
 register_token_code('I01000', '"I" row endpoint appended of UNKNOWN_EP_TYPE_VALUE.')
 register_token_code('I01001', '"I" row endpoint removed.')
+register_token_code('I01002', 'Source row endpoint {ep_hash} has no references.')
 register_token_code('I01100', '"A" source row endpoint appended of UNKNOWN_EP_TYPE_VALUE.')
 register_token_code('I01101', '"A" source row endpoint removed.')
 register_token_code('I01102', '"A" destination row endpoint appended of UNKNOWN_EP_TYPE_VALUE.')
@@ -137,43 +140,13 @@ register_token_code('I01403', '"P" row endpoint removed.')
 register_token_code('I01900', 'No source endpoints in the list to remove.')
 
 
-# FIXME: Why is this here & not in ep_type.py?
-def validate_value(value_str, ep_type_int) -> bool:
-    """Validate the executable string is a valid ep_type value.
-
-    Args
-    ----
-        value_str (str): As string that when executed as the RHS of an assignment returns a value of ep_type
-        ep_type_int (int): An Endpoint Type Definition (see ref).
-
-    Returns
-    -------
-        bool: True if valid else False
-    """
-    tstr: str = type_str(ep_type_int)
-    try:
-        eval(tstr)  # pylint: disable=eval-used
-    except NameError:
-        if _LOG_DEBUG:
-            _logger.debug(f'Importing {tstr}.')
-        exec(import_str(ep_type_int))  # pylint: disable=exec-used
-
-    if _LOG_DEBUG:
-        _logger.debug(f'retval = isinstance({value_str}, {tstr})')
-    try:
-        retval: bool = eval(f'isinstance({value_str}, {tstr})')  # pylint: disable=eval-used
-    except (NameError, SyntaxError):
-        return False
-    return retval
-
-
 # TODO: Consider caching calculated results.
 class gc_graph():
     """Manipulating Genetic Code Graphs."""
     __slots__: tuple[LiteralString, ...] = ('i_graph', 'rows', 'app_graph', 'status', 'has_f')
     i_graph: internal_graph
     rows: GCGraphRows
-    app_graph: Any
+    app_graph: Any  # TODO: This should be on demand
     status: Any
     has_f: bool
 
@@ -193,7 +166,7 @@ class gc_graph():
             for ep_class in (False, True):
                 row_dict: dict[str, end_point] = {k: v for k, v in self.i_graph.items() if v.cls == ep_class and v.row == row}
                 str_list.extend(["'" + k + "': " + str(v) for k, v in sorted(row_dict.items(), key=lambda x: x[1].idx)])
-        return ', '.join(str_list)
+        return '\n'.join(str_list)
 
     def _convert_to_internal(self, c_graph: ConnectionGraph) -> internal_graph:
         """Convert graph to internal format.
@@ -254,7 +227,7 @@ class gc_graph():
         for ep in sorted(self.i_graph.row_filter('C'), key=lambda x: x.idx):
             if 'C' not in graph:
                 graph['C'] = []
-            graph.setdefault('C', []).append((ep.typ, ep.val))
+            graph.setdefault('C', []).append((ep.val, ep.typ))
         # FIXME: Validation would be useful here but a cirtcular reference at the moment.
         # if _LOG_DEBUG and not graph_validator.validate({'graph': graph}):
         #    raise ValueError(f"Connection graph is not valid:\n{pformat(graph, indent=4)}\n\n{graph_validator.error_str()}")
@@ -639,38 +612,36 @@ class gc_graph():
         """Make the graph consistent.
 
         The make the graph consistent the following operations are performed:
-            1. Connect all destinations to existing sources if possible
-            2. Create new inputs for any destinations that are still unconnected.
-            3. Purge any unconnected constants & inputs.
-            4. Reference all unconnected sources in row 'U'
-            5. self.app_graph is regenerated
-            6. Check a valid steady state has been achieved
+            1. Clean row U.
+            2. Connect all unconnected destinations to existing sources if possible
+            3. Reference all unconnected sources in row 'U'
+            4. self.app_graph is regenerated
+            5. Check a valid steady state has been achieved
         """
         _logger.debug("Normalising...")
 
-        # Remove all references to U before starting
+        # 1. Remove all references to U before starting
         for ep in tuple(self.i_graph.row_filter('U')):
+            # TODO: Can we do this quicker. Do not need to check references?
             self._remove_ep(ep, check=False)
-        for ep in self.i_graph.values():
-            victims = reversed(tuple(idx for idx, ref in enumerate(ep.refs) if ref.row == 'U'))
-            for idx in victims:
-                del ep.refs[idx]
 
-        # 1 Connect all destinations to existing sources if possible
+        # There should be no references to 'U'
+        # for ep in self.i_graph.values():
+        #     victims = reversed(tuple(idx for idx, ref in enumerate(ep.refs) if ref.row == 'U'))
+        #     for idx in victims:
+        #         del ep.refs[idx]
+
+        # 2 Connect all destinations to existing sources if possible
         self.connect_all()
 
-        # 4 Reference all unconnected sources in row 'U'
-        # First remove all existing row U endpoints
-        # Then any references to them
-        # Finally add the new unreferenced connections.
+        # 3 Reference all unconnected sources in row 'U'
         for idx, ep in enumerate(self.i_graph.src_unref_filter()):
             self._add_ep(dst_end_point('U', idx, ep.typ, refs=[src_end_point_ref(ep.row, ep.idx)]))
-            ep.refs = [dst_end_point_ref('U', idx)]
 
-        # 5 self.app_graph is regenerated
+        # 4 self.app_graph is regenerated
         self.app_graph = self.connection_graph()
 
-        # 6 Check a valid steady state has been achieved
+        # 5 Check a valid steady state has been achieved
         return self.is_stable()
 
     def is_stable(self) -> bool:
@@ -693,8 +664,8 @@ class gc_graph():
 
         This function is not intended to be fast.
         Genetic code graphs MUST obey the following rules:
-            1. All connections are referenced at source and destination.
-            2. All sources are connected or referenced by the unconnected 'U' row.
+            1. All connections are referenced at source (except row 'U') and destination
+            2. All sunreferenced ources are referenced by the unconnected 'U' row.
             3a. All destinations are connected.
             3b. All destinations are only connected once.
             4. Types are valid.
@@ -730,13 +701,15 @@ class gc_graph():
             for ref in ep.refs:
                 ref_hash: EndPointHash = ref.force_key(not ep.cls)
                 if ref_hash not in self.i_graph:
-                    self.status.append(text_token({'E1019': {'ep_hash': ep.key(), 'ref_hash': ref_hash}}))
-                elif end_point_ref(ep.row, ep.idx) not in self.i_graph[ref_hash].refs:
-                    self.status.append(text_token({'E1020': {'ep_hash': ep.key(), 'ref_hash': ref_hash}}))
+                    self.status.append(text_token({'E01019': {'ep_hash': ep.key(), 'ref_hash': ref_hash}}))
+                elif ep.row != 'U' and end_point_ref(ep.row, ep.idx) not in self.i_graph[ref_hash].refs:
+                    self.status.append(text_token({'E01020': {'ep_hash': ep.key(), 'ref_hash': ref_hash}}))
 
         # 2.
-        for ep in self.i_graph.src_unref_filter():
-            self.status.append(text_token({'E01001': {'ep_hash': ep.key()}}))
+        unref_srcs: set[src_end_point_ref] = {src_end_point_ref(ep.row, ep.idx) for ep in self.i_graph.src_unref_filter()}
+        u_refs: set[src_end_point_ref] = {ep.refs[0] for ep in self.i_graph.dst_row_filter('U') if ep.refs}
+        for unref_src in (unref_srcs - u_refs):
+            self.status.append(text_token({'E01021': {'ep_hash': unref_src.key()}}))
 
         # 3a.
         for ep in self.i_graph.dst_unref_filter():
@@ -755,22 +728,22 @@ class gc_graph():
         for row in ROWS:
             for cls_row, cls_str in ((self.i_graph.src_row_filter(row), 'Src'), (self.i_graph.dst_row_filter(row), 'Dst')):
                 indices: list[int] = sorted((ep.idx for ep in cls_row))
-                if [idx for idx in indices if idx not in range(indices[-1] + 1)]:
-                    self.status.append(text_token({'E1003': {'cls_str': cls_str, 'row': row, 'indices': indices}}))
+                if [idx for idx in indices if idx not in range(len(indices))]:
+                    self.status.append(text_token({'E01003': {'cls_str': cls_str, 'row': row, 'indices': indices}}))
 
         # 6
-        for ep in filter(lambda x: validate_value(x.val, x.typ), self.i_graph.row_filter('C')):
+        for ep in filter(lambda x: not validate_value(x.val, x.typ), self.i_graph.row_filter('C')):
             self.status.append(text_token({'E01005': {'ref': ep.key(), 'value': ep.val, 'type': asstr(ep.typ)}}))
 
         # 7
-        if self.has_f != 'P' in self.rows[DST_EP]:
+        if self.has_f != ('P' in self.rows[DST_EP]):
             self.status.append(text_token({'E01006': {}}))
 
         # 8
         for row in ROWS:
             for count, cls in ((self.i_graph.num_eps(row, SRC_EP), SRC_EP), (self.i_graph.num_eps(row, DST_EP), DST_EP)):
-                if self.rows[cls][row] != count:
-                    self.status.append(text_token({'E1004': {
+                if self.rows[cls].get(row, 0) != count:
+                    self.status.append(text_token({'E01004': {
                         'cls_str': ('source', 'desintation')[cls],
                         'row': row,
                         'row_count': self.rows[cls][row],
@@ -793,13 +766,12 @@ class gc_graph():
         # 12
         for dst_ep in self.i_graph.dst_filter():
             for ref in dst_ep.refs:
-                src_ep: end_point = self.i_graph[ref.key()]
-                if not compatible(src_ep.typ, dst_ep.typ):
+                src_ep: end_point | None = self.i_graph.get(ref.key())
+                if src_ep is not None and not compatible(src_ep.typ, dst_ep.typ):
                     self.status.append(text_token({'E01009': {'ref1': src_ep.key(),
                                                               'type1': asstr(src_ep.typ),
                                                               'ref2': dst_ep.key(),
                                                               'type2': asstr(dst_ep.typ)}}))
-
         # 13a
         for ep in self.i_graph.dst_filter():
             for ref in ep.refs:
@@ -809,7 +781,7 @@ class gc_graph():
         # 13b
         for ep in self.i_graph.src_filter():
             for ref in ep.refs:
-                if ref.row in SOURCE_ROWS or ref.row == ep.row:
+                if ref.row not in VALID_ROW_DESTINATIONS[self.has_f][ep.row]:
                     self.status.append(text_token({'E01017': {'ref1': ep.key(), 'ref2': ref.key()}}))
 
         # 14a
@@ -828,7 +800,7 @@ class gc_graph():
             if self.status:
                 _logger.debug(f'Graph internal format:\n{self}')
             for status in self.status:
-                _logger.debug(status)
+                _logger.debug(str(status))
 
         return not self.status
 

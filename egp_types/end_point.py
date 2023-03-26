@@ -1,7 +1,7 @@
 """End point and end point reference classes."""
 
 from dataclasses import dataclass, field
-from typing import Any, TypeGuard
+from typing import Any, TypeGuard, Self
 
 from .egp_typing import (DST_EP, SRC_EP, DestinationRow, DstEndPointHash,
                          EndPointClass, EndPointHash, EndPointIndex,
@@ -27,11 +27,19 @@ class end_point_ref(generic_end_point):
         """Create a unique key to use in the internal graph."""
         return self.key_base() + 'ds'[cls]
 
+    def __eq__(self, ref: Self) -> bool:
+        """Equivilence for end point references."""
+        return self.row == ref.row and self.idx == ref.idx
+
 
 @dataclass(slots=True)
 class dst_end_point_ref(end_point_ref):
     """Refers to a destination end point"""
     row: DestinationRow
+
+    def __hash__(self) -> int:
+        """For hashable operations."""
+        return hash(self.key())
 
     def key(self) -> DstEndPointHash:
         """Create a unique key to use in the internal graph."""
@@ -46,6 +54,10 @@ class dst_end_point_ref(end_point_ref):
 class src_end_point_ref(end_point_ref):
     """Refers to a source endpoint"""
     row: SourceRow
+
+    def __hash__(self) -> int:
+        """For hashable operations."""
+        return hash(self.key())
 
     def key(self) -> SrcEndPointHash:
         """Create a unique key to use in the internal graph."""
@@ -66,6 +78,10 @@ class end_point(generic_end_point):
     cls: EndPointClass
     refs: list[end_point_ref] = field(default_factory=list)
     val: Any = None
+
+    def __hash__(self) -> int:
+        """For hashable operations."""
+        return hash(self.key())
 
     def key(self) -> EndPointHash:
         """Create a unique key to use in the internal graph."""
