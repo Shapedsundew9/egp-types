@@ -42,6 +42,8 @@ from .end_point import (dst_end_point, dst_end_point_ref, end_point,
 from .ep_type import (REAL_EP_TYPE_VALUES, asint, asstr, compatible,
                       validate_value, validate)
 from .internal_graph import internal_graph
+from itertools import count
+
 
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
@@ -120,6 +122,7 @@ register_token_code('E01019', 'Endpoint {ep_hash} references {ref_hash} but it d
 register_token_code('E01020', 'Endpoint {ep_hash} references {ref_hash} but {ref_hash} does not reference it back.')
 register_token_code('E01021', 'Source row endpoint {ep_hash} has no references but is not referenced by row "U".')
 register_token_code('E01022', 'Row "U" endpoint {ep_hash} references a source that does not exist or is connected.')
+register_token_code('E01023', 'Row "P" endpoint {p_hash} is not the same type as row "O" {o_hash} and is required to be.')
 
 register_token_code('I01000', '"I" row endpoint appended of UNKNOWN_EP_TYPE_VALUE.')
 register_token_code('I01001', '"I" row endpoint removed.')
@@ -256,35 +259,39 @@ class gc_graph():
         """
         nx_graph: DiGraph = DiGraph()
         gtg: dict[str, dict[bool, dict[int, str]]] = {k: {SRC_EP: {}, DST_EP: {}} for k in ROWS}
+        node_map: dict[str, int] = {}
+        node_counter = count()
         for ep in self.i_graph.values():
-            if ep.row not in nx_graph.nodes:
+            if ep.row not in node_map:
+                node_map[ep.row] = next(node_counter)
                 size: int = round(_NX_NODE_RADIUS * sqrt(float(self.rows[SRC_EP].get(ep.row, 0) + self.rows[DST_EP].get(ep.row, 0))))
-                nx_graph.add_node(ep.row, text=ep.row, size=size, font_size='28px',
+                nx_graph.add_node(node_map[ep.row], text=ep.row, size=size, font_size='28px',
                                   x_offset=-8, y_offset=-19, type='GC', ep_type='N/A', value='N/A',
                                   **_NX_ROW_NODE_ATTR[ep.row])
             if ep.idx not in gtg[ep.row][ep.cls]:
                 row: LiteralString = ep.row if ep.cls else ep.row.lower()
                 node: str = row + str(ep.idx)
+                node_map[node] = next(node_counter)
                 if _LOG_DEBUG:
                     _logger.debug(f"Adding to nx_graph node: {node}")
                 ep_type: Literal['Destination', 'Source'] = ('Destination', 'Source')[ep.cls]
                 value: Any = ep.val if ep.row == 'C' else 'N/A'
-                nx_graph.add_node(node, text=node, size=_NX_NODE_RADIUS, font_size='16px',
+                nx_graph.add_node(node_map[node], text=node, size=_NX_NODE_RADIUS, font_size='16px',
                                   x_offset=-9, y_offset=-11, type=asstr(ep.typ),
                                   ep_type=ep_type, value=value, **_NX_ROW_NODE_ATTR[ep.row])
-                data: tuple[str, str] = (ep.row, node) if ep.cls else (node, ep.row)
+                data: tuple[int, int] = (node_map[ep.row], node_map[node]) if ep.cls else (node_map[node], node_map[ep.row])
                 nx_graph.add_edge(*data, **_NX_ROW_EDGE_ATTR)
                 gtg[ep.row][ep.cls][ep.idx] = node
         for ep in self.i_graph.dst_filter():
             for ref in ep.refs:
                 dst_node: str = gtg[ep.row][DST_EP][ep.idx]
                 src_node: str = gtg[ref.row][SRC_EP][ref.idx]
-                nx_graph.add_edge(src_node, dst_node, **_NX_ROW_EDGE_ATTR)
+                nx_graph.add_edge(node_map[src_node], node_map[dst_node], **_NX_ROW_EDGE_ATTR)
                 if _LOG_DEBUG:
                     _logger.debug(f"Adding to nx_graph edge : {src_node}->{dst_node}")
         return nx_graph
 
-    def nx_draw(self, path: str = "./nx_graph", size: tuple[int, int] = (1600, 900)) -> None:
+    def nx_draw(self, path: str = "./nx_graph", size: tuple[int, int] = (1600, 1600)) -> None:
         """Draw the directed networkx graph where each destination endpoint as a unique node.
 
         Args
@@ -293,7 +300,7 @@ class gc_graph():
         size: Tuple of x, y output image dimensions.
         """
         nx_graph: DiGraph = self.nx_graph()
-        plot: figure = figure(plot_width=size[0], plot_height=size[1],
+        plot: figure = figure(max_width=size[0], max_height=size[1],
                               tools="pan,wheel_zoom,save,reset", active_scroll='wheel_zoom',
                               title="Erasmus GP GC Internal Graph", x_range=Range1d(-110.1, 110.1), y_range=Range1d(-110.1, 110.1))
         plot.add_tools(HoverTool(tooltips=_NX_HOVER_TOOLTIPS, anchor='top_right'), TapTool(), BoxSelectTool())
@@ -371,6 +378,8 @@ class gc_graph():
                 node_p['size'][node] = round(node_p['size'][node] * sqrt(size))
                 node_p['font_size'][node] = round(node_p['font_size'][node] * sqrt(size))
                 gtg[row] = node
+        for row in gtg:
+            dst_list: tuple[dst_end_point, ...] = tuple(self.i_graph.dst_row_filter(row))
             for ep in dst_list:
                 dst_row: DestinationRow = ep.row
                 src_row: SourceRow = ep.refs[0].row
@@ -562,7 +571,7 @@ class gc_graph():
         """
         return self.rows[ep_cls].get(row, 0)
 
-    def reindex_row(self, row: Row) -> None:
+    def reindex_row(self, row: Row, cls: EndPointClass | None = None) -> None:
         """Re-index row.
 
         If end points have been removed from a row the row will need
@@ -575,24 +584,44 @@ class gc_graph():
 
         Args
         ----
-        row: One of 'ICPUO'
+        row: Any valid row letter.
+        cls: Source or destination endpoints or None
         """
-        # Map the indices to a contiguous integer sequence starting at 0
-        r_map: dict[int, int] = {idx: i for i, idx in enumerate((ep.idx for ep in self.i_graph.row_filter(row)))}
-        # For each row select all the endpoints and iterate through the references to them
-        # For each reference update: Find the reverse reference and update it with the new index
-        # Finally update the index in the endpoint
-        # TODO: Do we need to re-create this filter?
-        for ep in tuple(self.i_graph.row_filter(row)):
+        # Its necessary to sort the indices so we do not map an index twice. 
+        if cls is None:
+            eps: list[end_point] = sorted(self.i_graph.row_filter(row), key=lambda x: x.idx)
+        elif cls == DST_EP:
+            eps = sorted(self.i_graph.dst_row_filter(row), key=lambda x: x.idx)
+        else:
+            eps = sorted(self.i_graph.src_row_filter(row), key=lambda x: x.idx)
+
+        if eps:
+            # Map the indices to a contiguous integer sequence starting at 0
+            r_map: dict[int, int] = {idx: i for i, idx in enumerate((ep.idx for ep in eps))}
+            # For each row select all the endpoints and iterate through the references to them
+            # For each reference update: Find the reverse reference and update it with the new index
+            # Finally update the index in the endpoint
             if _LOG_DEBUG:
-                _logger.debug(f"References to re-index: {ep.refs}")
-            for ref in ep.refs:
-                for refd in self.i_graph[ref.force_key(not ep.cls)].refs:
-                    if refd.row == row and refd.idx == ep.idx:
-                        refd.idx = r_map[ep.idx]
-            del self.i_graph[ep.key()]
-            ep.idx = r_map[ep.idx]
-            self.i_graph[ep.key()] = ep
+                _logger.debug(f"Reindexing row {row} {('DST', 'SRC')[cls] if cls is not None else 'ALL'} endpoints.")
+            for ep in eps:
+                if r_map[ep.idx] != ep.idx:
+                    if _LOG_DEBUG:
+                        _logger.debug(f"Mapping {ep.key()} to {end_point_ref(ep.row, r_map[ep.idx]).force_key(ep.cls)}")
+                        _logger.debug(f"References to re-index: {ep.refs}")
+                    for ref in ep.refs:
+                        for refd in self.i_graph[ref.force_key(not ep.cls)].refs:
+                            if refd.row == row and refd.idx == ep.idx:
+                                refd.idx = r_map[ep.idx]
+                    del self.i_graph[ep.key()]
+                    ep.idx = r_map[ep.idx]
+                    self.i_graph[ep.key()] = ep
+
+    def reindex(self) -> None:
+        """Reindex all rows."""
+        for row in self.rows[DST_EP]:
+            self.reindex_row(row, DST_EP)
+        for row in self.rows[SRC_EP]:
+            self.reindex_row(row, SRC_EP)
 
     def purge_unconnectable_types(self) -> None:
         """This is a test case function.
@@ -605,7 +634,7 @@ class gc_graph():
             dst_types: set[int] = {ep.typ for ep in self.i_graph.dst_row_filter(row)}
             unconnectable_types: set[int] = dst_types - src_types
             for unconnectable_type in unconnectable_types:
-                for ep in filter(lambda x, uct=unconnectable_type: x.typ == uct, self.i_graph.dst_row_filter(row)):
+                for ep in filter(lambda x, uct=unconnectable_type: x.typ == uct, tuple(self.i_graph.dst_row_filter(row))):
                     self._remove_ep(ep)
 
     def normalize(self) -> bool:
@@ -635,7 +664,7 @@ class gc_graph():
         self.connect_all()
 
         # 3 Reference all unconnected sources in row 'U'
-        for idx, ep in enumerate(self.i_graph.src_unref_filter()):
+        for idx, ep in enumerate(tuple(self.i_graph.src_unref_filter())):
             self._add_ep(dst_end_point('U', idx, ep.typ, refs=[src_end_point_ref(ep.row, ep.idx)]))
 
         # 4 self.app_graph is regenerated
@@ -741,13 +770,13 @@ class gc_graph():
 
         # 8
         for row in ROWS:
-            for count, cls in ((self.i_graph.num_eps(row, SRC_EP), SRC_EP), (self.i_graph.num_eps(row, DST_EP), DST_EP)):
-                if self.rows[cls].get(row, 0) != count:
+            for counter, cls in ((self.i_graph.num_eps(row, SRC_EP), SRC_EP), (self.i_graph.num_eps(row, DST_EP), DST_EP)):
+                if self.rows[cls].get(row, 0) != counter:
                     self.status.append(text_token({'E01004': {
                         'cls_str': ('source', 'desintation')[cls],
                         'row': row,
                         'row_count': self.rows[cls][row],
-                        'i_count': count
+                        'i_count': counter
                     }}))
 
         #  & 9
@@ -790,6 +819,9 @@ class gc_graph():
             len_o: int = self.i_graph.num_eps('O', DST_EP)
             if len_p != len_o:
                 self.status.append(text_token({'E01013': {'len_p': len_p, 'len_o': len_o}}))
+            for o_ep, p_ep in zip(self.i_graph.dst_row_filter('O'), self.i_graph.dst_row_filter('P')):
+                if o_ep.typ != p_ep.typ:
+                    self.status.append(text_token({'E01023': {'p_hash': p_ep.key(), 'o_hash': o_ep.key()}}))
 
         # 14b
         if self.has_f:
@@ -885,8 +917,8 @@ class gc_graph():
             _logger.debug(f'The destination endpoint requiring a connection: {dst_ep}')
 
         filter_func = self.i_graph.src_unref_filter if unreferenced else self.i_graph.src_filter
-        eligible_rows = tuple(row for row in VALID_ROW_SOURCES[self.has_f] if row in allowed_rows)
-        src_eps = tuple(src_ep for src_ep in filter_func() if src_ep.row in eligible_rows)
+        eligible_rows = tuple(row for row in VALID_ROW_SOURCES[self.has_f][dst_ep.row] if row in allowed_rows)
+        src_eps = tuple(src_ep for src_ep in filter_func() if src_ep.row in eligible_rows and compatible(src_ep.typ, dst_ep.typ))
         if src_eps:
             src_ep: src_end_point = choice(src_eps)
             if _LOG_DEBUG:

@@ -105,6 +105,7 @@ ConstantRow = list[ConstantValue]
 ConnectionGraphPair = tuple[DestinationRow | Literal['C'], ConnectionRow | ConstantRow]
 ConnectionPair = tuple[DestinationRow, ConnectionRow]
 ConstantPair = tuple[Literal['C'], ConstantRow]
+JSONGraph = dict[DestinationRow, list[list[SourceRow | EndPointIndex | EndPointType]] | list[list[ConstantExecStr | EndPointType]]]
 
 
 class ConnectionGraph(TypedDict):
@@ -116,6 +117,11 @@ class ConnectionGraph(TypedDict):
     O: NotRequired[ConnectionRow]
     P: NotRequired[ConnectionRow]
     U: NotRequired[ConnectionRow]
+
+
+def json_to_connection_graph(json_graph: JSONGraph) -> ConnectionGraph:
+    """convert a JSON connection graph to a ConnectionGraph."""
+    return {k: [tuple(e) for e in v] for k, v in json_graph.items()}  # type: ignore
 
 
 def isConstantPair(obj: tuple[str, Any]) -> TypeGuard[ConstantPair]:

@@ -11,7 +11,7 @@ import pytest
 from numpy.random import choice
 from surebrec.surebrec import generate
 
-from egp_types.egp_typing import DST_EP, SRC_EP, ConnectionGraph
+from egp_types.egp_typing import DST_EP, SRC_EP, ConnectionGraph, json_to_connection_graph, Row
 from egp_types.ep_type import EP_TYPE_VALUES, INVALID_EP_TYPE_VALUE, asint
 from egp_types.gc_graph import gc_graph
 from egp_types.xgc_validator import LGC_entry_validator
@@ -22,9 +22,11 @@ _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 _TEST_RESULTS_JSON = 'data/test_gc_graph_results.json'
 
 
-# Types are in string format for readability in the results file.
+# JSON cannot represent the ConnectionGraph type so a conversion step is needed.
 with open(join(dirname(__file__), _TEST_RESULTS_JSON), 'r', encoding='utf-8') as results_file:
-    results: dict[str, Any] = load(results_file)
+    results: list[dict[str, Any]] = load(results_file)
+for result in results:
+    result['graph'] = json_to_connection_graph(result['graph'])
 
 
 def random_type(probability: float = 0.0) -> int:
@@ -58,10 +60,15 @@ def random_graph(probability: float = 0.0) -> gc_graph:
     ----
     probability: 0.0 <= p <= 1.0 probability of choosing a random type on each type selection.
     """
-    rc_graph: ConnectionGraph = generate(LGC_entry_validator, 1)[0]['graph']  # type: ignore
+    rc_graph: ConnectionGraph = json_to_connection_graph(generate(LGC_entry_validator, 1)[0]['graph'])  # type: ignore
+    if 'P' in rc_graph and 'O' in rc_graph:
+        rc_graph['P'] = deepcopy(rc_graph['O'])
     gcg = gc_graph(rc_graph)
+    if _LOG_DEBUG:
+        _logger.debug(f"Pre-normalized randomly generated internal graph:\n{gcg}")
     gcg.remove_all_connections()
     gcg.purge_unconnectable_types()
+    gcg.reindex()
     gcg.normalize()
     return gcg
 
