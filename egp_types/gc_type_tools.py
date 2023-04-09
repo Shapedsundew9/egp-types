@@ -78,12 +78,12 @@ def is_pgc(genetic_code: dict) -> bool:
         # More juicy test for consistency
         # TODO: More conditions can be added
         # Check the physical property?
-        it: list[int] = genetic_code.get('input_types', [])
-        i: list[int] = genetic_code.get('inputs', [])
-        ot: list[int] = genetic_code.get('output_types', [])
-        o: list[int] = genetic_code.get('outputs', [])
-        pgc_inputs: bool = bool(it) and it[0] == -3 and len(i) == 1
-        pgc_outputs: bool = bool(ot) and ot[0] == -3 and len(o) == 1
+        input_types: list[int] = genetic_code.get('input_types', [])
+        inputs: list[int] = genetic_code.get('inputs', [])
+        output_types: list[int] = genetic_code.get('output_types', [])
+        outputs: list[int] = genetic_code.get('outputs', [])
+        pgc_inputs: bool = bool(input_types) and input_types[0] == -3 and len(inputs) == 1
+        pgc_outputs: bool = bool(output_types) and output_types[0] == -3 and len(outputs) == 1
         check: bool = (pgc_inputs and pgc_outputs) == (genetic_code.get('pgc_fitness', None) is not None)
         if not check:
             raise ValueError(
@@ -92,7 +92,7 @@ def is_pgc(genetic_code: dict) -> bool:
     return genetic_code.get('pgc_fitness', None) is not None
 
 
-def define_signature(gc) -> bytes:
+def define_signature(xgc) -> bytes:
     """Define the signature of a genetic code.
 
     The signature for a codon GC is slightly different to a regular GC.
@@ -106,16 +106,16 @@ def define_signature(gc) -> bytes:
     (str): Lowercase hex SHA256 string.
     """
     # NOTE: This needs to be very specific and stand the test of time!
-    gca_hex: str = '0' * 64 if gc['gca'] is None else gc['gca'].hexdigest()
-    gcb_hex: str = '0' * 64 if gc['gcb'] is None else gc['gcb'].hexdigest()
-    string: str = pformat(gc['graph'], indent=0, sort_dicts=True, width=65535, compact=True) + gca_hex + gcb_hex
+    gca_hex: str = '0' * 64 if xgc['gca'] is None else xgc['gca'].hexdigest()
+    gcb_hex: str = '0' * 64 if xgc['gcb'] is None else xgc['gcb'].hexdigest()
+    string: str = pformat(xgc['graph'], indent=0, sort_dicts=True, width=65535, compact=True) + gca_hex + gcb_hex
 
     # If it is a codon glue on the mandatory definition
-    if "generation" in gc and gc["generation"] == 0:
-        if "meta_data" in gc and "function" in gc["meta_data"]:
-            string += gc["meta_data"]["function"]["python3"]["0"]["inline"]
-            if 'code' in gc["meta_data"]["function"]["python3"]["0"]:
-                string += gc["meta_data"]["function"]["python3"]["0"]["code"]
-                string += str(gc['creator'])
+    if "generation" in xgc and xgc["generation"] == 0:
+        if "meta_data" in xgc and "function" in xgc["meta_data"]:
+            string += xgc["meta_data"]["function"]["python3"]["0"]["inline"]
+            if 'code' in xgc["meta_data"]["function"]["python3"]["0"]:
+                string += xgc["meta_data"]["function"]["python3"]["0"]["code"]
+                string += str(xgc['creator'])
 
     return sha256(string.encode()).digest()

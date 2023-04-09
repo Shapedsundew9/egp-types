@@ -18,7 +18,7 @@ from os.path import dirname, join
 from typing import Any, Iterable, Literal
 
 from .egp_typing import (EndPointTypeLookup, EndPointTypeLookupFile,
-                         isInstanciationValue)
+                         isInstanciationValue, InstanciationType)
 
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
@@ -72,10 +72,10 @@ UNKNOWN_EP_TYPE_VALUE: Literal[-32767] = -32767
 
 ep_type_lookup['n2v'][INVALID_EP_TYPE_NAME] = INVALID_EP_TYPE_VALUE
 ep_type_lookup['v2n'][INVALID_EP_TYPE_VALUE] = INVALID_EP_TYPE_NAME
-ep_type_lookup['instanciation'][INVALID_EP_TYPE_VALUE] = (None, None, None, None, False)
+ep_type_lookup['instanciation'][INVALID_EP_TYPE_VALUE] = (None, None, None, None, False, '')
 ep_type_lookup['n2v'][UNKNOWN_EP_TYPE_NAME] = UNKNOWN_EP_TYPE_VALUE
 ep_type_lookup['v2n'][UNKNOWN_EP_TYPE_VALUE] = UNKNOWN_EP_TYPE_NAME
-ep_type_lookup['instanciation'][UNKNOWN_EP_TYPE_VALUE] = (None, None, None, None, False)
+ep_type_lookup['instanciation'][UNKNOWN_EP_TYPE_VALUE] = (None, None, None, None, False, '')
 
 
 class inst(IntEnum):
@@ -86,6 +86,7 @@ class inst(IntEnum):
     MODULE = 2  # (str) module name
     NAME = 3    # (str) object name
     PARAM = 4   # (bool or None)
+    DEFAULT = 5  # (str) a default value
 
 
 class vtype(IntEnum):
@@ -118,11 +119,12 @@ def import_str(ep_type_i: int) -> str:
     -------
     The import e.g. 'from numpy import float32 as numpy_float32'
     """
-    i11n: tuple[str | None, str | None, str | None, str | None, bool] = ep_type_lookup['instanciation'][ep_type_i]
-    if i11n[inst.MODULE] is None:
+    # FIXME: This needs to become arbitary module depth & consider name collisions.
+    i11n: InstanciationType = ep_type_lookup['instanciation'][ep_type_i]
+    if i11n[inst.PACKAGE] is None:
         return 'None'
-    package: str = '' if i11n[inst.PACKAGE] is None else str(i11n[inst.PACKAGE]) + '.'
-    return f'from {package}{i11n[inst.MODULE]} import {i11n[inst.NAME]} as {i11n[inst.MODULE]}_{i11n[inst.NAME]}'
+    source: str = str(i11n[inst.PACKAGE]) if i11n[inst.MODULE] is None else str(i11n[inst.PACKAGE]) + '.' + str(i11n[inst.MODULE])
+    return f'from {source} import {i11n[inst.NAME]}'
 
 
 # If a type does not exist on this system remove it (all instances will be treated as INVALID)
@@ -309,7 +311,7 @@ def type_str(ep_type_i: int) -> str:
     -------
     The type string e.g. 'int' or 'str'
     """
-    i11n: tuple[str | None, str | None, str | None, str | None, bool] = ep_type_lookup['instanciation'][ep_type_i]
+    i11n: InstanciationType = ep_type_lookup['instanciation'][ep_type_i]
     name: str | bool | None = i11n[inst.NAME]
     if isinstance(name, str):
         type_name: str = name
@@ -427,19 +429,36 @@ def validate_value(value_str: str, ep_type_int: int) -> bool:
     if not validate(ep_type_int):
         return False
 
-    # If it is try ti instanciate the string representation
+    # If it is try to instanciate the string representation
     tstr: str = type_str(ep_type_int)
     try:
         eval(tstr)  # pylint: disable=eval-used
     except NameError:
+        execution_str = import_str(ep_type_int)
         if _LOG_DEBUG:
-            _logger.debug(f'Importing {tstr}.')
-        exec(import_str(ep_type_int))  # pylint: disable=exec-used
+            _logger.debug(f'Import execution string: {execution_str}.')
+        exec(execution_str)  # pylint: disable=exec-used
 
-    if _LOG_DEBUG:
-        _logger.debug(f'retval = isinstance({value_str}, {tstr})')
+    # None is special
+    if value_str == 'None' and ep_type_int == ep_type_lookup['n2v']['None']:
+        return True
+
     try:
         retval: bool = eval(f'isinstance({value_str}, {tstr})')  # pylint: disable=eval-used
     except (NameError, SyntaxError):
+        if _LOG_DEBUG:
+            try:
+                typ: str = eval(f'type({value_str})')  # pylint: disable=eval-used
+            except (NameError, SyntaxError):
+                _logger.debug(f'isinstance({value_str}, {tstr}) is False. {value_str} is not a valid object.')    
+            else:
+                _logger.debug(f'isinstance({value_str}, {tstr}) is False. {value_str} is of type {typ}')
         return False
+    if _LOG_DEBUG:
+        if retval:
+            _logger.debug(f'retval = isinstance({value_str}, {tstr}) is True')
+        else:
+            typ: str = eval(f'type({value_str})')  # pylint: disable=eval-used
+            _logger.debug(f'retval = isinstance({value_str}, {tstr}) is False. {value_str} is of type {typ}.')
+
     return retval

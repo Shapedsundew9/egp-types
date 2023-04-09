@@ -149,15 +149,18 @@ class EndPointTypeLookupFile(TypedDict):
     instanciation: dict[str, list[str | bool | None]]
 
 
-def isInstanciationValue(obj) -> TypeGuard[tuple[str | None, str | None, str | None, str | None, bool]]:
+def isInstanciationValue(obj) -> TypeGuard[tuple[str | None, str | None, str | None, str | None, bool, str]]:
     """Is obj an instance of an instanciation definition."""
     if not isinstance(obj, (tuple, list)):
         return False
-    if not len(obj) == 5:
+    if not len(obj) == 6:
         return False
     if not all((isinstance(element, str) or element is None for element in obj[:4])):
         return False
-    return isinstance(obj[4], bool)
+    return isinstance(obj[4], bool) and isinstance(obj[5], str)
+
+
+InstanciationType = tuple[str | None, str | None, str | None, str | None, bool, str]
 
 
 class EndPointTypeLookup(TypedDict):
@@ -165,5 +168,5 @@ class EndPointTypeLookup(TypedDict):
     n2v: dict[str, int]  # End point type name: End point type value
     v2n: dict[int, str]  # End point type value: End point type name
 
-    # End point type value: package, version, module, name, can take parameters
-    instanciation: dict[int, tuple[str | None, str | None, str | None, str | None, bool]]
+    # End point type value: package, version, module, name, default can take parameters
+    instanciation: dict[int, InstanciationType]

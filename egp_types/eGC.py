@@ -1,6 +1,6 @@
 """The embryonic GC (eGC) class."""
 from logging import DEBUG, Logger, NullHandler, getLogger
-from typing import Any, LiteralString, Iterable, Sequence
+from typing import Any, LiteralString, Iterable, Sequence, Callable, NoReturn
 
 from .ep_type import interface_definition, vtype
 from .gc_graph import gc_graph
@@ -10,6 +10,11 @@ from .reference import ref_str
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
 _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
+
+
+def not_implemented_exception() -> NoReturn:
+    """Bound to the reference generation function."""
+    raise NotImplementedError('Abstract base class.')
 
 
 class eGC(dict):
@@ -23,7 +28,8 @@ class eGC(dict):
         'gca_ref', 'gcb_ref', 'ancestor_a_ref', 'ancestor_b_ref',
         'generation', 'igraph'
     )
-    validator: xgc_validator_generator = xgc_validator_generator({k: XGC_ENTRY_SCHEMA[k] for k in _EGC_ENTRIES}, allow_unknow=True)
+    validator: xgc_validator_generator = xgc_validator_generator({k: XGC_ENTRY_SCHEMA[k] for k in _EGC_ENTRIES}, allow_unknown=True)
+    new_reference: Callable[[], NoReturn | int] = not_implemented_exception
 
     def __init__(
             self,
@@ -62,7 +68,7 @@ class eGC(dict):
             self['outputs'] = oid_types[2]
 
         if 'ref' not in self:
-            self['ref'] = self.new_reference()
+            self['ref'] = eGC.new_reference()
 
         if 'igraph' not in self:
             if 'graph' in self:
@@ -101,7 +107,7 @@ class eGC(dict):
         if not self.validator.validate(self):
             raise ValueError(f"Validation FAILED with:\n{self.validator.error_str()}")
 
-    @staticmethod
-    def new_reference() -> int:
-        """Bound to the reference generation function."""
-        raise NotImplementedError('Abstract base class.')
+
+def set_reference_generator(func: Callable[[], int]) -> None:
+    """Define the reference generator for all eGC's."""
+    eGC.new_reference = func

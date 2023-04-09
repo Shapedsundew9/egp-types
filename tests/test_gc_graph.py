@@ -6,20 +6,29 @@ from logging import DEBUG, Logger, NullHandler, getLogger
 from os.path import dirname, join
 from random import randint, random
 from typing import Any
+from itertools import count
+from functools import partial
 
 import pytest
 from numpy.random import choice
 from surebrec.surebrec import generate
 
-from egp_types.egp_typing import DST_EP, SRC_EP, ConnectionGraph, json_to_connection_graph, Row
-from egp_types.ep_type import EP_TYPE_VALUES, INVALID_EP_TYPE_VALUE, asint
+from egp_types.egp_typing import DST_EP, SRC_EP, ConnectionGraph, json_to_connection_graph, ConstantRow
+from egp_types.ep_type import EP_TYPE_VALUES, INVALID_EP_TYPE_VALUE, asint, ep_type_lookup, inst
 from egp_types.gc_graph import gc_graph
 from egp_types.xgc_validator import LGC_entry_validator
+from egp_types import set_reference_generator, reference
+
 
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
 _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 _TEST_RESULTS_JSON = 'data/test_gc_graph_results.json'
+
+
+# Reference generation for eGC's
+ref_generator = partial(reference, owner_id=0, counter=count())
+set_reference_generator(ref_generator)
 
 
 # JSON cannot represent the ConnectionGraph type so a conversion step is needed.
@@ -50,7 +59,7 @@ def random_type(probability: float = 0.0) -> int:
     return asint('builtins_int')
 
 
-def random_graph(probability: float = 0.0) -> gc_graph:
+def random_graph() -> gc_graph:
     """Create a random graph.
 
     The graph is not guaranteed to be valid when p > 0.0. If a destination row requires a type that
@@ -61,14 +70,30 @@ def random_graph(probability: float = 0.0) -> gc_graph:
     probability: 0.0 <= p <= 1.0 probability of choosing a random type on each type selection.
     """
     rc_graph: ConnectionGraph = json_to_connection_graph(generate(LGC_entry_validator, 1)[0]['graph'])  # type: ignore
-    if 'P' in rc_graph and 'O' in rc_graph:
-        rc_graph['P'] = deepcopy(rc_graph['O'])
+    if 'F' in rc_graph:
+        # O references A and P reference B - to validate they must have the same types. Easiest to duplicate.
+        if 'A' in rc_graph:
+            rc_graph['B'] = deepcopy(rc_graph['A'])
+        if 'O' in rc_graph:
+            # P is the same as O when F is defined.
+            rc_graph['P'] = deepcopy(rc_graph['O'])
+        elif 'P' in rc_graph:
+            # But if there is no O there must be no P
+            del rc_graph['P']
+
+    new_constants: ConstantRow = [(ep_type_lookup['instanciation'][typ][inst.DEFAULT.value], typ) for _, typ in rc_graph.get('C', [])]
+    if new_constants:
+        rc_graph['C'] = new_constants
     gcg = gc_graph(rc_graph)
     if _LOG_DEBUG:
         _logger.debug(f"Pre-normalized randomly generated internal graph:\n{gcg}")
+    print("\n", gcg)
     gcg.remove_all_connections()
+    print("\nRemoved all connections\n", gcg)
     gcg.purge_unconnectable_types()
+    print("\nPurged\n", gcg)
     gcg.reindex()
+    print("\nReindexed\n", gcg)
     gcg.normalize()
     return gcg
 

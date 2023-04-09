@@ -243,6 +243,7 @@
                 "type": "list"
             },
             "F": {
+                "dependencies": ["A", "B"],
                 "maxlength": 1,
                 "minlength": 1,
                 "required": false,
@@ -291,7 +292,7 @@
             },
             "P": {
                 "required": false,
-                "dependencies": "F",
+                "dependencies": ["F", "O"],
                 "schema": {
                     "items": [
                         {

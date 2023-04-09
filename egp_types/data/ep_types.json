@@ -3,58 +3,66 @@
         "-2": [
             "egp_types",
             null,
+            null,
             "xGC",
-            "xGC",
-            true
+            true,
+            "xGC()"
         ],
         "-1": [
             "egp_types",
             null,
+            null,
             "eGC",
-            "eGC",
-            true
+            true,
+            "eGC()"
         ],
         "0": [
             null,
             null,
             null,
             "None",
-            false
+            false,
+            "None"
         ],
         "1": [
             null,
             null,
             null,
             "bool",
-            true
+            true,
+            "True"
         ],
         "2": [
             null,
             null,
             null,
             "int",
-            true
+            true,
+            "2"
         ],
         "3": [
             null,
             null,
             null,
             "float",
-            true
+            true,
+            "2.0"
         ],
         "4": [
             null,
             null,
             null,
             "complex",
-            true
+            true,
+            "complex(2.0,-2.0)"
         ],
         "5": [
             null,
             null,
             null,
             "str",
-            true
+            true,
+            "'two'"
         ]
     },
     "n2v": {

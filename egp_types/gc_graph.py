@@ -164,7 +164,7 @@ class gc_graph():
     def __repr__(self) -> str:
         """Print the graph in row order sources then destinations in index order."""
         # NOTE: This function is used in determining the signature of a GC.
-        str_list: list[str] = []
+        str_list: list[str] = [f'Rows: {self.rows}']
         for row in ROWS:
             for ep_class in (False, True):
                 row_dict: dict[str, end_point] = {k: v for k, v in self.i_graph.items() if v.cls == ep_class and v.row == row}
@@ -633,6 +633,7 @@ class gc_graph():
             src_types: set[int] = {ep.typ for ep in self.i_graph.src_rows_filter(VALID_ROW_SOURCES[self.has_f][row])}
             dst_types: set[int] = {ep.typ for ep in self.i_graph.dst_row_filter(row)}
             unconnectable_types: set[int] = dst_types - src_types
+            print(f"Unconnectable types {unconnectable_types} for row {row}")
             for unconnectable_type in unconnectable_types:
                 for ep in filter(lambda x, uct=unconnectable_type: x.typ == uct, tuple(self.i_graph.dst_row_filter(row))):
                     self._remove_ep(ep)
@@ -831,8 +832,8 @@ class gc_graph():
         if _LOG_DEBUG:
             if self.status:
                 _logger.debug(f'Graph internal format:\n{self}')
-            for status in self.status:
-                _logger.debug(str(status))
+                for status in self.status:
+                    _logger.debug(str(status))
 
         return not self.status
 
@@ -867,7 +868,8 @@ class gc_graph():
         ----
         dst_ep_seq: An iterable of destination endpoints to disconnect.
         """
-        for dst_ep in dst_ep_iter:
+        # Row U is the unconnected row and not referenced in the source row (because it is unconnected!)
+        for dst_ep in filter(lambda x: x.row != 'U', dst_ep_iter):
             self.i_graph[dst_ep.refs[0].key()].refs.remove(dst_end_point_ref(dst_ep.row, dst_ep.idx))
 
     def random_add_connection(self) -> None:
