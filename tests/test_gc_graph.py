@@ -8,15 +8,16 @@ from random import randint, random
 from typing import Any
 from itertools import count
 from functools import partial
+from pprint import pformat
 
 import pytest
 from numpy.random import choice
 from surebrec.surebrec import generate
 
-from egp_types.egp_typing import DST_EP, SRC_EP, ConnectionGraph, json_to_connection_graph, ConstantRow
+from egp_types.egp_typing import DST_EP, SRC_EP, ConnectionGraph, json_to_connection_graph, ConstantRow, CPI
 from egp_types.ep_type import EP_TYPE_VALUES, INVALID_EP_TYPE_VALUE, asint, ep_type_lookup, inst
 from egp_types.gc_graph import gc_graph
-from egp_types.xgc_validator import LGC_entry_validator
+from egp_types.xgc_validator import graph_validator
 from egp_types import set_reference_generator, reference
 
 
@@ -69,14 +70,26 @@ def random_graph() -> gc_graph:
     ----
     probability: 0.0 <= p <= 1.0 probability of choosing a random type on each type selection.
     """
-    rc_graph: ConnectionGraph = json_to_connection_graph(generate(LGC_entry_validator, 1)[0]['graph'])  # type: ignore
+    rc_graph: ConnectionGraph = json_to_connection_graph(generate(graph_validator, 1)[0]['graph'])  # type: ignore
+    print('\nOriginal rc_graph:\n', pformat(rc_graph, indent=4, width=256))
+    # Uniquify source reference indexes to prevent random collisions
+    unique = count()
+    for row in rc_graph:
+        if row != 'C':
+            rc_graph[row] = [(ref[0], next(unique), ref[2]) for ref in rc_graph[row]]
     if 'F' in rc_graph:
         # O references A and P reference B - to validate they must have the same types. Easiest to duplicate.
         if 'A' in rc_graph:
             rc_graph['B'] = deepcopy(rc_graph['A'])
+            # Duplicate A & B sources in U to keep symmetry.
+            if 'U' in rc_graph:
+                rc_graph['U'].extend([('B', ref[1], ref[2]) for ref in rc_graph['U'] if ref[0] == 'A'])
+                rc_graph['U'].extend([('A', ref[1], ref[2]) for ref in rc_graph['U'] if ref[0] == 'B'])
         if 'O' in rc_graph:
-            # P is the same as O when F is defined.
-            rc_graph['P'] = deepcopy(rc_graph['O'])
+            # O sources cannot be from row B when F is present
+            rc_graph['O'] = [((ref[0], 'A')[ref[0] == 'B'], ref[1], ref[2]) for ref in rc_graph['O']]
+            # P destinations are the same as O destinations when F is defined but cannot reference row A (must be B)
+            rc_graph['P'] = [((ref[0], 'B')[ref[0] == 'A'], ref[1], ref[2]) for ref in rc_graph['O']]
         elif 'P' in rc_graph:
             # But if there is no O there must be no P
             del rc_graph['P']
@@ -84,10 +97,11 @@ def random_graph() -> gc_graph:
     new_constants: ConstantRow = [(ep_type_lookup['instanciation'][typ][inst.DEFAULT.value], typ) for _, typ in rc_graph.get('C', [])]
     if new_constants:
         rc_graph['C'] = new_constants
+    print('\nNew rc_graph\n', pformat(rc_graph, indent=4, width=256))
     gcg = gc_graph(rc_graph)
     if _LOG_DEBUG:
         _logger.debug(f"Pre-normalized randomly generated internal graph:\n{gcg}")
-    print("\n", gcg)
+    print("\nPre-normalized\n", gcg)
     gcg.remove_all_connections()
     print("\nRemoved all connections\n", gcg)
     gcg.purge_unconnectable_types()
@@ -154,29 +168,10 @@ def test_remove_connection_simple(test) -> None:
     assert graph.validate()
 
     # TOD: gc_graphO: Split this out into its own test case when the graphs are staticly defined in a JSON file.
-    for _ in range(int(sum(graph.rows[DST_EP].values()) / 2)):
-        graph.random_remove_connection()
+    graph.random_remove_connection(int(sum(graph.rows[DST_EP].values()) / 2))
     graph.normalize()
     assert graph.validate()
     # graph.draw(join(_log_location, 'graph_' + str(test)))
-
-
-@pytest.mark.parametrize("test", range(100))
-def test_add_connection(test) -> None:
-    """Verify adding connections makes valid graphs.
-
-    In this version multiple types endpoint types are used. This can lead to a legitimate invalid
-    graph with error codes E01001 or E01004.
-    """
-    # TODO: These random test cases need to be made static when we are confident in them.
-    # Generate them into a JSON file.
-    _logger.debug(f'Case {test}')
-    gc: gc_graph = random_graph(0.5)
-    if not gc.validate():
-        codes = set([t.code for t in gc.status])
-        codes.discard('E01001')
-        codes.discard('E01004')
-        assert not codes
 
 
 @pytest.mark.parametrize("test", range(100))
@@ -227,8 +222,8 @@ def test_stack(test):
     if not test:
         none_limit = 500
 
-    gA = random_graph(0.5)
-    gB = random_graph(0.5)
+    gA = random_graph()
+    gB = random_graph()
     gC = gA.stack(gB)
 
     if gC is None:

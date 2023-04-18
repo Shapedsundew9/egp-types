@@ -104,7 +104,7 @@ register_token_code('E01002', '{ep_hash} endpoint does not have a valid type: {t
 register_token_code('E01003', '{cls_str} row {row} does not have contiguous indices starting at 0: {indices}.')
 register_token_code('E01004', 'The {cls_str} row {row} endpoint count ({row_count}) != i_graph count ({i_count})')
 register_token_code('E01005', 'Constant {ref} does not have a valid value ({value}) for type {type}.')
-register_token_code('E01006', 'If row "F" is defined then row "P" must be defined.')
+register_token_code('E01006', 'If row "P" is defined then row "F" must be defined.')
 register_token_code('E01007', 'Endpoint {ref} must be a source.')
 register_token_code('E01008', 'Endpoint {ref} must be a destination.')
 register_token_code(
@@ -766,7 +766,7 @@ class gc_graph():
             self.status.append(text_token({'E01005': {'ref': ep.key(), 'value': ep.val, 'type': asstr(ep.typ)}}))
 
         # 7
-        if self.has_f != ('P' in self.rows[DST_EP]):
+        if 'P' in self.rows[DST_EP] and not self.has_f:
             self.status.append(text_token({'E01006': {}}))
 
         # 8
@@ -871,6 +871,7 @@ class gc_graph():
         # Row U is the unconnected row and not referenced in the source row (because it is unconnected!)
         for dst_ep in filter(lambda x: x.row != 'U', dst_ep_iter):
             self.i_graph[dst_ep.refs[0].key()].refs.remove(dst_end_point_ref(dst_ep.row, dst_ep.idx))
+            dst_ep.refs = []
 
     def random_add_connection(self) -> None:
         """Randomly choose two endpoints to connect.
