@@ -14,6 +14,7 @@ from egp_types.xGC import xGC
 
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
+eGC.new_reference = lambda: 1
 
 
 @pytest.mark.parametrize("type_object, valid",

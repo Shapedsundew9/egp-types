@@ -11,7 +11,7 @@ from collections import Counter
 from logging import DEBUG, Logger, NullHandler, getLogger
 from math import sqrt
 from random import choice, randint, sample
-from typing import Any, Iterable, Literal, LiteralString, Sequence, Self
+from typing import Any, Iterable, Literal, LiteralString, Sequence
 
 import gi
 
@@ -465,7 +465,11 @@ class gc_graph():
         ----
         ep_type: ep_type in integer format. If None a random real ep_type is chosen.
         """
-        nep_type: int = choice(REAL_EP_TYPE_VALUES) if ep_type is None else ep_type
+        if ep_type is None:
+            graph_viable_types = tuple(self.viable_dst_types('O'))
+            nep_type: int = choice(graph_viable_types) if graph_viable_types else choice(REAL_EP_TYPE_VALUES)
+        else:
+            nep_type = ep_type
         o_index: int = self.rows[DST_EP].get('O', 0)
         self._add_ep(dst_end_point('O', o_index, nep_type))
         if self.has_f:
@@ -496,10 +500,10 @@ class gc_graph():
                 ep_ref: dst_end_point_ref = dst_end_point_ref('P', nidx)
                 if _LOG_DEBUG:
                     _logger.debug(f"Removing output {ep_ref}.")
-            ep: dst_end_point = self.i_graph[ep_ref.key()]  # type: ignore
-            self._remove_ep(ep, False)
-            for ref in ep.refs:
-                self.i_graph[ref.key()].refs.remove(ep_ref)
+                ep: dst_end_point = self.i_graph[ep_ref.key()]  # type: ignore
+                self._remove_ep(ep, False)
+                for ref in ep.refs:
+                    self.i_graph[ref.key()].refs.remove(ep_ref)
 
             # Only re-index row O if it was not the last endpoint that was removed (optimisation)
             if idx != num_outputs - 1:
@@ -587,7 +591,7 @@ class gc_graph():
         row: Any valid row letter.
         cls: Source or destination endpoints or None
         """
-        # Its necessary to sort the indices so we do not map an index twice. 
+        # Its necessary to sort the indices so we do not map an index twice.
         if cls is None:
             eps: list[end_point] = sorted(self.i_graph.row_filter(row), key=lambda x: x.idx)
         elif cls == DST_EP:
@@ -633,7 +637,6 @@ class gc_graph():
             src_types: set[int] = {ep.typ for ep in self.i_graph.src_rows_filter(VALID_ROW_SOURCES[self.has_f][row])}
             dst_types: set[int] = {ep.typ for ep in self.i_graph.dst_row_filter(row)}
             unconnectable_types: set[int] = dst_types - src_types
-            print(f"Unconnectable types {unconnectable_types} for row {row}")
             for unconnectable_type in unconnectable_types:
                 for ep in filter(lambda x, uct=unconnectable_type: x.typ == uct, tuple(self.i_graph.dst_row_filter(row))):
                     self._remove_ep(ep)
@@ -645,8 +648,8 @@ class gc_graph():
             1. Clean row U.
             2. Connect all unconnected destinations to existing sources if possible
             3. Reference all unconnected sources in row 'U'
-            4. self.app_graph is regenerated
-            5. Check a valid steady state has been achieved
+            4. Check a valid steady state has been achieved
+            5. self.app_graph is regenerated
         """
         _logger.debug("Normalising...")
 
@@ -668,11 +671,13 @@ class gc_graph():
         for idx, ep in enumerate(tuple(self.i_graph.src_unref_filter())):
             self._add_ep(dst_end_point('U', idx, ep.typ, refs=[src_end_point_ref(ep.row, ep.idx)]))
 
-        # 4 self.app_graph is regenerated
-        self.app_graph = self.connection_graph()
+        # 4 Check a valid steady state has been achieved
+        # 5 self.app_graph is regenerated
+        if self.is_stable():
+            self.app_graph = self.connection_graph()
+            return True
 
-        # 5 Check a valid steady state has been achieved
-        return self.is_stable()
+        return False
 
     def is_stable(self) -> bool:
         """Determine if the graph is in a stable state.
@@ -805,7 +810,7 @@ class gc_graph():
         # 13a
         for ep in self.i_graph.dst_filter():
             for ref in ep.refs:
-                if ref.row not in VALID_ROW_SOURCES[self.has_f][ep.row]:
+                if ref.row not in VALID_ROW_SOURCES[self.has_f].get(ep.row, tuple()):
                     self.status.append(text_token({'E01010': {'ref1': ep.key(), 'ref2': ref.key()}}))
 
         # 13b
@@ -940,6 +945,7 @@ class gc_graph():
         -------
         A list of integers which are ep_type_ints in the order defined in the graph.
         """
+        # TODO: If the graph has been normalized it would be quicker to get this from the connection graph
         return [ep.typ for ep in sorted(self.i_graph.row_filter('I'), key=lambda x: x.idx)]
 
     def output_if(self) -> list[int]:
@@ -949,7 +955,9 @@ class gc_graph():
         -------
         A list of integers which are ep_type_ints in the order defined in the graph.
         """
+        # TODO: If the graph has been normalized it would be quicker to get this from the connection graph
         return [ep.typ for ep in sorted(self.i_graph.row_filter('O'), key=lambda x: x.idx)]
 
-    def stack(self, _: Self) -> Self:
-        return self
+    def viable_dst_types(self, row: DestinationRow) -> set[int]:
+        """Create a tuple of viable destination end point types for row."""
+        return {ep.typ for ep in self.i_graph.src_rows_filter(VALID_ROW_SOURCES[self.has_f][row])}

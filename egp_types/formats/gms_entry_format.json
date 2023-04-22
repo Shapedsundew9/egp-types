@@ -183,159 +183,261 @@
             "description": "Defines the sub-codes of the genetic code and how they are connected together."
         },
         "required": true,
-        "schema": {
-            "A": {
-                "required": false,
-                "schema": {
-                    "items": [
-                        {
-                            "allowed": [
-                                "I",
-                                "C"
-                            ],
-                            "type": "string"
-                        },
-                        "ep_idx",
-                        "ep_type"
-                    ],
-                    "maxlength": 3,
-                    "minlength": 3,
+        "oneof_schema": [
+            {
+                "A": {
+                    "required": false,
+                    "schema": {
+                        "items": [
+                            {
+                                "allowed": [
+                                    "I",
+                                    "C"
+                                ],
+                                "type": "string"
+                            },
+                            "ep_idx",
+                            "ep_type"
+                        ],
+                        "maxlength": 3,
+                        "minlength": 3,
+                        "type": "list"
+                    },
                     "type": "list"
                 },
-                "type": "list"
+                "B": {
+                    "required": false,
+                    "dependencies": "A",
+                    "schema": {
+                        "items": [
+                            {
+                                "allowed": [
+                                    "I",
+                                    "C",
+                                    "A"
+                                ],
+                                "type": "string"
+                            },
+                            "ep_idx",
+                            "ep_type"
+                        ],
+                        "maxlength": 3,
+                        "minlength": 3,
+                        "type": "list"
+                    },
+                    "type": "list"
+                },
+                "C": {
+                    "required": false,
+                    "schema": {
+                        "items": [
+                            {
+                                "regex": "[a-zA-Z][a-zA-Z0-9_]{1,64}",
+                                "type": "string"
+                            },
+                            "ep_type"
+                        ],
+                        "maxlength": 2,
+                        "minlength": 2,
+                        "type": "list"
+                    },
+                    "type": "list"
+                },
+                "O": {
+                    "schema": {
+                        "items": [
+                            {
+                                "allowed": [
+                                    "I",
+                                    "C",
+                                    "A",
+                                    "B"
+                                ],
+                                "type": "string"
+                            },
+                            "ep_idx",
+                            "ep_type"
+                        ],
+                        "maxlength": 3,
+                        "minlength": 3,
+                        "type": "list"
+                    },
+                    "type": "list"
+                },
+                "U": {
+                    "required": false,
+                    "schema": {
+                        "items": [
+                            {
+                                "allowed": [
+                                    "I",
+                                    "C",
+                                    "A",
+                                    "B"
+                                ],
+                                "type": "string"
+                            },
+                            "ep_idx",
+                            "ep_type"
+                        ],
+                        "maxlength": 3,
+                        "minlength": 3,
+                        "type": "list"
+                    },
+                    "type": "list"
+                }
             },
-            "B": {
-                "required": false,
-                "dependencies": "A",
-                "schema": {
-                    "items": [
-                        {
-                            "allowed": [
-                                "I",
-                                "C",
-                                "A"
-                            ],
-                            "type": "string"
-                        },
-                        "ep_idx",
-                        "ep_type"
-                    ],
-                    "maxlength": 3,
-                    "minlength": 3,
+            {
+                "A": {
+                    "required": true,
+                    "schema": {
+                        "items": [
+                            {
+                                "allowed": [
+                                    "I",
+                                    "C"
+                                ],
+                                "type": "string"
+                            },
+                            "ep_idx",
+                            "ep_type"
+                        ],
+                        "maxlength": 3,
+                        "minlength": 3,
+                        "type": "list"
+                    },
                     "type": "list"
                 },
-                "type": "list"
-            },
-            "C": {
-                "required": false,
-                "schema": {
-                    "items": [
-                        {
-                            "regex": "[a-zA-Z][a-zA-Z0-9_]{1,64}",
-                            "type": "string"
-                        },
-                        "ep_type"
-                    ],
-                    "maxlength": 2,
-                    "minlength": 2,
+                "B": {
+                    "required": false,
+                    "dependencies": "A",
+                    "schema": {
+                        "items": [
+                            {
+                                "allowed": [
+                                    "I",
+                                    "C"
+                                ],
+                                "type": "string"
+                            },
+                            "ep_idx",
+                            "ep_type"
+                        ],
+                        "maxlength": 3,
+                        "minlength": 3,
+                        "type": "list"
+                    },
                     "type": "list"
                 },
-                "type": "list"
-            },
-            "F": {
-                "dependencies": ["A", "B"],
-                "maxlength": 1,
-                "minlength": 1,
-                "required": false,
-                "schema": {
-                    "items": [
-                        {
-                            "allowed": [
-                                "I"
-                            ],
-                            "type": "string"
-                        },
-                        "ep_idx",
-                        {
-                            "allowed": [
-                                1
-                            ],
-                            "type": "integer"
-                        }
-                    ],
-                    "maxlength": 3,
-                    "minlength": 3,
+                "C": {
+                    "required": false,
+                    "schema": {
+                        "items": [
+                            {
+                                "regex": "[a-zA-Z][a-zA-Z0-9_]{1,64}",
+                                "type": "string"
+                            },
+                            "ep_type"
+                        ],
+                        "maxlength": 2,
+                        "minlength": 2,
+                        "type": "list"
+                    },
                     "type": "list"
                 },
-                "type": "list"
-            },
-            "O": {
-                "schema": {
-                    "items": [
-                        {
-                            "allowed": [
-                                "I",
-                                "C",
-                                "A",
-                                "B"
-                            ],
-                            "type": "string"
-                        },
-                        "ep_idx",
-                        "ep_type"
-                    ],
-                    "maxlength": 3,
-                    "minlength": 3,
+                "F": {
+                    "maxlength": 1,
+                    "minlength": 1,
+                    "required": true,
+                    "schema": {
+                        "items": [
+                            {
+                                "allowed": [
+                                    "I"
+                                ],
+                                "type": "string"
+                            },
+                            "ep_idx",
+                            {
+                                "allowed": [
+                                    1
+                                ],
+                                "type": "integer"
+                            }
+                        ],
+                        "maxlength": 3,
+                        "minlength": 3,
+                        "type": "list"
+                    },
                     "type": "list"
                 },
-                "type": "list"
-            },
-            "P": {
-                "required": false,
-                "dependencies": ["F", "O"],
-                "schema": {
-                    "items": [
-                        {
-                            "allowed": [
-                                "I",
-                                "C",
-                                "A",
-                                "B"
-                            ],
-                            "type": "string"
-                        },
-                        "ep_idx",
-                        "ep_type"
-                    ],
-                    "maxlength": 3,
-                    "minlength": 3,
+                "O": {
+                    "required": false,
+                    "schema": {
+                        "items": [
+                            {
+                                "allowed": [
+                                    "I",
+                                    "C",
+                                    "A"
+                                ],
+                                "type": "string"
+                            },
+                            "ep_idx",
+                            "ep_type"
+                        ],
+                        "maxlength": 3,
+                        "minlength": 3,
+                        "type": "list"
+                    },
                     "type": "list"
                 },
-                "type": "list"
-            },
-            "U": {
-                "required": false,
-                "schema": {
-                    "items": [
-                        {
-                            "allowed": [
-                                "I",
-                                "C",
-                                "A",
-                                "B"
-                            ],
-                            "type": "string"
-                        },
-                        "ep_idx",
-                        "ep_type"
-                    ],
-                    "maxlength": 3,
-                    "minlength": 3,
+                "P": {
+                    "required": false,
+                    "dependencies": ["O"],
+                    "schema": {
+                        "items": [
+                            {
+                                "allowed": [
+                                    "I",
+                                    "C",
+                                    "B"
+                                ],
+                                "type": "string"
+                            },
+                            "ep_idx",
+                            "ep_type"
+                        ],
+                        "maxlength": 3,
+                        "minlength": 3,
+                        "type": "list"
+                    },
                     "type": "list"
                 },
-                "type": "list"
+                "U": {
+                    "required": false,
+                    "schema": {
+                        "items": [
+                            {
+                                "allowed": [
+                                    "I",
+                                    "C",
+                                    "A",
+                                    "B"
+                                ],
+                                "type": "string"
+                            },
+                            "ep_idx",
+                            "ep_type"
+                        ],
+                        "maxlength": 3,
+                        "minlength": 3,
+                        "type": "list"
+                    },
+                    "type": "list"
+                }
             }
-        },
+        ],
         "type": "dict"
     },
     "input_types": {

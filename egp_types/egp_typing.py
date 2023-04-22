@@ -40,9 +40,7 @@ VALID_ROW_SOURCES: tuple[dict[Row, tuple[SourceRow, ...]], dict[Row, tuple[Sourc
         'A': ('I', 'C'),
         'B': ('I', 'C', 'A'),
         'U': ('I', 'C', 'A', 'B'),
-        'O': ('I', 'C', 'A', 'B'),
-        'P': ('I', 'C', 'B'),
-        'F': ('I',)
+        'O': ('I', 'C', 'A', 'B')
     },
     # Has row F
     # F determines if the path through A or B is chosen

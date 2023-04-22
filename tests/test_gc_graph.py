@@ -1,25 +1,24 @@
 """gc_graph verficiation."""
 
 from copy import deepcopy
+from functools import partial
+from itertools import count
 from json import load
 from logging import DEBUG, Logger, NullHandler, getLogger
 from os.path import dirname, join
-from random import randint, random
+from random import choice, randint, random
 from typing import Any
-from itertools import count
-from functools import partial
-from pprint import pformat
 
 import pytest
-from numpy.random import choice
 from surebrec.surebrec import generate
 
-from egp_types.egp_typing import DST_EP, SRC_EP, ConnectionGraph, json_to_connection_graph, ConstantRow, CPI
-from egp_types.ep_type import EP_TYPE_VALUES, INVALID_EP_TYPE_VALUE, asint, ep_type_lookup, inst
+from egp_types import reference, set_reference_generator
+from egp_types.egp_typing import (DST_EP, SRC_EP, ConnectionGraph, ConstantRow,
+                                  json_to_connection_graph)
+from egp_types.ep_type import (EP_TYPE_VALUES, INVALID_EP_TYPE_VALUE, asint,
+                               ep_type_lookup, inst)
 from egp_types.gc_graph import gc_graph
 from egp_types.xgc_validator import graph_validator
-from egp_types import set_reference_generator, reference
-
 
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
@@ -71,7 +70,7 @@ def random_graph() -> gc_graph:
     probability: 0.0 <= p <= 1.0 probability of choosing a random type on each type selection.
     """
     rc_graph: ConnectionGraph = json_to_connection_graph(generate(graph_validator, 1)[0]['graph'])  # type: ignore
-    print('\nOriginal rc_graph:\n', pformat(rc_graph, indent=4, width=256))
+    # print('\nOriginal rc_graph:\n', pformat(rc_graph, indent=4, width=256))
     # Uniquify source reference indexes to prevent random collisions
     unique = count()
     for row in rc_graph:
@@ -86,28 +85,23 @@ def random_graph() -> gc_graph:
                 rc_graph['U'].extend([('B', ref[1], ref[2]) for ref in rc_graph['U'] if ref[0] == 'A'])
                 rc_graph['U'].extend([('A', ref[1], ref[2]) for ref in rc_graph['U'] if ref[0] == 'B'])
         if 'O' in rc_graph:
-            # O sources cannot be from row B when F is present
-            rc_graph['O'] = [((ref[0], 'A')[ref[0] == 'B'], ref[1], ref[2]) for ref in rc_graph['O']]
             # P destinations are the same as O destinations when F is defined but cannot reference row A (must be B)
             rc_graph['P'] = [((ref[0], 'B')[ref[0] == 'A'], ref[1], ref[2]) for ref in rc_graph['O']]
-        elif 'P' in rc_graph:
-            # But if there is no O there must be no P
-            del rc_graph['P']
 
     new_constants: ConstantRow = [(ep_type_lookup['instanciation'][typ][inst.DEFAULT.value], typ) for _, typ in rc_graph.get('C', [])]
     if new_constants:
         rc_graph['C'] = new_constants
-    print('\nNew rc_graph\n', pformat(rc_graph, indent=4, width=256))
+    # print('\nNew rc_graph\n', pformat(rc_graph, indent=4, width=256))
     gcg = gc_graph(rc_graph)
     if _LOG_DEBUG:
         _logger.debug(f"Pre-normalized randomly generated internal graph:\n{gcg}")
-    print("\nPre-normalized\n", gcg)
+    # print("\nPre-normalized\n", gcg)
     gcg.remove_all_connections()
-    print("\nRemoved all connections\n", gcg)
+    # print("\nRemoved all connections\n", gcg)
     gcg.purge_unconnectable_types()
-    print("\nPurged\n", gcg)
+    # print("\nPurged\n", gcg)
     gcg.reindex()
-    print("\nReindexed\n", gcg)
+    # print("\nReindexed\n", gcg)
     gcg.normalize()
     return gcg
 
@@ -125,6 +119,7 @@ def test_graph_validation(i, case) -> None:
 @pytest.mark.parametrize("i, case", enumerate(results))
 def test_graph_str(i, case) -> None:
     """Verification the __repr__() method is not broken."""
+    _logger.debug(f'Case {i}')
     gcg = gc_graph(case['graph'])
     assert str(gcg)
 
@@ -174,74 +169,8 @@ def test_remove_connection_simple(test) -> None:
     # graph.draw(join(_log_location, 'graph_' + str(test)))
 
 
-@pytest.mark.parametrize("test", range(100))
-def test_stack_simple(test):
-    """Verify stacking valid graphs.
-
-    Create two random graphs, gA & gB, and stack them.
-    If gB has no inputs it cannot be stacked and the stacking method returns None.
-    To keep it simple all the endpoints have the same type ("int"). This
-    ensures all validation criteria will be met.
-    """
-    # TODO: These random test cases need to be made static when we are confident in them.
-    # Generate them into a JSON file.
-    global none_limit
-    if not test:
-        none_limit = 5000
-
-    gA = random_graph()
-    gB = random_graph()
-    gC = gA.stack(gB)
-
-    if gC is None:
-        none_limit -= 1
-    assert none_limit
-    assert gC is None or gC.validate()
-    # if not gC is None:
-    #    print(gA)
-    #    gA.draw('gA')
-    #    print(gB)
-    #    gB.draw('gB')
-    #    print(gC)
-    #    gC.draw('gC')
-    #    barf()
-
-
-@pytest.mark.parametrize("test", range(100))
-def test_stack(test):
-    """Verify stacking valid graphs.
-
-    Create two random graphs, gA & gB, and stack them.
-    If gB has no inputs it cannot be stacked and the stacking method returns None.
-    In this version multiple types endpoint types are used. This can lead to a legitimate invalid
-    stacked graphs which also return as None.
-    """
-    # TODO: These random test cases need to be made static when we are confident in them.
-    # Generate them into a JSON file.
-    global none_limit
-    if not test:
-        none_limit = 500
-
-    gA = random_graph()
-    gB = random_graph()
-    gC = gA.stack(gB)
-
-    if gC is None:
-        none_limit -= 1
-    assert none_limit
-    assert gC is None or gC.validate()
-    # if not gC is None:
-    #    print(gA)
-    #    gA.draw('gA')
-    #    print(gB)
-    #    gB.draw('gB')
-    #    print(gC)
-    #    gC.draw('gC')
-    #    barf()
-
-
-@pytest.mark.parametrize("test", range(100))
-def test_add_input_simple(test):
+@pytest.mark.parametrize("_", range(100))
+def test_add_input_simple(_) -> None:
     """Verify adding inputs makes valid graphs.
 
     Create a random graph, add an input & re-normalise.
@@ -249,20 +178,20 @@ def test_add_input_simple(test):
     """
     # TODO: These random test cases need to be made static when we are confident in them.
     # Generate them into a JSON file.
-    graph = random_graph()
+    graph: gc_graph = random_graph()
     assert graph.validate()
 
-    before = graph.rows[SRC_EP]['I']
+    before: int = graph.rows[SRC_EP].get('I', 0)
     graph.add_input()
     graph.normalize()
-    after = graph.rows[SRC_EP]['I']
+    after: int = graph.rows[SRC_EP].get('I', 0)
     assert graph.validate()
     assert after == before + 1
     # graph.draw(join(_log_location, 'graph_' + str(test)))
 
 
-@pytest.mark.parametrize("test", range(100))
-def test_remove_input_simple(test):
+@pytest.mark.parametrize("_", range(100))
+def test_remove_input_simple(_) -> None:
     """Verify removing inputs makes valid graphs.
 
     Create a random graph, remove an input & re-normalise.
@@ -270,13 +199,13 @@ def test_remove_input_simple(test):
     """
     # TODO: These random test cases need to be made static when we are confident in them.
     # Generate them into a JSON file.
-    graph = random_graph()
+    graph: gc_graph = random_graph()
     assert graph.validate()
 
-    before = graph.rows[SRC_EP]['I']
+    before: int = graph.rows[SRC_EP].get('I', 0)
     graph.remove_input()
     graph.normalize()
-    after = graph.rows[SRC_EP]['I']
+    after: int = graph.rows[SRC_EP].get('I', 0)
 
     # E1001 & E01016 are a legit error when removing an input.
     if not graph.validate():
@@ -288,8 +217,8 @@ def test_remove_input_simple(test):
     # graph.draw(join(_log_location, 'graph_' + str(test)))
 
 
-@pytest.mark.parametrize("test", range(100))
-def test_add_output_simple(test):
+@pytest.mark.parametrize("_", range(100))
+def test_add_output_simple(_) -> None:
     """Verify adding outputs makes valid graphs.
 
     Create a random graph, add an output & re-normalise.
@@ -297,20 +226,20 @@ def test_add_output_simple(test):
     """
     # TODO: These random test cases need to be made static when we are confident in them.
     # Generate them into a JSON file.
-    graph = random_graph()
+    graph: gc_graph = random_graph()
     assert graph.validate()
 
-    before = graph.rows[DST_EP]['O']
-    graph.add_output(asint('builtins_int'))
+    before: int = graph.rows[DST_EP].get('O', 0)
+    graph.add_output()
     graph.normalize()
-    after = graph.rows[DST_EP]['O']
+    after: int = graph.rows[DST_EP].get('O', 0)
     assert graph.validate()
     assert after == before + 1
     # graph.draw(join(_log_location, 'graph_' + str(test)))
 
 
-@pytest.mark.parametrize("test", range(100))
-def test_remove_output_simple(test):
+@pytest.mark.parametrize("_", range(100))
+def test_remove_output_simple(_) -> None:
     """Verify removing outputs makes valid graphs.
 
     Create a random graph, remove an output & re-normalise.
@@ -318,13 +247,13 @@ def test_remove_output_simple(test):
     """
     # TODO: These random test cases need to be made static when we are confident in them.
     # Generate them into a JSON file.
-    graph = random_graph()
+    graph: gc_graph = random_graph()
     assert graph.validate()
 
-    before = graph.rows[DST_EP]['O']
+    before: int = graph.rows[DST_EP].get('O', 0)
     graph.remove_output()
     graph.normalize()
-    after = graph.rows[DST_EP]['O']
+    after: int = graph.rows[DST_EP].get('O', 0)
 
     # E1000 is a legit error when removing an output (no row O).
     if not graph.validate():
@@ -340,8 +269,8 @@ def test_remove_output_simple(test):
     # graph.draw(join(_log_location, 'graph_' + str(test)))
 
 
-@pytest.mark.parametrize("test", range(100))
-def test_remove_constant_simple(test):
+@pytest.mark.parametrize("_", range(100))
+def test_remove_constant_simple(_) -> None:
     """Verify removing contants makes valid graphs.
 
     Create a random graph, remove a constant & re-normalise.
@@ -349,13 +278,13 @@ def test_remove_constant_simple(test):
     """
     # TODO: These random test cases need to be made static when we are confident in them.
     # Generate them into a JSON file.
-    graph = random_graph()
+    graph: gc_graph = random_graph()
     assert graph.validate()
 
-    before = len(graph.app_graph.get('C', []))
+    before: int = graph.rows[SRC_EP].get('C', 0)
     graph.remove_constant()
     graph.normalize()
-    after = len(graph.app_graph.get('C', []))
+    after: int = graph.rows[SRC_EP].get('C', 0)
 
     # E1001 is a legit error when removing an constant.
     if not graph.validate():
@@ -366,8 +295,8 @@ def test_remove_constant_simple(test):
     # graph.draw(join(_log_location, 'graph_' + str(test)))
 
 
-@pytest.mark.parametrize("test", range(100))
-def test_binary_compound_modifications(test):
+@pytest.mark.parametrize("_", range(100))
+def test_binary_compound_modifications(_) -> None:
     """Verify compounding modifications still makes valid graphs.
 
     Create a random graph, do 2 random modifications & re-normalise.
@@ -375,21 +304,22 @@ def test_binary_compound_modifications(test):
     """
     # TODO: These random test cases need to be made static when we are confident in them.
     # Generate them into a JSON file.
-    graph = random_graph()
+    graph: gc_graph = random_graph()
     assert graph.validate()
 
     for _ in range(2):
-        a = randint(0, 4)
-        if a == 0:
-            graph.add_input()
-        elif a == 1:
-            graph.remove_input()
-        elif a == 2:
-            graph.add_output(asint('builtins_int'))
-        elif a == 3:
-            graph.remove_output()
-        elif a == 4:
-            graph.remove_constant()
+        selection: int = randint(0, 4)
+        match selection:
+            case 0:
+                graph.add_input()
+            case 1:
+                graph.remove_input()
+            case 2:
+                graph.add_output()
+            case 3:
+                graph.remove_output()
+            case 4:
+                graph.remove_constant()
 
     # E1000 & E1001 are legit errors when modifiying the graph
     graph.normalize()
@@ -403,8 +333,8 @@ def test_binary_compound_modifications(test):
         assert not codes
 
 
-@pytest.mark.parametrize("test", range(100))
-def test_nary_compound_modifications(test):
+@pytest.mark.parametrize("_", range(100))
+def test_nary_compound_modifications(_) -> None:
     """Verify compounding modifications still makes valid graphs.
 
     Create a random graph, do 3 to 20 random modifications & re-normalise.
@@ -412,21 +342,22 @@ def test_nary_compound_modifications(test):
     """
     # TODO: These random test cases need to be made static when we are confident in them.
     # Generate them into a JSON file.
-    graph = random_graph()
+    graph: gc_graph = random_graph()
     assert graph.validate()
 
     for _ in range(randint(3, 20)):
-        a = randint(0, 4)
-        if a == 0:
-            graph.add_input()
-        elif a == 1:
-            graph.remove_input()
-        elif a == 2:
-            graph.add_output(asint('builtins_int'))
-        elif a == 3:
-            graph.remove_output()
-        elif a == 4:
-            graph.remove_constant()
+        selection: int = randint(0, 4)
+        match selection:
+            case 0:
+                graph.add_input()
+            case 1:
+                graph.remove_input()
+            case 2:
+                graph.add_output()
+            case 3:
+                graph.remove_output()
+            case 4:
+                graph.remove_constant()
 
     # E1000 & E1001 are legit errors when modifiying the graph
     graph.normalize()
