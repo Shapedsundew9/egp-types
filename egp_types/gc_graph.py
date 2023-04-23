@@ -18,32 +18,33 @@ import gi
 # Needed to prevent something pulling in GtK 4.0 and graph_tool complaining.
 gi.require_version('Gtk', '3.0')   # pylint: disable=wrong-import-position
 
+from itertools import count  # pylint: disable=wrong-import-order
+
 from bokeh.io import output_file, save
 from bokeh.models import (BoxSelectTool, Circle, ColumnDataSource,
                           GraphRenderer, HoverTool, LabelSet, MultiLine,
                           NodesAndLinkedEdges, Range1d, TapTool)
 from bokeh.palettes import Category20_20, Greys9
 from bokeh.plotting import figure, from_networkx
-from cairo import (FONT_WEIGHT_BOLD,  # pylint: disable=no-name-in-module
-                   FontWeight)
+from cairo import FONT_WEIGHT_BOLD   # pylint: disable=no-name-in-module
+from cairo import FontWeight  # pylint: disable=no-name-in-module
 from egp_utils.text_token import register_token_code, text_token
 from graph_tool import EdgePropertyMap, Graph, VertexPropertyMap
 from graph_tool.draw import graph_draw
-from networkx import DiGraph, get_node_attributes, spring_layout  # type: ignore
+from networkx import (DiGraph, get_node_attributes,  # type: ignore
+                      spring_layout)  # type: ignore
 
 from .egp_typing import (CPI, CVI, DST_EP, ROWS, SOURCE_ROWS, SRC_EP,
-                         VALID_ROW_SOURCES, VALID_ROW_DESTINATIONS, ConnectionGraph, DestinationRow,
-                         EndPointClass, EndPointHash, EndPointIndex,
-                         EndPointType, GCGraphRows, PairIdx, Row, SourceRow,
-                         SrcEndPointHash, isConnectionPair, isConstantPair,
-                         vertex)
+                         VALID_ROW_DESTINATIONS, VALID_ROW_SOURCES,
+                         ConnectionGraph, DestinationRow, EndPointClass,
+                         EndPointHash, EndPointIndex, EndPointType,
+                         GCGraphRows, PairIdx, Row, SourceRow, SrcEndPointHash,
+                         isConnectionPair, isConstantPair, vertex)
 from .end_point import (dst_end_point, dst_end_point_ref, end_point,
                         end_point_ref, src_end_point, src_end_point_ref)
-from .ep_type import (REAL_EP_TYPE_VALUES, asint, asstr, compatible,
-                      validate_value, validate)
+from .ep_type import (REAL_EP_TYPE_VALUES, asint, asstr, compatible, validate,
+                      validate_value)
 from .internal_graph import internal_graph
-from itertools import count
-
 
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
@@ -146,11 +147,13 @@ register_token_code('I01900', 'No source endpoints in the list to remove.')
 # TODO: Consider caching calculated results.
 class gc_graph():
     """Manipulating Genetic Code Graphs."""
-    __slots__: tuple[LiteralString, ...] = ('i_graph', 'rows', 'app_graph', 'status', 'has_f')
+    __slots__: tuple[LiteralString, ...] = ('i_graph', 'rows', 'app_graph', 'status', 'has_a', 'has_b', 'has_f')
     i_graph: internal_graph
     rows: GCGraphRows
     app_graph: Any  # TODO: This should be on demand
     status: Any
+    has_a: bool
+    has_b: bool
     has_f: bool
 
     def __init__(self, c_graph: ConnectionGraph | None = None, i_graph: internal_graph | None = None) -> None:
@@ -159,6 +162,8 @@ class gc_graph():
         self.i_graph = i_graph if i_graph is not None else self._convert_to_internal(nc_graph)
         self.rows = (dict(Counter([ep.row for ep in self.i_graph.dst_filter()])),
                      dict(Counter([ep.row for ep in self.i_graph.src_filter()])))
+        self.has_a = 'A' in self.rows[DST_EP] or 'A' in self.rows[SRC_EP]
+        self.has_b = 'B' in self.rows[DST_EP] or 'B' in self.rows[SRC_EP]
         self.has_f = 'F' in self.rows[DST_EP]
 
     def __repr__(self) -> str:
@@ -201,16 +206,25 @@ class gc_graph():
         return i_graph
 
     def _add_ep(self, ep: end_point) -> None:
-        """Add an endpoint to the internal graph format structure."""
+        """Add an endpoint to the internal graph format structure.
+
+        Other than _convert_to_internal() this MUST be the only way to add end points.
+        """
         row_counts: dict[str, int] = self.rows[ep.cls]
         if ep.row not in self.rows[ep.cls]:
             row_counts[ep.row] = 0
+            match ep.row:
+                case 'A': self.has_a = True
+                case 'B': self.has_b = True
+                case 'F': self.has_f = True
         ep.idx = row_counts[ep.row]
         self.i_graph[ep.key()] = ep
         row_counts[ep.row] += 1
 
     def _remove_ep(self, ep: end_point, check: bool = True) -> None:
         """Remove an endpoint to the internal graph format structure.
+
+        Other than _convert_to_internal() this MUST be the only way to remove end points.
 
         Args
         ----
@@ -220,6 +234,12 @@ class gc_graph():
         if not check or not ep.refs:
             del self.i_graph[ep.key()]
             self.rows[ep.cls][ep.row] -= 1
+            if not self.rows[ep.cls][ep.row] and not self.rows[not ep.cls].get(ep.row, 0):
+                del self.rows[ep.cls][ep.row]
+                match ep.row:
+                    case 'A': self.has_a = False
+                    case 'B': self.has_b = False
+                    case 'F': self.has_f = False
 
     def connection_graph(self) -> ConnectionGraph:
         """Convert graph to GMS graph (Connection Graph) format."""

@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 from typing import Any, TypeGuard, Self
+from copy import deepcopy
 
 from .egp_typing import (DST_EP, SRC_EP, DestinationRow, DstEndPointHash,
                          EndPointClass, EndPointHash, EndPointIndex,
@@ -96,6 +97,33 @@ class end_point(generic_end_point):
         """Return a reference to this end point."""
         return end_point_ref(self.row, self.idx)
 
+    def copy(self, clean: bool = False) -> Self:
+        """Return a copy of the end point with no references."""
+        return end_point(self.row, self.idx, self.typ, self.cls) if clean else deepcopy(self)
+
+    def move_copy(self, row: Row, clean: bool = False) -> Self:
+        """Return a copy of the end point with the row changed."""
+        ep: Self = self.copy(clean)
+        ep.row = row
+        return ep
+
+    def move_cls_copy(self, row: Row, cls: EndPointClass, clean: bool = False) -> Self:
+        """Return a copy of the end point with the row & cls changed."""
+        ep: Self = self.copy(clean)
+        ep.row = row
+        ep.cls = cls
+        return ep
+
+    def redirect_refs(self, old_ref_row, new_ref_row) -> None:
+        """Redirect all references to old_ref_row to new_ref_row."""
+        for ref in filter(lambda x: x.row == old_ref_row, self.refs):
+            ref.row = new_ref_row
+
+    def safe_add_ref(self, ref: end_point_ref) -> None:
+        """Check if a reference exists before adding it."""
+        if ref not in self.refs:
+            self.refs.append(ref)
+
 
 @dataclass(slots=True)
 class dst_end_point(end_point):
@@ -116,6 +144,10 @@ class dst_end_point(end_point):
         """Return a reference to this end point."""
         return dst_end_point_ref(self.row, self.idx)
 
+    def clean_copy(self) -> Self:
+        """Return a copy of the end point with no references."""
+        return dst_end_point(self.row, self.idx, self.typ)
+
 
 @dataclass(slots=True)
 class src_end_point(end_point):
@@ -135,6 +167,10 @@ class src_end_point(end_point):
     def as_ref(self) -> src_end_point_ref:
         """Return a reference to this end point."""
         return src_end_point_ref(self.row, self.idx)
+
+    def clean_copy(self) -> Self:
+        """Return a copy of the end point with no references."""
+        return src_end_point(self.row, self.idx, self.typ)
 
 
 def isDstEndPoint(ep: end_point) -> TypeGuard[dst_end_point]:
