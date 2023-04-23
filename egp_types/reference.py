@@ -50,7 +50,7 @@ def reference(owner_id: int, counter: count) -> int:
     ----------------------------------
     | 63 | GL | 0: Not in the GL, 1: In the GL |
     | 62:0 | TS | When GL = 1: TS = signature[62:0] |
-    | 62:32 | OW | When GL = 0: Owner UID |
+    | 63:32 | OW | When GL = 0: Owner UID |
     | 31:0 | IX | When GL = 0: UID in the owner scope |
 
     Args

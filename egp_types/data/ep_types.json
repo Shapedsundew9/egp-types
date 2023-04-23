@@ -3,18 +3,18 @@
         "-2": [
             "egp_types",
             null,
-            null,
+            "xGC",
             "xGC",
             true,
-            "xGC()"
+            "egp_types_xGC_xGC()"
         ],
         "-1": [
             "egp_types",
             null,
-            null,
+            "eGC",
             "eGC",
             true,
-            "eGC()"
+            "egp_types_eGC_eGC()"
         ],
         "0": [
             null,
@@ -75,15 +75,15 @@
         "builtins_int": 2,
         "builtins_str": 5,
         "complex": 4,
-        "egp_types.eGC_eGC": -1,
-        "egp_types.xGC_xGC": -2,
+        "egp_types_eGC_eGC": -1,
+        "egp_types_xGC_xGC": -2,
         "float": 3,
         "int": 2,
         "str": 5
     },
     "v2n": {
-        "-2": "egp_types.xGC_xGC",
-        "-1": "egp_types.eGC_eGC",
+        "-2": "egp_types_xGC_xGC",
+        "-1": "egp_types_eGC_eGC",
         "0": "builtins_NoneType",
         "1": "builtins_bool",
         "2": "builtins_int",

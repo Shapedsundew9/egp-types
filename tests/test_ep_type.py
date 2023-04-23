@@ -167,7 +167,7 @@ def test_asstr_type_objects(type_object, ep_type_str) -> None:
                              (8, "builtins_int"),
                              ("Test", "builtins_str"),
                              ([], INVALID_EP_TYPE_NAME),
-                             (eGC(), "egp_types.gc_type_eGC"),
+                             (eGC(), "egp_types_eGC_eGC"),
                              (xGC, INVALID_EP_TYPE_NAME),
                              ({}, INVALID_EP_TYPE_NAME)
                          )

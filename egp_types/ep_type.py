@@ -108,6 +108,15 @@ class vtype(IntEnum):
     TYPE_OBJECT = 4
 
 
+def object_name(i11n: InstanciationType) -> str:
+    """Return the imported object name."""
+    if i11n[inst.PACKAGE] is None:
+        return str(i11n[inst.NAME])
+    if i11n[inst.MODULE] is None:
+        return '_'.join((str(i11n[inst.PACKAGE]), str(i11n[inst.NAME])))
+    return '_'.join((str(i11n[inst.PACKAGE]), str(i11n[inst.MODULE]), str(i11n[inst.NAME])))
+
+
 def import_str(ep_type_i: int) -> str:
     """Return the import string for ep_type_int.
 
@@ -123,8 +132,11 @@ def import_str(ep_type_i: int) -> str:
     i11n: InstanciationType = ep_type_lookup['instanciation'][ep_type_i]
     if i11n[inst.PACKAGE] is None:
         return 'None'
-    source: str = str(i11n[inst.PACKAGE]) if i11n[inst.MODULE] is None else str(i11n[inst.PACKAGE]) + '.' + str(i11n[inst.MODULE])
-    return f'from {source} import {i11n[inst.NAME]}'
+    if i11n[inst.MODULE] is None:
+        source: str = str(i11n[inst.PACKAGE])
+    else:
+        source: str = str(i11n[inst.PACKAGE]) + '.' + str(i11n[inst.MODULE])
+    return f'from {source} import {i11n[inst.NAME]} as {object_name(i11n)}'
 
 
 # If a type does not exist on this system remove it (all instances will be treated as INVALID)
@@ -154,7 +166,7 @@ def func2(i11n) -> bool:
 
 _GC_TYPE_NAMES: list[str] = []
 for i in tuple(filter(func2, ep_type_lookup['instanciation'].values())):
-    _GC_TYPE_NAMES.append(f'{i[inst.MODULE]}_{i[inst.NAME]}')
+    _GC_TYPE_NAMES.append(object_name(i))
 
 # Must be defined after the imports
 EP_TYPE_NAMES: set[str] = set(ep_type_lookup['n2v'].keys())
@@ -221,7 +233,7 @@ def asint(obj: Any, vault_t: vtype = vtype.EP_TYPE_STR) -> int:
             ep_type_name = INVALID_EP_TYPE_NAME
             for type_name in _GC_TYPE_NAMES:
                 if type_name + '(' in obj:
-                    ep_type_name = 'egp_types.' + type_name
+                    ep_type_name = type_name
                     break
         return ep_type_lookup['n2v'].get(ep_type_name, INVALID_EP_TYPE_VALUE)
     if vault_t == vtype.EP_TYPE_STR:
@@ -259,7 +271,7 @@ def asstr(obj: Any, value_t: vtype = vtype.EP_TYPE_INT) -> str:
             # If it looks like a GC type instanciation assume it is OK.
             for type_name in _GC_TYPE_NAMES:
                 if type_name + '(' in obj:
-                    return 'egp_types.' + type_name
+                    return type_name
             return INVALID_EP_TYPE_NAME
         return ep_type_name if ep_type_name in EP_TYPE_NAMES else INVALID_EP_TYPE_NAME
     if value_t == vtype.EP_TYPE_INT:
@@ -278,7 +290,7 @@ def fully_qualified_name(obj: Any) -> str:
     -------
     Fully qualified type name.
     """
-    return obj.__class__.__module__ + '_' + obj.__class__.__qualname__
+    return obj.__class__.__module__.replace('.', '_') + '_' + obj.__class__.__qualname__
 
 
 def compatible(a_type: int | str, b_type: int | str) -> bool:
@@ -312,12 +324,7 @@ def type_str(ep_type_i: int) -> str:
     The type string e.g. 'int' or 'str'
     """
     i11n: InstanciationType = ep_type_lookup['instanciation'][ep_type_i]
-    name: str | bool | None = i11n[inst.NAME]
-    if isinstance(name, str):
-        type_name: str = name
-    else:
-        raise SystemError(f'Instanciation name was expected to be of type str but got {type(name)}')
-    return type_name if i11n[inst.MODULE] is None else f'{i11n[inst.MODULE]}_{i11n[inst.NAME]}'
+    return object_name(i11n)
 
 
 def instance_str(ep_type_i: int, param_str: str = '') -> str:
@@ -325,14 +332,14 @@ def instance_str(ep_type_i: int, param_str: str = '') -> str:
 
     Args
     ----
-    ep_type_i): A valid ep_type value.
+    ep_type_i: A valid ep_type value.
     param_str: A string to be used as instanciation parameters.
 
     Returns
     -------
     The instanciation e.g. numpy_float32(<param_str>)
     """
-    inst_str: str = type_str(_ep_type_int)
+    inst_str: str = type_str(ep_type_i)
     if ep_type_lookup['instanciation'][ep_type_i][inst.PARAM]:
         inst_str += f'({param_str})'
     return inst_str
