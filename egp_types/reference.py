@@ -12,6 +12,10 @@ _MASK: int = _OVER_MAX - 1
 ref_str: Callable[[int], str] = lambda x: 'None' if x is None else f"{((_OVER_MAX + x) & _MASK):016x}"
 
 
+class ISPUIDOverflowError(Exception):
+    """Raised when the ISPUID overflows."""
+
+
 def isGLGC(ref: int) -> bool:
     """Test if a reference is for a GC loaded from the GL."""
     return bool(ref < 0)
@@ -41,24 +45,27 @@ def ref_from_sig(signature: bytes, shift: int = 0) -> int:
     return ((int.from_bytes(signature[low:high], byteorder="big") >> mask) & _REFERENCE_MASK) - _GL_GC
 
 
-def reference(owner_id: int, counter: count) -> int:
+def reference(gpspuid: int, counter: count) -> int:
     """Create a unique reference.
 
     References have the structure:
 
     | Bit Field | Name | Description |
     ----------------------------------
-    | 63 | GL | 0: Not in the GL, 1: In the GL |
-    | 62:0 | TS | When GL = 1: TS = signature[62:0] |
-    | 63:32 | OW | When GL = 0: Owner UID |
-    | 31:0 | IX | When GL = 0: UID in the owner scope |
+    | 63 | GL | Set to 0 for all new references. 1 if reference came from a signature.
+    | 62:32 | GPSPUID | Gene Pool Sub-Process UID |
+    | 31:0 | ISPUID | Intra-Sub-Process UId |
 
     Args
     ----
-    owner_id: 31 bit unsigned integer uniquely identifying the counter to be used.
+    gpspuid: 32 bit unsigned integer uniquely identifying sub-process in the gene pool scope.
 
     Returns
     -------
-    Signed 64 bit integer reference where the MSb is 0
+    Signed 64 bit integer
     """
-    return next(counter) + (owner_id << 32)
+    ispuid: int = next(counter)
+    if ispuid == 0x100000000:
+        raise ISPUIDOverflowError()
+
+    return ispuid + ((gpspuid & 0x7FFFFFFF) << 32)
