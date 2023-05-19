@@ -26,7 +26,7 @@ class eGC(dict):
 
     _EGC_ENTRIES: tuple[LiteralString, ...] = (
         'gca_ref', 'gcb_ref', 'ancestor_a_ref', 'ancestor_b_ref',
-        'generation', 'igraph'
+        'generation', 'gc_graph'
     )
     validator: xgc_validator_generator = xgc_validator_generator({k: XGC_ENTRY_SCHEMA[k] for k in _EGC_ENTRIES}, allow_unknown=True)
     new_reference: Callable[[], NoReturn | int] = not_implemented_exception
@@ -70,17 +70,17 @@ class eGC(dict):
         if 'ref' not in self:
             self['ref'] = eGC.new_reference()
 
-        if 'igraph' not in self:
+        if 'gc_graph' not in self:
             if 'graph' in self:
-                igraph: gc_graph = gc_graph(self['graph'])
+                gcgraph: gc_graph = gc_graph(self['graph'])
             else:
-                igraph = gc_graph()
+                gcgraph = gc_graph()
                 if graph_inputs is not None:
-                    igraph.add_inputs(graph_inputs)
+                    gcgraph.add_inputs(graph_inputs)
                 if graph_outputs is not None:
-                    igraph.add_outputs(graph_outputs)
-                igraph.normalize()
-            self['igraph'] = igraph
+                    gcgraph.add_outputs(graph_outputs)
+                gcgraph.normalize()
+            self['gc_graph'] = gcgraph
 
         if _LOG_DEBUG:
             if not eGC.validator.validate(self):

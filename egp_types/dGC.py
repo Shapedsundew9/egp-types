@@ -7,7 +7,7 @@ from .gc_graph import gc_graph
 class dGC(TypedDict):
     """A dict based minimal GC."""
     graph: NotRequired[ConnectionGraph]
-    igraph: Required[gc_graph]
+    gc_graph: Required[gc_graph]
     ancestor_a_ref: Required[int | None]
     ancestor_b_ref: Required[int | None]
     ref: Required[int]

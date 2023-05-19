@@ -16,6 +16,7 @@ DstEndPointDict = dict[DstEndPointHash, dst_end_point]
 
 class internal_graph(EndPointDict):
     """Convinient structure for GC graph manipulation."""
+    # TODO: Be clear on rules regarding which method modify the structure
 
     def next_idx(self, row: Row, cls: EndPointClass) -> int:
         """Return the next endpoint index for the class in the row."""
@@ -97,22 +98,22 @@ class internal_graph(EndPointDict):
         """Return a copy of the specified rows destination endpoints. Remove references if clean is True."""
         return {key: ep.copy(clean) for key, ep in self.items() if isDstEndPoint(ep) and ep.row in rows}
 
-    def move_row(self, from_row: Row, to_row: Row, clean: bool = False) -> EndPointDict:
-        """Return a copy of the specified from_row endpoints mapped to to_row. Remove references if clean is True."""
-        return {nep.key(): nep for nep in (ep.move_copy(to_row, clean) for ep in self.values() if ep.row == from_row)}
+    def move_row(self, f_row: Row, t_row: Row, clean: bool = False) -> EndPointDict:
+        """Return a copy of the specified f_row endpoints mapped to t_row. Remove references if clean is True."""
+        return {n.key(): n for n in (ep.move_copy(t_row, clean) for ep in self.values() if ep.row == f_row)}
 
-    def move_row_cls(self, from_row: Row, to_row: Row, to_cls: EndPointClass, clean: bool = False) -> EndPointDict:
-        """Return a copy of the specified from_row endpoints mapped to to_row. Remove references if clean is True."""
-        return {nep.key(): nep for nep in (ep.move_cls_copy(to_row, to_cls, clean) for ep in self.values() if ep.row == from_row)}
+    def move_row_cls(self, f_row: Row, f_cls: EndPointClass, t_row: Row, t_cls: EndPointClass, clean: bool = False) -> EndPointDict:
+        """Return a copy of the specified f_row & f_cls endpoints mapped to t_row & t_cls. Remove references if clean is True."""
+        return {n.key(): n for n in (ep.move_cls_copy(t_row, t_cls, clean) for ep in self.values() if ep.row == f_row and ep.cls == f_cls)}
 
     def direct_connect(self, src_row: SourceRow, dst_row: DestinationRow) -> DstEndPointDict:
         """Create a destination row with the exact endpoints needed by src_row."""
-        return {nep.key(): nep for nep in (dst_end_point(dst_row, ep.idx, ep.typ) for ep in self.src_row_filter(src_row))}
+        return {n.key(): n for n in (dst_end_point(dst_row, ep.idx, ep.typ) for ep in self.src_row_filter(src_row))}
 
     def append_connect(self, src_row: SourceRow, dst_row: DestinationRow) -> DstEndPointDict:
         """Create endpoints as they would append to a destination row with the exact endpoints needed by src_row."""
         idx = count(self.next_idx(dst_row, DST_EP))
-        return {nep.key(): nep for nep in (dst_end_point(dst_row, next(idx), ep.typ) for ep in self.src_row_filter(src_row))}
+        return {n.key(): n for n in (dst_end_point(dst_row, next(idx), ep.typ) for ep in self.src_row_filter(src_row))}
 
     def redirect_refs(self, row: Row, cls: EndPointClass, old_ref_row: Row, new_ref_row: Row) -> None:
         """Redirects cls end point references on row from old_ref_row to new_ref_row."""
@@ -122,7 +123,7 @@ class internal_graph(EndPointDict):
     def insert_row_as(self, row: Literal['A', 'B']) -> EndPointDict:
         """Create a row with the input & output interface of self."""
         io_if: Generator[end_point, None, None] = self.rows_filter(('I', 'O'))
-        return {nep.key(): nep for nep in (end_point(row, ep.idx, ep.typ, not ep.cls, deepcopy(ep.refs)) for ep in io_if)}
+        return {n.key(): n for n in (end_point(row, ep.idx, ep.typ, not ep.cls, deepcopy(ep.refs)) for ep in io_if)}
 
     def complete_references(self) -> None:
         """An incomplete reference is when a destination references a source but the source does not reference the destination."""

@@ -10,7 +10,7 @@ from graph_tool import Edge as gt_edge
 
 DestinationRow = Literal['A', 'B', 'F', 'O', 'P', 'U']
 SourceRow = Literal['I', 'C', 'A', 'B']
-Row = Literal['A', 'B', 'F', 'O', 'P', 'I', 'C', 'A', 'B', 'U']
+Row = Literal['A', 'B', 'F', 'O', 'P', 'I', 'C', 'U']
 EndPointClass = bool
 EndPointIndex = int
 EndPointType = int
