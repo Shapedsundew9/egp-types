@@ -2,7 +2,9 @@
 from hashlib import sha256
 from logging import DEBUG, Logger, NullHandler, getLogger
 from pprint import pformat
-from typing import Literal, LiteralString
+from typing import Literal, LiteralString, TypeGuard
+from .aGC import aGC
+from .xGC import pGC
 
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
@@ -63,7 +65,7 @@ _GL_EXCLUDE_COLUMNS: tuple[LiteralString, ...] = (
 _SIGN: tuple[Literal[1], Literal[-1]] = (1, -1)
 
 
-def is_pgc(genetic_code: dict) -> bool:
+def is_pgc(genetic_code: aGC) -> TypeGuard[pGC]:
     """Determine if a GC is a PGC.
 
     Args
