@@ -48,6 +48,8 @@ def ref_from_sig(signature: bytes, shift: int = 0) -> int:
 def reference(gpspuid: int, counter: count) -> int:
     """Create a unique reference.
 
+    The reference 0x00000000000000000 is reserved and will not be created.
+
     References have the structure:
 
     | Bit Field | Name | Description |
@@ -67,5 +69,6 @@ def reference(gpspuid: int, counter: count) -> int:
     ispuid: int = next(counter)
     if ispuid == 0x100000000:
         raise ISPUIDOverflowError()
-
+    if not gpspuid and not ispuid:
+        ispuid = 1
     return ispuid + ((gpspuid & 0x7FFFFFFF) << 32)
