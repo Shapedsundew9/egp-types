@@ -72,3 +72,13 @@ def reference(gpspuid: int, counter: count) -> int:
     if not gpspuid and not ispuid:
         ispuid = 1
     return ispuid + ((gpspuid & 0x7FFFFFFF) << 32)
+
+
+def get_gpspuid(ref: int) -> int:
+    """Get the GPSPUID from a reference."""
+    return (ref >> 32) & 0x7FFFFFFF
+
+
+def get_ispuid(ref: int) -> int:
+    """Get the ISPUID from a reference."""
+    return ref & 0xFFFFFFFF
