@@ -112,10 +112,10 @@ def define_signature(mgc: Any) -> bytes:
     # NOTE: This needs to be very specific and stand the test of time!
     # Also NOTE: Ancestory is bound in which means if ancestors end up being culled we will
     # need a way to point to the youngest existing ancestor.
-    gca_hex: str = '0' * 64 if mgc['gca'] is None else mgc['gca'].hexdigest()
-    gcb_hex: str = '0' * 64 if mgc['gcb'] is None else mgc['gcb'].hexdigest()
-    ancestor_a_hex: str = '0' * 64 if mgc['gca'] is None else mgc['gca'].hexdigest()
-    ancestor_b_hex: str = '0' * 64 if mgc['gcb'] is None else mgc['gcb'].hexdigest()
+    gca_hex: str = '0' * 64 if mgc['gca'] is None else mgc['gca'].hex()
+    gcb_hex: str = '0' * 64 if mgc['gcb'] is None else mgc['gcb'].hex()
+    ancestor_a_hex: str = '0' * 64 if mgc['gca'] is None else mgc['gca'].hex()
+    ancestor_b_hex: str = '0' * 64 if mgc['gcb'] is None else mgc['gcb'].hex()
     string: str = pformat(mgc['graph'], indent=0, sort_dicts=True, width=65535, compact=True)
     string += gca_hex + gcb_hex + ancestor_a_hex + ancestor_b_hex + str(mgc['creator'])
 

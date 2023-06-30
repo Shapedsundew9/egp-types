@@ -163,7 +163,7 @@ class _gms_entry_validator(base_validator):
 
     def _check_with_valid_num_inputs(self, field: str, value: Any) -> None:
         if value != len(self.document['inputs']):
-            self._error(field, f"num_inputs ({value}) != length of inputs ({len(self.document['inputs'])}.")
+            self._error(field, f"num_inputs ({value}) != length of inputs ({len(self.document['inputs'])}).")
 
     def _check_with_valid_num_outputs(self, field: str, value: Any) -> None:
         if value != len(self.document['outputs']):
@@ -238,9 +238,7 @@ class _gms_entry_validator(base_validator):
     def _normalize_default_setter_set_input_indices(self, document) -> bytes:
         # Get the type list then find all the inputs in order & look them up.
         type_list: list[int] = self._normalize_default_setter_set_input_types(document)
-        inputs: list[tuple[str, int, int]] = []
-        for row in document["graph"].values():
-            inputs.extend((tuple(ep) for ep in filter(lambda x: x[0] == 'I', row)))
+        inputs: set[tuple[str, int, int]] = {tuple(ep) for row in document["graph"].values() for ep in filter(lambda x: x[0] == 'I', row)}
         return bytes((type_list.index(ep[2]) for ep in sorted(inputs, key=lambda x: x[1])))
 
     def _normalize_default_setter_set_output_indices(self, document) -> bytes:
@@ -335,7 +333,7 @@ class _LGC_json_load_entry_validator(_LGC_entry_validator):
         return encode_properties(value)
 
     def _normalize_coerce_type_indices_str_to_binary(self, value) -> str | None:
-        return bytearray.fromhex(value)
+        return bytes.fromhex(value)
 
 
 class _LGC_json_dump_entry_validator(_LGC_entry_validator):

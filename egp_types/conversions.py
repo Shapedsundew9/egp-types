@@ -140,12 +140,12 @@ def str_to_sha256(obj: str | bytearray | memoryview | bytes | None) -> bytearray
     (bytearray): bytearray representation of the string.
     """
     if isinstance(obj, str):
-        return bytearray.fromhex(obj)
+        return bytes.fromhex(obj)
     if isinstance(obj, memoryview) or isinstance(obj, bytearray) or isinstance(obj, bytes):
         return obj
     if obj is None:
         return None
-    raise TypeError(f"Un-encodeable type '{type(obj)}': Expected 'str' or byte type.")
+    raise TypeError(f"Un-encodeable type '{type(obj)}': Expected 'str' or bytes type.")
 
 
 def str_to_uuid(obj: str | UUID | None) -> UUID | None:
