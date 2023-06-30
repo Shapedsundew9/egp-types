@@ -21,6 +21,26 @@
         "type": "binary",
         "required": true
     },
+    "closest_surviving_ancestor_a": {
+        "default": null,
+        "maxlength": 32,
+        "meta": {
+            "description": "The signature of The closest surviving ancestor A if missing_links_a is > 0 else null."
+        },
+        "minlength": 32,
+        "nullable": true,
+        "type": "binary"
+    },
+    "closest_surviving_ancestor_b": {
+        "default": null,
+        "maxlength": 32,
+        "meta": {
+            "description": "The signature of the closest surviving ancestor B if missing_links_a is > 0 else null."
+        },
+        "minlength": 32,
+        "nullable": true,
+        "type": "binary"
+    },
     "creator": {
         "default": null,
         "meta": {
@@ -51,6 +71,29 @@
         "nullable": true,
         "type": "binary",
         "required": true
+    },
+    "lost_descendants": {
+        "check_with": "valid_lost_descendants"
+    },
+    "missing_links_a": {
+        "check_with": "valid_missing_links_a",
+        "default": 0,
+        "max": 9223372036854775807,
+        "meta": {
+            "description": "The number of ancestors purged between this GC and it's closest existing ancestor A."
+        },
+        "min": 0,
+        "type": "integer"
+    },
+    "missing_links_b": {
+        "check_with": "valid_missing_links_b",
+        "default": 0,
+        "max": 9223372036854775807,
+        "meta": {
+            "description": "The number of ancestors purged between this GC and it's closest existing ancestor B."
+        },
+        "min": 0,
+        "type": "integer"
     },
     "pgc": {
         "default": null,

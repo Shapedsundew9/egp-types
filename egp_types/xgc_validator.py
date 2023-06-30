@@ -282,6 +282,22 @@ class _LGC_entry_validator(_gms_entry_validator):
         if value is not None and value == self.document['signature']:
             self._error(field, 'A GC cannot be its own ancestor (B).')
 
+    def _check_with_valid_missing_links_a(self, field: str, value: Any) -> None:
+        if value == 0 and not self.document['closest_surviving_ancestor_a'] is None:
+            self._error(field, 'Closest surviving ancestor A is set but there are no missing links.')
+        if value > 0 and self.document['closest_surviving_ancestor_a'] is None:
+            self._error(field, 'Closest surviving ancestor A is not set but there are missing links.')
+
+    def _check_with_valid_missing_links_b(self, field: str, value: Any) -> None:
+        if value == 0 and not self.document['closest_surviving_ancestor_b'] is None:
+            self._error(field, 'Closest surviving ancestor B is set but there are no missing links.')
+        if value > 0 and self.document['closest_surviving_ancestor_b'] is None:
+            self._error(field, 'Closest surviving ancestor B is not set but there are missing links.')
+
+    def _check_with_valid_lost_descendants(self, field: str, value: Any) -> None:
+        if value > 0 and self.document['e_count'] == 1:
+            self._error(field, 'GC has not evolved but has lost descendants')
+
     def _check_with_valid_gca(self, field: str, value: Any) -> None:
         if 'A' in self.document['graph'] and value is None:
             self._error(field, 'graph references row A but gca is None.')

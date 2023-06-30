@@ -460,6 +460,15 @@
         },
         "type": "binary"
     },
+    "lost_descendants": {
+        "default": 0,
+        "max": 9223372036854775807,
+        "meta": {
+            "description": "The number of descendants of this GC that have been purged."
+        },
+        "min": 0,
+        "type": "integer"
+    },
     "meta_data": {
         "meta": {
             "description": "Other data associated with this genetic code."
