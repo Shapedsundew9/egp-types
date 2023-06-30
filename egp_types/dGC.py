@@ -1,4 +1,4 @@
-"""Basic dict GC type definition."""
+"""Basic GP dict GC type definition."""
 from typing import Required, NotRequired, TypedDict
 from .egp_typing import ConnectionGraph
 from .gc_graph import gc_graph

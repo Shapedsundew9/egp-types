@@ -334,6 +334,9 @@ class _LGC_json_load_entry_validator(_LGC_entry_validator):
     def _normalize_coerce_properties_dict_to_int(self, value) -> int:
         return encode_properties(value)
 
+    def _normalize_coerce_type_indices_str_to_binary(self, value) -> str | None:
+        return bytearray.fromhex(value)
+
 
 class _LGC_json_dump_entry_validator(_LGC_entry_validator):
 
@@ -354,6 +357,9 @@ class _LGC_json_dump_entry_validator(_LGC_entry_validator):
 
     def _normalize_coerce_properties_int_to_dict(self, value) -> dict[str, bool]:
         return decode_properties(value)
+
+    def _normalize_coerce_type_indices_binary_to_str(self, value) -> str | None:
+        return value.hex()
 
 
 class _gGC_entry_validator(_gms_entry_validator):

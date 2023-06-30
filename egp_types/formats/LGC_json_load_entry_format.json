@@ -23,6 +23,12 @@
     "properties": {
         "coerce": "properties_dict_to_int"
     },
+    "inputs": {
+        "coerce": "type_indices_str_to_binary"
+    },
+    "outputs": {
+        "coerce": "type_indices_str_to_binary"
+    },
     "signature": {
         "coerce": "signature_str_to_binary"
     },
