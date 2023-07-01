@@ -689,6 +689,7 @@
         "type": "list"
     },
     "pgc_fitness": {
+        "check_with": "valid_pgc_fitness",
         "default": null,
         "maxlength": 16,
         "meta": {

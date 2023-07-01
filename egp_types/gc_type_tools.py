@@ -83,11 +83,9 @@ def is_pgc(genetic_code: Any):
         # TODO: More conditions can be added
         # Check the physical property?
         input_types: list[int] = genetic_code.get('input_types', [])
-        inputs: list[int] = genetic_code.get('inputs', [])
         output_types: list[int] = genetic_code.get('output_types', [])
-        outputs: list[int] = genetic_code.get('outputs', [])
-        pgc_inputs: bool = bool(input_types) and input_types[0] == -3 and len(inputs) == 1
-        pgc_outputs: bool = bool(output_types) and output_types[0] == -3 and len(outputs) == 1
+        pgc_inputs: bool = bool(input_types) and -3 in input_types
+        pgc_outputs: bool = bool(output_types) and -3 in output_types
         check: bool = (pgc_inputs and pgc_outputs) == (genetic_code.get('pgc_fitness', None) is not None)
         if not check:
             raise ValueError(

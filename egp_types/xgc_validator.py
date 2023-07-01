@@ -16,7 +16,7 @@ from .conversions import (encode_properties, str_to_datetime, str_to_sha256,
                           sha256_to_str, uuid_to_str)
 from .ep_type import validate, MIN_EP_TYPE_VALUE, MAX_EP_TYPE_VALUE
 from .gc_graph import gc_graph
-from .gc_type_tools import PROPERTIES, define_signature
+from .gc_type_tools import PROPERTIES, define_signature, PHYSICAL_PROPERTY
 
 # End point type values are used in may places. Making a rule
 # helps keep things consistent.
@@ -105,6 +105,11 @@ class _gms_entry_validator(base_validator):
             if any(invalid.values()):
                 indices: list[int] = [i for i, v in invalid.items() if not v]
                 self._error(field, f'_pgc_e_count cannot be 0 if _pgc_evolvability is non-zero at indices {indices}.')
+            e_count: list[float] | tuple[float, ...] = self.document['pgc_e_count']
+            invalid: dict[int, bool] = {i: e_count[i] > v for i, v in enumerate(value)}
+            if any(invalid.values()):
+                indices: list[int] = [i for i, v in invalid.items() if not v]
+                self._error(field, f'_pgc_e_count cannot be > pgc_e_count at indices {indices}.')
 
     def _check_with_valid__pgc_evolvability(self, field: str, value: Any) -> None:
         self._valid_pgc(field, value)
@@ -115,13 +120,18 @@ class _gms_entry_validator(base_validator):
             if any(invalid.values()):
                 indices: list[int] = [i for i, v in invalid.items() if not v]
                 self._error(field, f'_pgc_f_count cannot be 0 if _pgc_fitness is non-zero at indices {indices}.')
+            f_count: list[float] | tuple[float, ...] = self.document['pgc_f_count']
+            invalid: dict[int, bool] = {i: f_count[i] > v for i, v in enumerate(value)}
+            if any(invalid.values()):
+                indices: list[int] = [i for i, v in invalid.items() if not v]
+                self._error(field, f'_pgc_f_count cannot be > pgc_f_count at indices {indices}.')
 
     def _check_with_valid__pgc_fitness(self, field: str, value: Any) -> None:
         self._valid_pgc(field, value)
 
     def _check_with_valid__reference_count(self, field: str, value: Any) -> None:
         if value > self.document['reference_count']:
-            self._error(field, f"_reference_count ({value}) cannot be higher than reference_count {self.document['reference_count']}.")
+            self._error(field, f"_reference_count ({value}) cannot be > reference_count {self.document['reference_count']}.")
 
     def _check_with_valid_created(self, field: str, value: datetime) -> None:
         if value > datetime.utcnow():
@@ -204,6 +214,19 @@ class _gms_entry_validator(base_validator):
             _invalid: list[int] = [idx for idx, pgc_f_count in enumerate(value) if pgc_f_count < self.document['_pgc_f_count'][idx]]
             if _invalid:
                 self._error(field, f'_pgc_f_count is greater than pgc_f_count at indices: {_invalid}')
+
+    def _check_with_valid_pgc_fitness(self, field: str, value: Any) -> None:
+        if self._valid_pgc(field, value):
+            if -3 not in self.document.get('input_types', [0]):
+                self._error(field, 'A pGC must have at least 1 xGC type input.')
+            if -3 not in self.document.get('output_types', [0]):
+                self._error(field, 'A pGC must have at least 1 xGC type output.')
+            if not (PHYSICAL_PROPERTY & self.document['properties']):
+                self._error(field, 'A pGC must have the physical property set.')
+        else:
+            # If there are no errors then it must be a gGC
+            if PHYSICAL_PROPERTY & self.document.get('properties', 0):
+                self._error(field, 'A gGC must NOT have the physical property set.')
 
     def _check_with_valid_properties(self, field: str, value: Any) -> None:
         valid_property_mask: int = 0
