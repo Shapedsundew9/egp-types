@@ -1,5 +1,5 @@
 """Common Erasmus GP Types."""
-from typing import Literal, Any, TypeGuard, TypedDict, NotRequired, Callable
+from typing import Literal, Any, TypeGuard, TypedDict, NotRequired
 from enum import IntEnum
 from graph_tool import Vertex as gt_vertex
 from graph_tool import Edge as gt_edge
