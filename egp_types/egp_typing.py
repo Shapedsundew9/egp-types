@@ -1,12 +1,9 @@
 """Common Erasmus GP Types."""
-from typing import Literal, Any, TypeGuard, TypedDict, NotRequired
+from typing import Literal, Any, TypeGuard, TypedDict, NotRequired, Callable
 from enum import IntEnum
 from graph_tool import Vertex as gt_vertex
 from graph_tool import Edge as gt_edge
-# from .xGC import xGC
 
-# FitnessFunction = Callable[[Iterable[xGC]], None]
-# SurvivabilityFunction = Callable[[Iterable[xGC], Iterable[xGC]], None]
 
 DestinationRow = Literal['A', 'B', 'F', 'O', 'P', 'U']
 SourceRow = Literal['I', 'C', 'A', 'B']
