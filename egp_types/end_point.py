@@ -6,7 +6,8 @@ from copy import deepcopy
 
 from .egp_typing import (DST_EP, SRC_EP, DestinationRow, DstEndPointHash,
                          EndPointClass, EndPointHash, EndPointIndex,
-                         EndPointType, Row, SourceRow, SrcEndPointHash)
+                         EndPointType, Row, SourceRow, SrcEndPointHash,
+                        VALID_ROW_DESTINATIONS, VALID_ROW_SOURCES)
 
 
 @dataclass(slots=True)
@@ -84,6 +85,12 @@ class end_point(generic_end_point):
         """For hashable operations."""
         return hash(self.key())
 
+    def _del_invalid_refs(self, ep: Self, row: Row, has_f: bool = False) -> None:
+        """Remove any invalid references"""
+        valid_ref_rows: tuple[Row, ...] = VALID_ROW_SOURCES[has_f][row] if ep.cls == DST_EP else VALID_ROW_DESTINATIONS[has_f][row]
+        for vidx in reversed([idx for idx, ref in enumerate(ep.refs) if ref.row not in valid_ref_rows]):
+            del ep.refs[vidx]
+
     def key(self) -> EndPointHash:
         """Create a unique key to use in the internal graph."""
         return self.key_base() + 'ds'[self.cls]
@@ -101,17 +108,24 @@ class end_point(generic_end_point):
         """Return a copy of the end point with no references."""
         return end_point(self.row, self.idx, self.typ, self.cls) if clean else deepcopy(self)
 
-    def move_copy(self, row: Row, clean: bool = False) -> Self:
-        """Return a copy of the end point with the row changed."""
+    def move_copy(self, row: Row, clean: bool = False, has_f: bool = False) -> Self:
+        """Return a copy of the end point with the row changed.
+        
+        Any references that are no longer valid are deleted.
+        """
         ep: Self = self.copy(clean)
         ep.row = row
+        if not clean:
+            self._del_invalid_refs(ep, row, has_f)
         return ep
 
-    def move_cls_copy(self, row: Row, cls: EndPointClass, clean: bool = False) -> Self:
+    def move_cls_copy(self, row: Row, cls: EndPointClass, clean: bool = False, has_f: bool = False) -> Self:
         """Return a copy of the end point with the row & cls changed."""
         ep: Self = self.copy(clean)
         ep.row = row
         ep.cls = cls
+        if not clean:
+            self._del_invalid_refs(ep, row, has_f)
         return ep
 
     def redirect_refs(self, old_ref_row, new_ref_row) -> None:

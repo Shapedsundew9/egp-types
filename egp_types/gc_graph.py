@@ -210,7 +210,7 @@ class gc_graph():
 
         Other than _convert_to_internal() this MUST be the only way to add end points.
         """
-        row_counts: dict[str, int] = self.rows[ep.cls]
+        row_counts: dict[Row, int] = self.rows[ep.cls]
         if ep.row not in self.rows[ep.cls]:
             row_counts[ep.row] = 0
             match ep.row:
@@ -322,9 +322,9 @@ class gc_graph():
         nx_graph: DiGraph = self.nx_graph()
         plot: figure = figure(max_width=size[0], max_height=size[1],
                               tools="pan,wheel_zoom,save,reset", active_scroll='wheel_zoom',
-                              title="Erasmus GP GC Internal Graph", x_range=Range1d(-110.1, 110.1), y_range=Range1d(-110.1, 110.1))
-        plot.add_tools(HoverTool(tooltips=_NX_HOVER_TOOLTIPS, anchor='top_right'), TapTool(), BoxSelectTool())
-        bk_graph: GraphRenderer = from_networkx(nx_graph, spring_layout, scale=100, center=(0, 0))
+                              title="Erasmus GP GC Internal Graph", x_range=Range1d(-110.1, 110.1), y_range=Range1d(-110.1, 110.1))  # type: ignore
+        plot.add_tools(HoverTool(tooltips=_NX_HOVER_TOOLTIPS, anchor='top_right'), TapTool(), BoxSelectTool())  # type: ignore
+        bk_graph: GraphRenderer = from_networkx(nx_graph, spring_layout, scale=100, center=(0, 0))  # type: ignore
         bk_graph.node_renderer.glyph = Circle(line_color='line', size='size', fill_color="fill")  # type: ignore
         bk_graph.node_renderer.selection_glyph = Circle(line_color='line', size='size', fill_color="select")  # type: ignore
         bk_graph.node_renderer.hover_glyph = Circle(line_color='line', size='size', fill_color="hover")  # type: ignore
@@ -349,11 +349,11 @@ class gc_graph():
             'x_offset': list(label_x_offsets.values()),
             'y_offset': list(label_y_offsets.values()),
             'font_size': list(label_font_sizes.values()),
-            'font': list(label_font.values())
+            'font': list(label_font.values())  # type: ignore
         })
         labels: LabelSet = LabelSet(x='x', y='y', text='text',
                                     source=source, text_font_size='font_size', x_offset='x_offset', y_offset='y_offset',
-                                    text_font='font', text_font_style='bold', text_color='black')
+                                    text_font='font', text_font_style='bold', text_color='black')  # type: ignore
         plot.renderers.append(labels)  # type: ignore
         output_file(f"{path}.html", title="Erasmus GP GC Internal Graph")
         save(plot)
