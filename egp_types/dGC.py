@@ -14,6 +14,7 @@ class dGC(TypedDict):
     missing_links_a: NotRequired[int]
     missing_links_b: NotRequired[int]
     lost_descendants: NotRequired[int]
+    population_uid: NotRequired[int]
     ref: Required[int]
     gca_ref: Required[int]
     gcb_ref: Required[int]
