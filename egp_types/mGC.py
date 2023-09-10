@@ -5,6 +5,7 @@ from .egp_typing import ConnectionGraph
 
 class mGC(TypedDict):
     """A dict based minimal GC."""
+
     graph: Required[ConnectionGraph]
     ancestor_a: Required[bytes]
     ancestor_b: Required[bytes]

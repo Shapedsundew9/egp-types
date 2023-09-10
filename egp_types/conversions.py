@@ -43,7 +43,9 @@ def str_to_json_obj(obj: Union[str, None]) -> Union[dict, list, None]:
     return None if obj is None else loads(obj)
 
 
-def encode_effective_pgcs(obj: Union[list[list[bytes]], None]) -> Union[list[list[bytes]], None]:
+def encode_effective_pgcs(
+    obj: Union[list[list[bytes]], None]
+) -> Union[list[list[bytes]], None]:
     """Encode the effective_pgcs list of lists of binary signatures into a JSON compatible object.
 
     Args
@@ -60,7 +62,9 @@ def encode_effective_pgcs(obj: Union[list[list[bytes]], None]) -> Union[list[lis
     return [[b64encode(signature) for signature in layer] for layer in obj]
 
 
-def decode_effective_pgcs(obj: Union[list[list[str]], None]) -> Union[list[list[bytes]], None]:
+def decode_effective_pgcs(
+    obj: Union[list[list[str]], None]
+) -> Union[list[list[bytes]], None]:
     """Encode the effective_pgcs list of lists of binary signatures into a JSON compatible object.
 
     Args
@@ -93,7 +97,11 @@ def compress_json(obj) -> bytes | memoryview | bytearray | None:
     # compression token dictionary.
     if isinstance(obj, dict):
         return compress(dumps(obj).encode())
-    if isinstance(obj, memoryview) or isinstance(obj, bytearray) or isinstance(obj, bytes):
+    if (
+        isinstance(obj, memoryview)
+        or isinstance(obj, bytearray)
+        or isinstance(obj, bytes)
+    ):
         return obj
     if obj is None:
         return None
@@ -128,7 +136,9 @@ def memoryview_to_bytes(obj) -> bytes | None:
     return None if obj is None else bytes(obj)
 
 
-def str_to_sha256(obj: str | bytearray | memoryview | bytes | None) -> bytearray | memoryview | bytes | None:
+def str_to_sha256(
+    obj: str | bytearray | memoryview | bytes | None,
+) -> bytearray | memoryview | bytes | None:
     """Convert a hexidecimal string to a bytearray.
 
     Args
@@ -141,7 +151,11 @@ def str_to_sha256(obj: str | bytearray | memoryview | bytes | None) -> bytearray
     """
     if isinstance(obj, str):
         return bytes.fromhex(obj)
-    if isinstance(obj, memoryview) or isinstance(obj, bytearray) or isinstance(obj, bytes):
+    if (
+        isinstance(obj, memoryview)
+        or isinstance(obj, bytearray)
+        or isinstance(obj, bytes)
+    ):
         return obj
     if obj is None:
         return None
@@ -185,7 +199,9 @@ def str_to_datetime(obj: str | datetime | None) -> datetime | None:
         return obj
     if obj is None:
         return None
-    raise TypeError(f"Un-encodeable type '{type(obj)}': Expected 'str' or datetime type.")
+    raise TypeError(
+        f"Un-encodeable type '{type(obj)}': Expected 'str' or datetime type."
+    )
 
 
 def sha256_to_str(obj: bytearray | bytes | str | None) -> str | None:
@@ -205,7 +221,9 @@ def sha256_to_str(obj: bytearray | bytes | str | None) -> str | None:
         return obj
     if obj is None:
         return None
-    raise TypeError(f"Un-encodeable type '{type(obj)}': Expected bytes, bytearray or str type.")
+    raise TypeError(
+        f"Un-encodeable type '{type(obj)}': Expected bytes, bytearray or str type."
+    )
 
 
 def uuid_to_str(obj: UUID | str | None) -> str | None:
@@ -245,7 +263,9 @@ def datetime_to_str(obj: datetime | str | None) -> str | None:
         return obj
     if obj is None:
         return None
-    raise TypeError(f"Un-encodeable type '{type(obj)}': Expected bytes, bytearray or str type.")
+    raise TypeError(
+        f"Un-encodeable type '{type(obj)}': Expected bytes, bytearray or str type."
+    )
 
 
 def encode_properties(obj: dict[str, bool] | int | None) -> int:
@@ -272,7 +292,9 @@ def encode_properties(obj: dict[str, bool] | int | None) -> int:
         return obj
     if obj is None:
         return 0
-    raise TypeError(f"Un-encodeable type '{type(obj)}': Expected 'dict' or integer type.")
+    raise TypeError(
+        f"Un-encodeable type '{type(obj)}': Expected 'dict' or integer type."
+    )
 
 
 def decode_properties(obj: int | dict[str, bool] | None) -> dict[str, bool]:
@@ -296,4 +318,6 @@ def decode_properties(obj: int | dict[str, bool] | None) -> dict[str, bool]:
         return {b: bool(f & obj) for b, f in PROPERTIES.items()}
     if obj is None:
         return {b: False for b, f in PROPERTIES.items()}
-    raise TypeError(f"Un-encodeable type '{type(obj)}': Expected 'dict' or integer type.")
+    raise TypeError(
+        f"Un-encodeable type '{type(obj)}': Expected 'dict' or integer type."
+    )

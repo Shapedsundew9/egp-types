@@ -4,15 +4,27 @@ from dataclasses import dataclass, field
 from typing import Any, TypeGuard, Self
 from copy import deepcopy
 
-from .egp_typing import (DST_EP, SRC_EP, DestinationRow, DstEndPointHash,
-                         EndPointClass, EndPointHash, EndPointIndex,
-                         EndPointType, Row, SourceRow, SrcEndPointHash,
-                        VALID_ROW_DESTINATIONS, VALID_ROW_SOURCES)
+from .egp_typing import (
+    DST_EP,
+    SRC_EP,
+    DestinationRow,
+    DstEndPointHash,
+    EndPointClass,
+    EndPointHash,
+    EndPointIndex,
+    EndPointType,
+    Row,
+    SourceRow,
+    SrcEndPointHash,
+    VALID_ROW_DESTINATIONS,
+    VALID_ROW_SOURCES,
+)
 
 
 @dataclass(slots=True)
-class generic_end_point():
-    """Lowest common denominator end point class """
+class generic_end_point:
+    """Lowest common denominator end point class"""
+
     row: Row
     idx: EndPointIndex
 
@@ -27,7 +39,7 @@ class end_point_ref(generic_end_point):
 
     def force_key(self, cls: EndPointClass) -> EndPointHash:
         """Create a unique key to use in the internal graph."""
-        return self.key_base() + 'ds'[cls]
+        return self.key_base() + "ds"[cls]
 
     def __eq__(self, ref: Self) -> bool:
         """Equivilence for end point references."""
@@ -37,6 +49,7 @@ class end_point_ref(generic_end_point):
 @dataclass(slots=True)
 class dst_end_point_ref(end_point_ref):
     """Refers to a destination end point"""
+
     row: DestinationRow
 
     def __hash__(self) -> int:
@@ -45,16 +58,17 @@ class dst_end_point_ref(end_point_ref):
 
     def key(self) -> DstEndPointHash:
         """Create a unique key to use in the internal graph."""
-        return self.key_base() + 'd'
+        return self.key_base() + "d"
 
     def invert_key(self) -> SrcEndPointHash:
         """Invert hash. Return a hash for the source endpoint equivilent."""
-        return self.key_base() + 's'
+        return self.key_base() + "s"
 
 
 @dataclass(slots=True)
 class src_end_point_ref(end_point_ref):
     """Refers to a source endpoint"""
+
     row: SourceRow
 
     def __hash__(self) -> int:
@@ -63,11 +77,11 @@ class src_end_point_ref(end_point_ref):
 
     def key(self) -> SrcEndPointHash:
         """Create a unique key to use in the internal graph."""
-        return self.key_base() + 's'
+        return self.key_base() + "s"
 
     def invert_key(self) -> DstEndPointHash:
         """Invert hash. Return a hash for the destination endpoint equivilent."""
-        return self.key_base() + 'd'
+        return self.key_base() + "d"
 
 
 @dataclass(slots=True)
@@ -76,6 +90,7 @@ class end_point(generic_end_point):
 
     If row == 'C', the constants row, then val is set to the constant.
     """
+
     typ: EndPointType
     cls: EndPointClass
     refs: list[end_point_ref] = field(default_factory=list)
@@ -87,17 +102,23 @@ class end_point(generic_end_point):
 
     def _del_invalid_refs(self, ep: Self, row: Row, has_f: bool = False) -> None:
         """Remove any invalid references"""
-        valid_ref_rows: tuple[Row, ...] = VALID_ROW_SOURCES[has_f][row] if ep.cls == DST_EP else VALID_ROW_DESTINATIONS[has_f][row]
-        for vidx in reversed([idx for idx, ref in enumerate(ep.refs) if ref.row not in valid_ref_rows]):
+        valid_ref_rows: tuple[Row, ...] = (
+            VALID_ROW_SOURCES[has_f][row]
+            if ep.cls == DST_EP
+            else VALID_ROW_DESTINATIONS[has_f][row]
+        )
+        for vidx in reversed(
+            [idx for idx, ref in enumerate(ep.refs) if ref.row not in valid_ref_rows]
+        ):
             del ep.refs[vidx]
 
     def key(self) -> EndPointHash:
         """Create a unique key to use in the internal graph."""
-        return self.key_base() + 'ds'[self.cls]
+        return self.key_base() + "ds"[self.cls]
 
     def force_key(self, force_class: EndPointClass | None = None) -> EndPointHash:
         """Create a unique key to use in the internal graph forcing the class type."""
-        cls: str = 'ds'[self.cls] if force_class is None else 'ds'[force_class]
+        cls: str = "ds"[self.cls] if force_class is None else "ds"[force_class]
         return self.key_base() + cls
 
     def as_ref(self) -> end_point_ref:
@@ -106,11 +127,15 @@ class end_point(generic_end_point):
 
     def copy(self, clean: bool = False) -> Self:
         """Return a copy of the end point with no references."""
-        return end_point(self.row, self.idx, self.typ, self.cls) if clean else deepcopy(self)
+        return (
+            end_point(self.row, self.idx, self.typ, self.cls)
+            if clean
+            else deepcopy(self)
+        )
 
     def move_copy(self, row: Row, clean: bool = False, has_f: bool = False) -> Self:
         """Return a copy of the end point with the row changed.
-        
+
         Any references that are no longer valid are deleted.
         """
         ep: Self = self.copy(clean)
@@ -119,7 +144,9 @@ class end_point(generic_end_point):
             self._del_invalid_refs(ep, row, has_f)
         return ep
 
-    def move_cls_copy(self, row: Row, cls: EndPointClass, clean: bool = False, has_f: bool = False) -> Self:
+    def move_cls_copy(
+        self, row: Row, cls: EndPointClass, clean: bool = False, has_f: bool = False
+    ) -> Self:
         """Return a copy of the end point with the row & cls changed."""
         ep: Self = self.copy(clean)
         ep.row = row
@@ -142,17 +169,18 @@ class end_point(generic_end_point):
 @dataclass(slots=True)
 class dst_end_point(end_point):
     """Destination End Point."""
+
     row: DestinationRow
     cls: EndPointClass = DST_EP
     refs: list[src_end_point_ref] = field(default_factory=list)
 
     def key(self) -> DstEndPointHash:
         """Create a unique key to use in the internal graph."""
-        return self.key_base() + 'd'
+        return self.key_base() + "d"
 
     def invert_key(self) -> SrcEndPointHash:
         """Invert hash. Return a hash for the source endpoint equivilent."""
-        return self.key_base() + 's'
+        return self.key_base() + "s"
 
     def as_ref(self) -> dst_end_point_ref:
         """Return a reference to this end point."""
@@ -166,17 +194,18 @@ class dst_end_point(end_point):
 @dataclass(slots=True)
 class src_end_point(end_point):
     """Source End Point."""
+
     row: SourceRow
     cls: EndPointClass = SRC_EP
     refs: list[dst_end_point_ref] = field(default_factory=list)
 
     def key(self) -> SrcEndPointHash:
         """Create a unique key to use in the internal graph."""
-        return self.key_base() + 's'
+        return self.key_base() + "s"
 
     def invert_key(self) -> DstEndPointHash:
         """Invert hash. Return a hash for the source endpoint equivilent."""
-        return self.key_base() + 'd'
+        return self.key_base() + "d"
 
     def as_ref(self) -> src_end_point_ref:
         """Return a reference to this end point."""

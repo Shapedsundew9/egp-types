@@ -12,7 +12,7 @@ _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
 
 # If this field exists and is not None the gGC is a pGC
-_PROOF_OF_PGC: Literal['pgc_fitness'] = 'pgc_fitness'
+_PROOF_OF_PGC: Literal["pgc_fitness"] = "pgc_fitness"
 
 
 class xGC(entry):
@@ -34,21 +34,23 @@ class xGC(entry):
         if self.is_pgc():
             self.__class__ = pGC
             return self  # type: ignore
-        raise RuntimeError('xGC cast to pGC but does not meet constraints to do so.')
+        raise RuntimeError("xGC cast to pGC but does not meet constraints to do so.")
 
     def to_ggc(self) -> gGC:
         """Cast the xGC to gGC."""
         if self.is_ggc():
             self.__class__ = gGC
             return self  # type: ignore
-        raise RuntimeError('xGC cast to gGC but does not meet constraints to do so.')
+        raise RuntimeError("xGC cast to gGC but does not meet constraints to do so.")
 
 
 class pGC(xGC):
     """pGC is a specialization of xGC."""
+
     # NOTE: pGC cannot define any new members, only methods, to support xGC light weight cast.
 
 
 class gGC(xGC):
     """gGC is a specialization of xGC."""
+
     # NOTE: pGC cannot define any new members, only methods, to support xGC light weight cast.

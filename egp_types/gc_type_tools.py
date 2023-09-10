@@ -41,28 +41,25 @@ PROPERTIES: dict[str, int] = {
     "logical": 1 << 17,
     "bitwise": 1 << 18,
     "boolean": 1 << 19,
-    "sequence": 1 << 20
+    "sequence": 1 << 20,
 }
-PHYSICAL_PROPERTY: int = PROPERTIES['physical']
+PHYSICAL_PROPERTY: int = PROPERTIES["physical"]
 LAYER_COLUMNS: tuple[LiteralString, ...] = (
     "evolvability",
     "fitness",
     "e_count",
     "f_count",
-    "if"
+    "if",
 )
-LAYER_COLUMNS_RESET: dict[str, int] = {
-    "e_count": 1,
-    "f_count": 1
-}
+LAYER_COLUMNS_RESET: dict[str, int] = {"e_count": 1, "f_count": 1}
 _GL_EXCLUDE_COLUMNS: tuple[LiteralString, ...] = (
-    'signature',
-    'gca',
-    'gcb',
-    'pgc',
-    'ancestor_a',
-    'ancestor_b',
-    'creator'
+    "signature",
+    "gca",
+    "gcb",
+    "pgc",
+    "ancestor_a",
+    "ancestor_b",
+    "creator",
 )
 _SIGN: tuple[Literal[1], Literal[-1]] = (1, -1)
 
@@ -82,16 +79,19 @@ def is_pgc(genetic_code: Any):
         # More juicy test for consistency
         # TODO: More conditions can be added
         # Check the physical property?
-        input_types: list[int] = genetic_code.get('input_types', [])
-        output_types: list[int] = genetic_code.get('output_types', [])
+        input_types: list[int] = genetic_code.get("input_types", [])
+        output_types: list[int] = genetic_code.get("output_types", [])
         pgc_inputs: bool = bool(input_types) and -3 in input_types
         pgc_outputs: bool = bool(output_types) and -3 in output_types
-        check: bool = (pgc_inputs and pgc_outputs) == (genetic_code.get('pgc_fitness', None) is not None)
+        check: bool = (pgc_inputs and pgc_outputs) == (
+            genetic_code.get("pgc_fitness", None) is not None
+        )
         if not check:
             raise ValueError(
                 f"PGC is not a PGC!: {genetic_code['ref']}\n\t{pgc_inputs}, {pgc_outputs}, {genetic_code.get('pgc_fitness', None)},"
-                f" {(pgc_inputs and pgc_outputs)}, {(genetic_code.get('pgc_fitness', None) is not None)}")
-    return genetic_code.get('pgc_fitness', None) is not None
+                f" {(pgc_inputs and pgc_outputs)}, {(genetic_code.get('pgc_fitness', None) is not None)}"
+            )
+    return genetic_code.get("pgc_fitness", None) is not None
 
 
 def define_signature(mgc: Any) -> bytes:
@@ -110,18 +110,20 @@ def define_signature(mgc: Any) -> bytes:
     # NOTE: This needs to be very specific and stand the test of time!
     # Also NOTE: Ancestory is bound in which means if ancestors end up being culled we will
     # need a way to point to the youngest existing ancestor.
-    gca_hex: str = '0' * 64 if mgc['gca'] is None else mgc['gca'].hex()
-    gcb_hex: str = '0' * 64 if mgc['gcb'] is None else mgc['gcb'].hex()
-    ancestor_a_hex: str = '0' * 64 if mgc['gca'] is None else mgc['gca'].hex()
-    ancestor_b_hex: str = '0' * 64 if mgc['gcb'] is None else mgc['gcb'].hex()
-    string: str = pformat(mgc['graph'], indent=0, sort_dicts=True, width=65535, compact=True)
-    string += gca_hex + gcb_hex + ancestor_a_hex + ancestor_b_hex + str(mgc['creator'])
+    gca_hex: str = "0" * 64 if mgc["gca"] is None else mgc["gca"].hex()
+    gcb_hex: str = "0" * 64 if mgc["gcb"] is None else mgc["gcb"].hex()
+    ancestor_a_hex: str = "0" * 64 if mgc["gca"] is None else mgc["gca"].hex()
+    ancestor_b_hex: str = "0" * 64 if mgc["gcb"] is None else mgc["gcb"].hex()
+    string: str = pformat(
+        mgc["graph"], indent=0, sort_dicts=True, width=65535, compact=True
+    )
+    string += gca_hex + gcb_hex + ancestor_a_hex + ancestor_b_hex + str(mgc["creator"])
 
     # If it is a codon glue on the mandatory definition
     if "generation" in mgc and mgc["generation"] == 0:
         if "meta_data" in mgc and "function" in mgc["meta_data"]:
             string += mgc["meta_data"]["function"]["python3"]["0"]["inline"]
-            if 'code' in mgc["meta_data"]["function"]["python3"]["0"]:
+            if "code" in mgc["meta_data"]["function"]["python3"]["0"]:
                 string += mgc["meta_data"]["function"]["python3"]["0"]["code"]
 
     return sha256(string.encode()).digest()

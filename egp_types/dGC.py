@@ -6,6 +6,7 @@ from .gc_graph import gc_graph
 
 class dGC(TypedDict):
     """A dict based minimal GC."""
+
     graph: NotRequired[ConnectionGraph]
     vertex_idx: NotRequired[int]
     gc_graph: Required[gc_graph]
