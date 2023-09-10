@@ -1,9 +1,9 @@
 {
     "ancestor_a": {
-        "coerce": "signature_str_to_binary"
+        "coerce": "sha256_str_to_binary"
     },
     "ancestor_b": {
-        "coerce": "signature_str_to_binary"
+        "coerce": "sha256_str_to_binary"
     },
     "created": {
         "coerce": "datetime_str_to_datetime"
@@ -12,13 +12,13 @@
         "coerce": "uuid_str_to_uuid"
     },
     "gca": {
-        "coerce": "signature_str_to_binary"
+        "coerce": "sha256_str_to_binary"
     },
     "gcb": {
-        "coerce": "signature_str_to_binary"
+        "coerce": "sha256_str_to_binary"
     },
     "pgc": {
-        "coerce": "signature_str_to_binary"
+        "coerce": "sha256_str_to_binary"
     },
     "properties": {
         "coerce": "properties_dict_to_int"
@@ -30,10 +30,10 @@
         "coerce": "type_indices_str_to_binary"
     },
     "signature": {
-        "coerce": "signature_str_to_binary"
+        "coerce": "sha256_str_to_binary"
     },
     "sms": {
-        "coerce": "signature_str_to_binary"
+        "coerce": "sha256_str_to_binary"
     },
     "updated": {
         "coerce": "datetime_str_to_datetime"

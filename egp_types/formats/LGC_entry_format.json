@@ -1,5 +1,6 @@
 {
     "ancestor_a": {
+        "coerce": "sha256_str_to_binary",
         "default": null,
         "maxlength": 32,
         "meta": {
@@ -11,6 +12,7 @@
         "required": true
     },
     "ancestor_b": {
+        "coerce": "sha256_str_to_binary",
         "default": null,
         "maxlength": 32,
         "meta": {
@@ -22,6 +24,7 @@
         "required": true
     },
     "closest_surviving_ancestor_a": {
+        "coerce": "sha256_str_to_binary",
         "default": null,
         "maxlength": 32,
         "meta": {
@@ -32,6 +35,7 @@
         "type": "binary"
     },
     "closest_surviving_ancestor_b": {
+        "coerce": "sha256_str_to_binary",
         "default": null,
         "maxlength": 32,
         "meta": {
@@ -42,6 +46,7 @@
         "type": "binary"
     },
     "creator": {
+        "coerce": "uuid_str_to_uuid",
         "default": null,
         "meta": {
             "description": "The UUID identifying the creator. If the genetic code has been created in another microbiome at an earlier time then this field will be updated."
@@ -51,6 +56,7 @@
         "required": true
     },
     "gca": {
+        "coerce": "sha256_str_to_binary",
         "default": null,
         "maxlength": 32,
         "meta": {
@@ -62,6 +68,7 @@
         "required": true
     },
     "gcb": {
+        "coerce": "sha256_str_to_binary",
         "default": null,
         "maxlength": 32,
         "meta": {
@@ -96,6 +103,7 @@
         "type": "integer"
     },
     "pgc": {
+        "coerce": "sha256_str_to_binary",
         "default": null,
         "maxlength": 32,
         "meta": {
@@ -107,6 +115,7 @@
         "required": true
     },
     "signature": {
+        "coerce": "sha256_str_to_binary",
         "required": true,
         "maxlength": 32,
         "meta": {
@@ -117,6 +126,7 @@
         "default_setter": "set_signature"
     },
     "sms": {
+        "coerce": "sha256_str_to_binary",
         "default": null,
         "maxlength": 32,
         "meta": {

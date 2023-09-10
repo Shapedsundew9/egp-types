@@ -6,10 +6,8 @@ The need for type conversions is driven by:
     c) Limitations of human readable file formats i.e. JSON
 """
 from base64 import b64decode, b64encode
-from datetime import datetime
 from json import dumps, loads
 from typing import Union
-from uuid import UUID
 from zlib import compress, decompress
 
 from egp_types.gc_type_tools import PROPERTIES
@@ -134,138 +132,6 @@ def memoryview_to_bytes(obj) -> bytes | None:
     (bytes or NoneType)
     """
     return None if obj is None else bytes(obj)
-
-
-def str_to_sha256(
-    obj: str | bytearray | memoryview | bytes | None,
-) -> bytearray | memoryview | bytes | None:
-    """Convert a hexidecimal string to a bytearray.
-
-    Args
-    ----
-    obj (str): Must be a hexadecimal string.
-
-    Returns
-    -------
-    (bytearray): bytearray representation of the string.
-    """
-    if isinstance(obj, str):
-        return bytes.fromhex(obj)
-    if (
-        isinstance(obj, memoryview)
-        or isinstance(obj, bytearray)
-        or isinstance(obj, bytes)
-    ):
-        return obj
-    if obj is None:
-        return None
-    raise TypeError(f"Un-encodeable type '{type(obj)}': Expected 'str' or bytes type.")
-
-
-def str_to_uuid(obj: str | UUID | None) -> UUID | None:
-    """Convert a UUID formated string to a UUID object.
-
-    Args
-    ----
-    obj (str): Must be a UUID formated hexadecimal string.
-
-    Returns
-    -------
-    (uuid): UUID representation of the string.
-    """
-    if isinstance(obj, str):
-        return UUID(obj)
-    if isinstance(obj, UUID):
-        return obj
-    if obj is None:
-        return None
-    raise TypeError(f"Un-encodeable type '{type(obj)}': Expected 'str' or UUID type.")
-
-
-def str_to_datetime(obj: str | datetime | None) -> datetime | None:
-    """Convert a datetime formated string to a datetime object.
-
-    Args
-    ----
-    obj (str): Must be a datetime formated string.
-
-    Returns
-    -------
-    (datetime): datetime representation of the string.
-    """
-    if isinstance(obj, str):
-        return datetime.strptime(obj, "%Y-%m-%dT%H:%M:%S.%fZ")
-    if isinstance(obj, datetime):
-        return obj
-    if obj is None:
-        return None
-    raise TypeError(
-        f"Un-encodeable type '{type(obj)}': Expected 'str' or datetime type."
-    )
-
-
-def sha256_to_str(obj: bytearray | bytes | str | None) -> str | None:
-    """Convert a bytearray to its lowercase hexadecimal string representation.
-
-    Args
-    ----
-    obj (bytearray): bytearray representation of the string.
-
-    Returns
-    -------
-    (str): Lowercase hexadecimal string.
-    """
-    if isinstance(obj, (bytes, bytearray)):
-        return obj.hex()
-    if isinstance(obj, str):
-        return obj
-    if obj is None:
-        return None
-    raise TypeError(
-        f"Un-encodeable type '{type(obj)}': Expected bytes, bytearray or str type."
-    )
-
-
-def uuid_to_str(obj: UUID | str | None) -> str | None:
-    """Convert a UUID to its lowercase hexadecimal string representation.
-
-    Args
-    ----
-    obj (UUID): UUID representation of the string.
-
-    Returns
-    -------
-    (str): Lowercase hexadecimal UUID string.
-    """
-    if isinstance(obj, UUID):
-        return str(obj)
-    if isinstance(obj, str):
-        return obj
-    if obj is None:
-        return None
-    raise TypeError(f"Un-encodeable type '{type(obj)}': Expected UUID or str type.")
-
-
-def datetime_to_str(obj: datetime | str | None) -> str | None:
-    """Convert a datetime to its string representation.
-
-    Args
-    ----
-    obj (datetime): datetime representation of the string.
-
-    Returns
-    -------
-    (str): datetime string.
-    """
-    if isinstance(obj, datetime):
-        return obj.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-    if isinstance(obj, str):
-        return obj
-    if obj is None:
-        return None
-    raise TypeError(
-        f"Un-encodeable type '{type(obj)}': Expected bytes, bytearray or str type."
-    )
 
 
 def encode_properties(obj: dict[str, bool] | int | None) -> int:

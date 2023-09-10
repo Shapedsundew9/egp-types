@@ -37,7 +37,7 @@ from bokeh.palettes import Category20_20, Greys9
 from bokeh.plotting import figure, from_networkx
 from cairo import FONT_WEIGHT_BOLD  # pylint: disable=no-name-in-module
 from cairo import FontWeight  # pylint: disable=no-name-in-module
-from egp_utils.text_token import register_token_code, text_token
+from text_token import register_token_code, text_token
 from graph_tool import EdgePropertyMap, Graph, VertexPropertyMap
 from graph_tool.draw import graph_draw
 from networkx import (
@@ -577,8 +577,8 @@ class gc_graph:
         plot.renderers.append(bk_graph)  # type: ignore
 
         x_y: tuple[tuple[float, ...], tuple[float, ...]] = tuple(
-            zip(*bk_graph.layout_provider.graph_layout.values())
-        )  # pylint: disable=no-member, # type: ignore
+            zip(*bk_graph.layout_provider.graph_layout.values())  # pylint: disable=no-member, # type: ignore
+        )
         node_labels: dict[str, str] = get_node_attributes(nx_graph, "text")
         label_x_offsets: dict[str, float] = get_node_attributes(nx_graph, "x_offset")
         label_y_offsets: dict[str, float] = get_node_attributes(nx_graph, "y_offset")

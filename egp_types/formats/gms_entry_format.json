@@ -142,6 +142,7 @@
         "type": "integer"
     },
     "created": {
+        "coerce": "datetime_str_to_datetime",
         "check_with": "valid_created",
         "meta": {
             "description": "The UTC date and time of the codes creation. If the genetic code has been created in another microbiome at an earlier time then this field will be updated."
@@ -725,6 +726,7 @@
         "type": "integer"
     },
     "updated": {
+        "coerce": "datetime_str_to_datetime",
         "check_with": "valid_updated",
         "default_setter": "set_updated",
         "type": "datetime"

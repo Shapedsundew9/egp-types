@@ -4,23 +4,13 @@ from copy import deepcopy
 from datetime import datetime
 from json import load
 from os.path import dirname, join
-from typing import Any
-from uuid import UUID
+from typing import Any, cast
 
 from egp_utils.base_validator import base_validator
 from egp_utils.common import merge
 from cerberus import rules_set_registry
 
-from .conversions import (
-    encode_properties,
-    str_to_datetime,
-    str_to_sha256,
-    str_to_uuid,
-    decode_properties,
-    datetime_to_str,
-    sha256_to_str,
-    uuid_to_str,
-)
+from .conversions import encode_properties, decode_properties
 from .ep_type import validate, MIN_EP_TYPE_VALUE, MAX_EP_TYPE_VALUE
 from .gc_graph import gc_graph
 from .gc_type_tools import PROPERTIES, define_signature, PHYSICAL_PROPERTY
@@ -319,7 +309,7 @@ class _gms_entry_validator(base_validator):
                 self._error(field, "A pGC must have at least 1 xGC type input.")
             if -3 not in self.document.get("output_types", [0]):
                 self._error(field, "A pGC must have at least 1 xGC type output.")
-            if not (PHYSICAL_PROPERTY & self.document["properties"]):
+            if not PHYSICAL_PROPERTY & self.document["properties"]:
                 self._error(field, "A pGC must have the physical property set.")
         else:
             # If there are no errors then it must be a gGC
@@ -370,13 +360,13 @@ class _gms_entry_validator(base_validator):
     def _normalize_default_setter_set_input_indices(self, document) -> bytes:
         # Get the type list then find all the inputs in order & look them up.
         type_list: list[int] = self._normalize_default_setter_set_input_types(document)
-        inputs: set[tuple[str, int, int]] = {
+        inputs: set[tuple[str| int, ...]] = {
             tuple(ep)
             for row in document["graph"].values()
             for ep in filter(lambda x: x[0] == "I", row)
         }
         return bytes(
-            (type_list.index(ep[2]) for ep in sorted(inputs, key=lambda x: x[1]))
+            (type_list.index(cast(int, ep[2])) for ep in sorted(inputs, key=lambda x: x[1]))
         )
 
     def _normalize_default_setter_set_output_indices(self, document) -> bytes:
@@ -502,46 +492,16 @@ class _LGC_json_load_entry_validator(_LGC_entry_validator):
     # TODO: Make errors ValidationError types for full disclosure
     # https://docs.python-cerberus.org/en/stable/customize.html#validator-error
 
-    def _normalize_coerce_signature_str_to_binary(
-        self, value
-    ) -> bytearray | memoryview | bytes | None:
-        return str_to_sha256(value)
-
-    def _normalize_coerce_signature_str_list_to_binary_list(
-        self, value
-    ) -> list[list[bytearray | memoryview | bytes | None]]:
-        return [[str_to_sha256(v) for v in vv] for vv in value]
-
-    def _normalize_coerce_datetime_str_to_datetime(self, value) -> datetime | None:
-        return str_to_datetime(value)
-
-    def _normalize_coerce_uuid_str_to_uuid(self, value) -> UUID | None:
-        return str_to_uuid(value)
-
     def _normalize_coerce_properties_dict_to_int(self, value) -> int:
         return encode_properties(value)
 
-    def _normalize_coerce_type_indices_str_to_binary(self, value) -> str | None:
+    def _normalize_coerce_type_indices_str_to_binary(self, value) -> bytes:
         return bytes.fromhex(value)
 
 
 class _LGC_json_dump_entry_validator(_LGC_entry_validator):
     # TODO: Make errors ValidationError types for full disclosure
     # https://docs.python-cerberus.org/en/stable/customize.html#validator-error
-
-    def _normalize_coerce_signature_binary_to_str(self, value) -> str | None:
-        return sha256_to_str(value)
-
-    def _normalize_coerce_signature_binary_list_to_str_list(
-        self, value
-    ) -> list[list[str | None]] | None:
-        return [[sha256_to_str(v) for v in vv] for vv in value]
-
-    def _normalize_coerce_datetime_to_datetime_str(self, value) -> str | None:
-        return datetime_to_str(value)
-
-    def _normalize_coerce_uuid_to_uuid_str(self, value) -> str | None:
-        return uuid_to_str(value)
 
     def _normalize_coerce_properties_int_to_dict(self, value) -> dict[str, bool]:
         return decode_properties(value)

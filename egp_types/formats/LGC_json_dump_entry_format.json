@@ -1,12 +1,12 @@
 {
     "ancestor_a": {
-        "coerce": "signature_binary_to_str",
+        "coerce": "sha256_binary_to_str",
         "minlength": 64,
         "maxlength": 64,
         "type": "string"
     },
     "ancestor_b": {
-        "coerce": "signature_binary_to_str",
+        "coerce": "sha256_binary_to_str",
         "minlength": 64,
         "maxlength": 64,
         "type": "string"
@@ -26,19 +26,19 @@
         "type": "string"
     },
     "gca": {
-        "coerce": "signature_binary_to_str",
+        "coerce": "sha256_binary_to_str",
         "minlength": 64,
         "maxlength": 64,
         "type": "string"
     },
     "gcb": {
-        "coerce": "signature_binary_to_str",
+        "coerce": "sha256_binary_to_str",
         "minlength": 64,
         "maxlength": 64,
         "type": "string"
     },
     "pgc": {
-        "coerce": "signature_binary_to_str",
+        "coerce": "sha256_binary_to_str",
         "minlength": 64,
         "maxlength": 64,
         "type": "string"
@@ -110,13 +110,13 @@
         "type": "string"
     },
     "signature": {
-        "coerce": "signature_binary_to_str",
+        "coerce": "sha256_binary_to_str",
         "minlength": 64,
         "maxlength": 64,
         "type": "string"
     },
     "sms": {
-        "coerce": "signature_binary_to_str",
+        "coerce": "sha256_binary_to_str",
         "minlength": 64,
         "maxlength": 64,
         "type": "string"
