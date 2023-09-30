@@ -93,6 +93,12 @@ class eGC(dict):
                 gcgraph.normalize()
             self["gc_graph"] = gcgraph
 
+        self.setdefault("gca_ref", 0)
+        self.setdefault("gcb_ref", 0)
+        self.setdefault("ancestor_a_ref", 0)
+        self.setdefault("ancestor_b_ref", 0)
+        self.setdefault("generation", 0)
+
         if _LOG_DEBUG:
             if not eGC.validator.validate(self):
                 _logger.error(

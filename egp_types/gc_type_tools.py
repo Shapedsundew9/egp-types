@@ -6,6 +6,7 @@ from hashlib import sha256
 from logging import DEBUG, Logger, NullHandler, getLogger
 from pprint import pformat
 from typing import Literal, LiteralString, Any
+from .ep_type import asint
 
 
 _logger: Logger = getLogger(__name__)
@@ -64,7 +65,7 @@ _GL_EXCLUDE_COLUMNS: tuple[LiteralString, ...] = (
 _SIGN: tuple[Literal[1], Literal[-1]] = (1, -1)
 
 
-def is_pgc(genetic_code: Any):
+def is_pgc(genetic_code: Any) -> bool:
     """Determine if a GC is a PGC.
 
     Args
@@ -81,14 +82,14 @@ def is_pgc(genetic_code: Any):
         # Check the physical property?
         input_types: list[int] = genetic_code.get("input_types", [])
         output_types: list[int] = genetic_code.get("output_types", [])
-        pgc_inputs: bool = bool(input_types) and -3 in input_types
-        pgc_outputs: bool = bool(output_types) and -3 in output_types
-        check: bool = (pgc_inputs and pgc_outputs) == (
-            genetic_code.get("pgc_fitness", None) is not None
-        )
-        if not check:
+        pgc_inputs: bool = any(asint(t) < 0 for t in input_types)
+        pgc_outputs: bool = any(asint(t) < 0 for t in output_types)
+        pgc_check: bool = (pgc_inputs and pgc_outputs) and (genetic_code.get("pgc_fitness", None) is not None)
+        ggc_check: bool = genetic_code.get("pgc_fitness", None) is None
+        if not (pgc_check or ggc_check) and not (pgc_check and ggc_check):
+            _logger.debug(f"Inconsistent GC definition: Is it a gGC or a pGC?:\n{pformat(genetic_code, indent=4, sort_dicts=True, width=140)}")
             raise ValueError(
-                f"PGC is not a PGC!: {genetic_code['ref']}\n\t{pgc_inputs}, {pgc_outputs}, {genetic_code.get('pgc_fitness', None)},"
+                f"Inconsistent GC definition: Is it a gGC or a pGC?: {genetic_code['ref']}\n\t{pgc_inputs}, {pgc_outputs},"
                 f" {(pgc_inputs and pgc_outputs)}, {(genetic_code.get('pgc_fitness', None) is not None)}"
             )
     return genetic_code.get("pgc_fitness", None) is not None

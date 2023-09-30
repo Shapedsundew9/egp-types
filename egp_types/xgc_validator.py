@@ -305,16 +305,18 @@ class _gms_entry_validator(base_validator):
 
     def _check_with_valid_pgc_fitness(self, field: str, value: Any) -> None:
         if self._valid_pgc(field, value):
-            if -3 not in self.document.get("input_types", [0]):
+            # FIXME: Can do more here to determine a valid pGC
+            if not any(t < 0 for t in self.document.get("input_types", [0])):
                 self._error(field, "A pGC must have at least 1 xGC type input.")
-            if -3 not in self.document.get("output_types", [0]):
+            if not any(t < 0 for t in self.document.get("output_types", [0])):
                 self._error(field, "A pGC must have at least 1 xGC type output.")
             if not PHYSICAL_PROPERTY & self.document["properties"]:
                 self._error(field, "A pGC must have the physical property set.")
         else:
             # If there are no errors then it must be a gGC
-            if PHYSICAL_PROPERTY & self.document.get("properties", 0):
-                self._error(field, "A gGC must NOT have the physical property set.")
+            # FIXME: Can do more here to determine a valid gGC
+            if value is not None:
+                self._error(field, "A gGC must NOT have pgc_fitness.")
 
     def _check_with_valid_properties(self, field: str, value: Any) -> None:
         valid_property_mask: int = 0
