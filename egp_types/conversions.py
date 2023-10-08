@@ -41,9 +41,7 @@ def str_to_json_obj(obj: Union[str, None]) -> Union[dict, list, None]:
     return None if obj is None else loads(obj)
 
 
-def encode_effective_pgcs(
-    obj: Union[list[list[bytes]], None]
-) -> Union[list[list[bytes]], None]:
+def encode_effective_pgcs(obj: Union[list[list[bytes]], None]) -> Union[list[list[bytes]], None]:
     """Encode the effective_pgcs list of lists of binary signatures into a JSON compatible object.
 
     Args
@@ -60,9 +58,7 @@ def encode_effective_pgcs(
     return [[b64encode(signature) for signature in layer] for layer in obj]
 
 
-def decode_effective_pgcs(
-    obj: Union[list[list[str]], None]
-) -> Union[list[list[bytes]], None]:
+def decode_effective_pgcs(obj: Union[list[list[str]], None]) -> Union[list[list[bytes]], None]:
     """Encode the effective_pgcs list of lists of binary signatures into a JSON compatible object.
 
     Args
@@ -95,11 +91,7 @@ def compress_json(obj) -> bytes | memoryview | bytearray | None:
     # compression token dictionary.
     if isinstance(obj, dict):
         return compress(dumps(obj).encode())
-    if (
-        isinstance(obj, memoryview)
-        or isinstance(obj, bytearray)
-        or isinstance(obj, bytes)
-    ):
+    if isinstance(obj, memoryview) or isinstance(obj, bytearray) or isinstance(obj, bytes):
         return obj
     if obj is None:
         return None
@@ -158,9 +150,7 @@ def encode_properties(obj: dict[str, bool] | int | None) -> int:
         return obj
     if obj is None:
         return 0
-    raise TypeError(
-        f"Un-encodeable type '{type(obj)}': Expected 'dict' or integer type."
-    )
+    raise TypeError(f"Un-encodeable type '{type(obj)}': Expected 'dict' or integer type.")
 
 
 def decode_properties(obj: int | dict[str, bool] | None) -> dict[str, bool]:
@@ -184,6 +174,4 @@ def decode_properties(obj: int | dict[str, bool] | None) -> dict[str, bool]:
         return {b: bool(f & obj) for b, f in PROPERTIES.items()}
     if obj is None:
         return {b: False for b, f in PROPERTIES.items()}
-    raise TypeError(
-        f"Un-encodeable type '{type(obj)}': Expected 'dict' or integer type."
-    )
+    raise TypeError(f"Un-encodeable type '{type(obj)}': Expected 'dict' or integer type.")

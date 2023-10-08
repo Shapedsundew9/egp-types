@@ -9,9 +9,7 @@ _GL_GC: Literal[9223372036854775808] = 0x8000000000000000
 # Pretty print for references
 _OVER_MAX: int = 1 << 64
 _MASK: int = _OVER_MAX - 1
-ref_str: Callable[[int], str] = (
-    lambda x: "None" if x is None else f"{((_OVER_MAX + x) & _MASK):016x}"
-)
+ref_str: Callable[[int], str] = lambda x: "None" if x is None else f"{((_OVER_MAX + x) & _MASK):016x}"
 
 
 class ISPUIDOverflowError(Exception):
@@ -41,15 +39,10 @@ def ref_from_sig(signature: bytes, shift: int = 0) -> int:
     high: int = 32 - (shift >> 3)
     mask: int = shift & 7
     if not mask:
-        return (
-            int.from_bytes(signature[high - 8 : high], byteorder="big")
-            & _REFERENCE_MASK
-        ) - _GL_GC
+        return (int.from_bytes(signature[high - 8 : high], byteorder="big") & _REFERENCE_MASK) - _GL_GC
 
     low: int = high - 9
-    return (
-        (int.from_bytes(signature[low:high], byteorder="big") >> mask) & _REFERENCE_MASK
-    ) - _GL_GC
+    return ((int.from_bytes(signature[low:high], byteorder="big") >> mask) & _REFERENCE_MASK) - _GL_GC
 
 
 def reference(gpspuid: int, counter: count) -> int:

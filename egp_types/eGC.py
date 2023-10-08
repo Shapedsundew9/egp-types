@@ -32,9 +32,7 @@ class eGC(dict):
         "generation",
         "gc_graph",
     )
-    validator: xgc_validator_generator = xgc_validator_generator(
-        {k: XGC_ENTRY_SCHEMA[k] for k in _EGC_ENTRIES}, allow_unknown=True
-    )
+    validator: xgc_validator_generator = xgc_validator_generator({k: XGC_ENTRY_SCHEMA[k] for k in _EGC_ENTRIES}, allow_unknown=True)
     new_reference: Callable[[], NoReturn | int] = not_implemented_exception
 
     def __init__(
@@ -63,17 +61,13 @@ class eGC(dict):
         graph_inputs: Sequence[int] | None = None
         graph_outputs: Sequence[int] | None = None
         if inputs is not None:
-            iid_types: tuple[tuple[int, ...], list[int], bytes] = interface_definition(
-                inputs, vt
-            )
+            iid_types: tuple[tuple[int, ...], list[int], bytes] = interface_definition(inputs, vt)
             graph_inputs = iid_types[0]
             self["input_types"] = iid_types[1]
             self["inputs"] = iid_types[2]
 
         if outputs is not None:
-            oid_types: tuple[tuple[int, ...], list[int], bytes] = interface_definition(
-                outputs, vt
-            )
+            oid_types: tuple[tuple[int, ...], list[int], bytes] = interface_definition(outputs, vt)
             graph_outputs = oid_types[0]
             self["output_types"] = oid_types[1]
             self["outputs"] = oid_types[2]
@@ -101,9 +95,7 @@ class eGC(dict):
 
         if _LOG_DEBUG:
             if not eGC.validator.validate(self):
-                _logger.error(
-                    f"eGC creation validation failed:\n{eGC.validator.error_str()}"
-                )
+                _logger.error(f"eGC creation validation failed:\n{eGC.validator.error_str()}")
 
     def __repr__(self) -> str:
         """Pretty print."""

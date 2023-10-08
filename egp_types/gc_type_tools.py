@@ -87,7 +87,9 @@ def is_pgc(genetic_code: Any) -> bool:
         pgc_check: bool = (pgc_inputs and pgc_outputs) and (genetic_code.get("pgc_fitness", None) is not None)
         ggc_check: bool = genetic_code.get("pgc_fitness", None) is None
         if not (pgc_check or ggc_check) and not (pgc_check and ggc_check):
-            _logger.debug(f"Inconsistent GC definition: Is it a gGC or a pGC?:\n{pformat(genetic_code, indent=4, sort_dicts=True, width=140)}")
+            _logger.debug(
+                f"Inconsistent GC definition: Is it a gGC or a pGC?:\n{pformat(genetic_code, indent=4, sort_dicts=True, width=140)}"
+            )
             raise ValueError(
                 f"Inconsistent GC definition: Is it a gGC or a pGC?: {genetic_code['ref']}\n\t{pgc_inputs}, {pgc_outputs},"
                 f" {(pgc_inputs and pgc_outputs)}, {(genetic_code.get('pgc_fitness', None) is not None)}"
@@ -115,9 +117,7 @@ def define_signature(mgc: Any) -> bytes:
     gcb_hex: str = "0" * 64 if mgc["gcb"] is None else mgc["gcb"].hex()
     ancestor_a_hex: str = "0" * 64 if mgc["gca"] is None else mgc["gca"].hex()
     ancestor_b_hex: str = "0" * 64 if mgc["gcb"] is None else mgc["gcb"].hex()
-    string: str = pformat(
-        mgc["graph"], indent=0, sort_dicts=True, width=65535, compact=True
-    )
+    string: str = pformat(mgc["graph"], indent=0, sort_dicts=True, width=65535, compact=True)
     string += gca_hex + gcb_hex + ancestor_a_hex + ancestor_b_hex + str(mgc["creator"])
 
     # If it is a codon glue on the mandatory definition

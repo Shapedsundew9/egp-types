@@ -37,14 +37,12 @@ _TEST_RESULTS_JSON = "data/test_gc_graph_results.json"
 
 
 # Reference generation for eGC's
-ref_generator = partial(reference, owner_id=0, counter=count())
+ref_generator = partial(reference, gpspuid=127, counter=count())
 set_reference_generator(ref_generator)
 
 
 # JSON cannot represent the ConnectionGraph type so a conversion step is needed.
-with open(
-    join(dirname(__file__), _TEST_RESULTS_JSON), "r", encoding="utf-8"
-) as results_file:
+with open(join(dirname(__file__), _TEST_RESULTS_JSON), "r", encoding="utf-8") as results_file:
     results: list[dict[str, Any]] = load(results_file)
 for result in results:
     result["graph"] = json_to_connection_graph(result["graph"])
@@ -94,22 +92,13 @@ def random_graph() -> gc_graph:
             rc_graph["B"] = deepcopy(rc_graph["A"])
             # Duplicate A & B sources in U to keep symmetry.
             if "U" in rc_graph:
-                rc_graph["U"].extend(
-                    [("B", ref[1], ref[2]) for ref in rc_graph["U"] if ref[0] == "A"]
-                )
-                rc_graph["U"].extend(
-                    [("A", ref[1], ref[2]) for ref in rc_graph["U"] if ref[0] == "B"]
-                )
+                rc_graph["U"].extend([("B", ref[1], ref[2]) for ref in rc_graph["U"] if ref[0] == "A"])
+                rc_graph["U"].extend([("A", ref[1], ref[2]) for ref in rc_graph["U"] if ref[0] == "B"])
         if "O" in rc_graph:
             # P destinations are the same as O destinations when F is defined but cannot reference row A (must be B)
-            rc_graph["P"] = [
-                ((ref[0], "B")[ref[0] == "A"], ref[1], ref[2]) for ref in rc_graph["O"]
-            ]
+            rc_graph["P"] = [((ref[0], "B")[ref[0] == "A"], ref[1], ref[2]) for ref in rc_graph["O"]]
 
-    new_constants: ConstantRow = [
-        (ep_type_lookup["instanciation"][typ][inst.DEFAULT.value], typ)
-        for _, typ in rc_graph.get("C", [])
-    ]
+    new_constants: ConstantRow = [(ep_type_lookup["instanciation"][typ][inst.DEFAULT.value], typ) for _, typ in rc_graph.get("C", [])]
     if new_constants:
         rc_graph["C"] = new_constants
     # print('\nNew rc_graph\n', pformat(rc_graph, indent=4, width=256))
@@ -158,10 +147,7 @@ def test_graph_internal(i, case) -> None:
     """Verification initializing with an internal representation is self consistent."""
     gcg = gc_graph(case["graph"])
     _logger.debug(f"Case {i}")
-    assert (
-        gcg.connection_graph()
-        == gc_graph(i_graph=deepcopy(gcg.i_graph)).connection_graph()
-    )
+    assert gcg.connection_graph() == gc_graph(i_graph=deepcopy(gcg.i_graph)).connection_graph()
 
 
 @pytest.mark.parametrize("i, case", enumerate(results))

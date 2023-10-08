@@ -41,16 +41,12 @@ rules_set_registry.extend(
 
 # Storage types schemas
 # The Genetic Material Store (GMS) is the abstract common base schema for LGC & GGC
-with open(
-    join(dirname(__file__), "formats/gms_entry_format.json"), "r", encoding="utf8"
-) as file_ptr:
+with open(join(dirname(__file__), "formats/gms_entry_format.json"), "r", encoding="utf8") as file_ptr:
     GMS_ENTRY_SCHEMA: dict[str, dict[str, Any]] = load(file_ptr)
 
 # LGC is the storage schema for the Genomic Libray
 LGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GMS_ENTRY_SCHEMA)
-with open(
-    join(dirname(__file__), "formats/LGC_entry_format.json"), "r", encoding="utf8"
-) as file_ptr:
+with open(join(dirname(__file__), "formats/LGC_entry_format.json"), "r", encoding="utf8") as file_ptr:
     merge(LGC_ENTRY_SCHEMA, load(file_ptr), update=True)
 
 LGC_JSON_LOAD_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(LGC_ENTRY_SCHEMA)
@@ -71,9 +67,7 @@ with open(
 
 # GGC is the storage schema for the Gene Pool
 GGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GMS_ENTRY_SCHEMA)
-with open(
-    join(dirname(__file__), "formats/gGC_entry_format.json"), "r", encoding="utf8"
-) as file_ptr:
+with open(join(dirname(__file__), "formats/gGC_entry_format.json"), "r", encoding="utf8") as file_ptr:
     merge(GGC_ENTRY_SCHEMA, load(file_ptr), update=True)
 
 # XGC_ENTRY_SCHEMA is the superset schema from which transient xGC's can be validated
@@ -103,14 +97,8 @@ class _gms_entry_validator(base_validator):
             self._error(field, "_e_count cannot be 0 if _evolvability is non-zero.")
 
     def _valid_pgc(self, field: str, value: Any) -> bool:
-        pgc_none: dict[str, bool] = {
-            k: v is None
-            for k, v in self.document.items()
-            if "pgc_" in k and "pgc_ref" not in k
-        }
-        if (value is None and not all(pgc_none.values())) or (
-            value is not None and any(pgc_none.values())
-        ):
+        pgc_none: dict[str, bool] = {k: v is None for k, v in self.document.items() if "pgc_" in k and "pgc_ref" not in k}
+        if (value is None and not all(pgc_none.values())) or (value is not None and any(pgc_none.values())):
             pgc_defined: list[str] = [k for k, v in pgc_none.items() if not v]
             pgc_undefined: list[str] = [k for k, v in pgc_none.items() if v]
             self._error(
@@ -123,9 +111,7 @@ class _gms_entry_validator(base_validator):
     def _check_with_valid__pgc_e_count(self, field: str, value: Any) -> None:
         if self._valid_pgc(field, value):
             evolve: list[float] | tuple[float, ...] = self.document["_pgc_evolvability"]
-            invalid: dict[int, bool] = {
-                i: v == 0 and evolve[i] > 0.0 for i, v in enumerate(value)
-            }
+            invalid: dict[int, bool] = {i: v == 0 and evolve[i] > 0.0 for i, v in enumerate(value)}
             if any(invalid.values()):
                 indices: list[int] = [i for i, v in invalid.items() if not v]
                 self._error(
@@ -136,19 +122,14 @@ class _gms_entry_validator(base_validator):
             invalid: dict[int, bool] = {i: e_count[i] > v for i, v in enumerate(value)}
             if any(invalid.values()):
                 indices: list[int] = [i for i, v in invalid.items() if not v]
-                self._error(
-                    field, f"_pgc_e_count cannot be > pgc_e_count at indices {indices}."
-                )
+                self._error(field, f"_pgc_e_count cannot be > pgc_e_count at indices {indices}.")
 
     def _check_with_valid__pgc_evolvability(self, field: str, value: Any) -> None:
         self._valid_pgc(field, value)
 
     def _check_with_valid__pgc_f_count(self, field: str, value: Any) -> None:
         if self._valid_pgc(field, value):
-            invalid: dict[int, bool] = {
-                i: v == 0 and self.document["_pgc_fitness"][i] > 0.0
-                for i, v in enumerate(value)
-            }
+            invalid: dict[int, bool] = {i: v == 0 and self.document["_pgc_fitness"][i] > 0.0 for i, v in enumerate(value)}
             if any(invalid.values()):
                 indices: list[int] = [i for i, v in invalid.items() if not v]
                 self._error(
@@ -159,9 +140,7 @@ class _gms_entry_validator(base_validator):
             invalid: dict[int, bool] = {i: f_count[i] > v for i, v in enumerate(value)}
             if any(invalid.values()):
                 indices: list[int] = [i for i, v in invalid.items() if not v]
-                self._error(
-                    field, f"_pgc_f_count cannot be > pgc_f_count at indices {indices}."
-                )
+                self._error(field, f"_pgc_f_count cannot be > pgc_f_count at indices {indices}.")
 
     def _check_with_valid__pgc_fitness(self, field: str, value: Any) -> None:
         self._valid_pgc(field, value)
@@ -181,15 +160,11 @@ class _gms_entry_validator(base_validator):
             )
         if self.document.get("updated") is not None:
             if self.document["updated"] < value:
-                self._error(
-                    field, "A record cannot be updated before it has been created."
-                )
+                self._error(field, "A record cannot be updated before it has been created.")
 
     def _check_with_valid_e_count(self, field: str, value: Any) -> None:
         if value == 1 and self.document["evolvability"] < 1.0:
-            self._error(
-                field, "e_count cannot be 1 if evolvability has changed (is not 1.0)."
-            )
+            self._error(field, "e_count cannot be 1 if evolvability has changed (is not 1.0).")
         if value < self.document["_e_count"]:
             self._error(
                 field,
@@ -198,9 +173,7 @@ class _gms_entry_validator(base_validator):
 
     def _check_with_valid_evolvability(self, field: str, value: Any) -> None:
         if value < 1.0 and self.document["e_count"] == 1:
-            self._error(
-                field, "e_count cannot be 1 if evolvability has changed (is not 1.0)."
-            )
+            self._error(field, "e_count cannot be 1 if evolvability has changed (is not 1.0).")
 
     def _check_with_valid_graph(self, field: str, value: Any) -> None:
         graph: gc_graph = gc_graph(value)
@@ -257,10 +230,7 @@ class _gms_entry_validator(base_validator):
 
     def _check_with_valid_pgc_e_count(self, field: str, value: Any) -> None:
         if self._valid_pgc(field, value):
-            invalid: dict[int, bool] = {
-                i: v == 1 and self.document["pgc_evolvability"][i] < 1.0
-                for i, v in enumerate(value)
-            }
+            invalid: dict[int, bool] = {i: v == 1 and self.document["pgc_evolvability"][i] < 1.0 for i, v in enumerate(value)}
             if any(invalid.values()):
                 indices: list[int] = [i for i, v in invalid.items() if not v]
                 self._error(
@@ -268,11 +238,7 @@ class _gms_entry_validator(base_validator):
                     f"pgc_e_count cannot be 1 if pgc_evolvability has changed (is not 1.0) at indices {indices}.",
                 )
 
-            _invalid: list[int] = [
-                idx
-                for idx, pgc_e_count in enumerate(value)
-                if pgc_e_count < self.document["_pgc_e_count"][idx]
-            ]
+            _invalid: list[int] = [idx for idx, pgc_e_count in enumerate(value) if pgc_e_count < self.document["_pgc_e_count"][idx]]
             if _invalid:
                 self._error(
                     field,
@@ -281,10 +247,7 @@ class _gms_entry_validator(base_validator):
 
     def _check_with_valid_pgc_f_count(self, field: str, value: Any) -> None:
         if self._valid_pgc(field, value):
-            invalid: dict[int, bool] = {
-                i: v == 1 and self.document["pgc_fitness"][i] < 1.0
-                for i, v in enumerate(value)
-            }
+            invalid: dict[int, bool] = {i: v == 1 and self.document["pgc_fitness"][i] < 1.0 for i, v in enumerate(value)}
             if any(invalid.values()):
                 indices: list[int] = [i for i, v in invalid.items() if not v]
                 self._error(
@@ -292,11 +255,7 @@ class _gms_entry_validator(base_validator):
                     f"pgc_f_count {list(invalid.values())} cannot be 1 if pgc_fitness has changed (is not 1.0) at indices {indices}.",
                 )
 
-            _invalid: list[int] = [
-                idx
-                for idx, pgc_f_count in enumerate(value)
-                if pgc_f_count < self.document["_pgc_f_count"][idx]
-            ]
+            _invalid: list[int] = [idx for idx, pgc_f_count in enumerate(value) if pgc_f_count < self.document["_pgc_f_count"][idx]]
             if _invalid:
                 self._error(
                     field,
@@ -344,9 +303,7 @@ class _gms_entry_validator(base_validator):
             )
         if self.document.get("created") is not None:
             if self.document["updated"] > value:
-                self._error(
-                    field, "A record cannot be updated before it has been created."
-                )
+                self._error(field, "A record cannot be updated before it has been created.")
 
     def _normalize_default_setter_set_input_types(self, document) -> list[int]:
         # Gather all the input endpoint types. Reduce in a set then order the list.
@@ -362,26 +319,13 @@ class _gms_entry_validator(base_validator):
     def _normalize_default_setter_set_input_indices(self, document) -> bytes:
         # Get the type list then find all the inputs in order & look them up.
         type_list: list[int] = self._normalize_default_setter_set_input_types(document)
-        inputs: set[tuple[str| int, ...]] = {
-            tuple(ep)
-            for row in document["graph"].values()
-            for ep in filter(lambda x: x[0] == "I", row)
-        }
-        return bytes(
-            (type_list.index(cast(int, ep[2])) for ep in sorted(inputs, key=lambda x: x[1]))
-        )
+        inputs: set[tuple[str | int, ...]] = {tuple(ep) for row in document["graph"].values() for ep in filter(lambda x: x[0] == "I", row)}
+        return bytes((type_list.index(cast(int, ep[2])) for ep in sorted(inputs, key=lambda x: x[1])))
 
     def _normalize_default_setter_set_output_indices(self, document) -> bytes:
         # Get the type list then find all the inputs in order & look them up.
         type_list: list[int] = self._normalize_default_setter_set_output_types(document)
-        return bytes(
-            (
-                type_list.index(ep[2])
-                for ep in sorted(
-                    document["graph"].get("O", tuple()), key=lambda x: x[1]
-                )
-            )
-        )
+        return bytes((type_list.index(ep[2]) for ep in sorted(document["graph"].get("O", tuple()), key=lambda x: x[1])))
 
     def _normalize_default_setter_set_num_inputs(self, document) -> int:
         inputs: set[int] = set()
@@ -482,9 +426,7 @@ class _LGC_entry_validator(_gms_entry_validator):
                 f"GC has no primary parent (ancestor A) but pgc is defined as {value}.",
             )
         if value is not None and value == self.document["signature"]:
-            self._error(
-                field, "A GC cannot have been created by itself (pgc == signature)."
-            )
+            self._error(field, "A GC cannot have been created by itself (pgc == signature).")
 
     def _normalize_default_setter_set_signature(self, _) -> bytes:
         return define_signature(self.document)
@@ -540,9 +482,7 @@ class _gGC_entry_validator(_gms_entry_validator):
         if "A" in self.document["graph"] and value is None:
             self._error(field, "graph references row A but gca_ref is None.")
         if "A" not in self.document["graph"] and value is not None:
-            self._error(
-                field, "No reference to row A in graph but gca_ref is not None."
-            )
+            self._error(field, "No reference to row A in graph but gca_ref is not None.")
         if value is not None and value == self.document["ref"]:
             self._error(field, "A GC cannot reference itself in row A.")
 
@@ -550,9 +490,7 @@ class _gGC_entry_validator(_gms_entry_validator):
         if "B" in self.document["graph"] and value is None:
             self._error(field, "graph references row B but gcb_ref is None.")
         if "B" not in self.document["graph"] and value is not None:
-            self._error(
-                field, "No reference to row B in graph but gcb_ref is not None."
-            )
+            self._error(field, "No reference to row B in graph but gcb_ref is not None.")
         if value is not None and self.document["gca"] is None:
             self._error(field, "gcb_ref is defined but gca_ref is None.")
 
@@ -567,22 +505,14 @@ class _gGC_entry_validator(_gms_entry_validator):
                 f"GC has no primary parent (ancestor A) but pgc_ref is defined as {value}.",
             )
         if value is not None and value == self.document["ref"]:
-            self._error(
-                field, "A GC cannot have been created by itself (pgc_ref == ref)."
-            )
+            self._error(field, "A GC cannot have been created by itself (pgc_ref == ref).")
 
 
 gms_entry_validator: _gms_entry_validator = _gms_entry_validator(GMS_ENTRY_SCHEMA)
 LGC_entry_validator: _LGC_entry_validator = _LGC_entry_validator(LGC_ENTRY_SCHEMA)
-LGC_json_load_entry_validator: _LGC_json_load_entry_validator = (
-    _LGC_json_load_entry_validator(LGC_JSON_LOAD_ENTRY_SCHEMA)
-)
-LGC_json_dump_entry_validator: _LGC_json_dump_entry_validator = (
-    _LGC_json_dump_entry_validator(LGC_JSON_DUMP_ENTRY_SCHEMA)
-)
-gGC_entry_validator: _gGC_entry_validator = _gGC_entry_validator(
-    GGC_ENTRY_SCHEMA, purge_unknown=True
-)
+LGC_json_load_entry_validator: _LGC_json_load_entry_validator = _LGC_json_load_entry_validator(LGC_JSON_LOAD_ENTRY_SCHEMA)
+LGC_json_dump_entry_validator: _LGC_json_dump_entry_validator = _LGC_json_dump_entry_validator(LGC_JSON_DUMP_ENTRY_SCHEMA)
+gGC_entry_validator: _gGC_entry_validator = _gGC_entry_validator(GGC_ENTRY_SCHEMA, purge_unknown=True)
 graph_validator: base_validator = base_validator(GRAPH_SCHEMA)
 
 

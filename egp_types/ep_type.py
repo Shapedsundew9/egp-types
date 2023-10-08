@@ -30,16 +30,12 @@ _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
 
 # Load type data
-with open(
-    join(dirname(__file__), "data/ep_types.json"), "r", encoding="utf-8"
-) as file_ptr:
+with open(join(dirname(__file__), "data/ep_types.json"), "r", encoding="utf-8") as file_ptr:
     data: EndPointTypeLookupFile = load(file_ptr)
 ep_type_lookup: EndPointTypeLookup = {"v2n": {}, "n2v": {}, "instanciation": {}}
 ep_type_lookup["v2n"] = {int(k): v for k, v in data["v2n"].items()}
 ep_type_lookup["n2v"] = {k: int(v) for k, v in data["n2v"].items()}
-ep_type_lookup["instanciation"] = {
-    int(k): v for k, v in data["instanciation"].items() if isInstanciationValue(v)
-}
+ep_type_lookup["instanciation"] = {int(k): v for k, v in data["instanciation"].items() if isInstanciationValue(v)}
 
 
 _EGP_SPECIAL_TYPE_LIMIT: Literal[-32767] = -32767
@@ -60,24 +56,14 @@ def _real_type_filter(v) -> bool:
     return v < _EGP_TYPE_LIMIT and v >= _EGP_REAL_TYPE_LIMIT
 
 
-SPECIAL_EP_TYPE_VALUES: tuple[int, ...] = tuple(
-    (v for v in filter(_special_type_filter, ep_type_lookup["v2n"]))
-)
-PHYSICAL_EP_TYPE_VALUES: tuple[int, ...] = tuple(
-    (v for v in filter(_physical_type_filter, ep_type_lookup["v2n"]))
-)
-REAL_EP_TYPE_VALUES: tuple[int, ...] = tuple(
-    (v for v in filter(_real_type_filter, ep_type_lookup["v2n"]))
-)
+SPECIAL_EP_TYPE_VALUES: tuple[int, ...] = tuple((v for v in filter(_special_type_filter, ep_type_lookup["v2n"])))
+PHYSICAL_EP_TYPE_VALUES: tuple[int, ...] = tuple((v for v in filter(_physical_type_filter, ep_type_lookup["v2n"])))
+REAL_EP_TYPE_VALUES: tuple[int, ...] = tuple((v for v in filter(_real_type_filter, ep_type_lookup["v2n"])))
 _EP_TYPE_VALUES: tuple[int, ...] = (*PHYSICAL_EP_TYPE_VALUES, *REAL_EP_TYPE_VALUES)
 MIN_EP_TYPE_VALUE: int = min(_EP_TYPE_VALUES)
 MAX_EP_TYPE_VALUE: int = max(_EP_TYPE_VALUES)
-assert len(set(_EP_TYPE_VALUES)) == len(
-    _EP_TYPE_VALUES
-), "Duplicate end point types detected!"
-assert (
-    max(_EP_TYPE_VALUES) - min(_EP_TYPE_VALUES) == len(_EP_TYPE_VALUES) - 1
-), "End point types must be contiguous!"
+assert len(set(_EP_TYPE_VALUES)) == len(_EP_TYPE_VALUES), "Duplicate end point types detected!"
+assert max(_EP_TYPE_VALUES) - min(_EP_TYPE_VALUES) == len(_EP_TYPE_VALUES) - 1, "End point types must be contiguous!"
 
 _logger.info(f"{len(SPECIAL_EP_TYPE_VALUES)} special endpoint types identified.")
 _logger.info(f"{len(PHYSICAL_EP_TYPE_VALUES)} physical endpoint types identified.")
@@ -146,9 +132,7 @@ def object_name(i11n: InstanciationType) -> str:
         return str(i11n[inst.NAME])
     if i11n[inst.MODULE] is None:
         return "_".join((str(i11n[inst.PACKAGE]), str(i11n[inst.NAME])))
-    return "_".join(
-        (str(i11n[inst.PACKAGE]), str(i11n[inst.MODULE]), str(i11n[inst.NAME]))
-    )
+    return "_".join((str(i11n[inst.PACKAGE]), str(i11n[inst.MODULE]), str(i11n[inst.NAME])))
 
 
 def import_str(ep_type_i: int) -> str:
@@ -181,15 +165,11 @@ def func1(i11n) -> bool:
     return i11n[1][inst.PACKAGE] is not None and i11n[1][inst.PACKAGE] != "egp_types"
 
 
-for _ep_type_int, instn in tuple(
-    filter(func1, ep_type_lookup["instanciation"].items())
-):
+for _ep_type_int, instn in tuple(filter(func1, ep_type_lookup["instanciation"].items())):
     try:
         exec(import_str(_ep_type_int))  # pylint: disable=exec-used
     except ModuleNotFoundError:
-        _logger.warning(
-            f"Module '{instn[inst.MODULE]}' was not found. '{instn[inst.NAME]}' will be treated as an INVALID type."
-        )
+        _logger.warning(f"Module '{instn[inst.MODULE]}' was not found. '{instn[inst.NAME]}' will be treated as an INVALID type.")
         del ep_type_lookup["n2v"][ep_type_lookup["v2n"][_ep_type_int]]
         del ep_type_lookup["instanciation"][_ep_type_int]
         del ep_type_lookup["v2n"][_ep_type_int]
@@ -260,18 +240,12 @@ def asint(obj: Any, vault_t: vtype = vtype.EP_TYPE_STR) -> int:
     The EP type of the object (may be egp.invalid_type)
     """
     if vault_t == vtype.TYPE_OBJECT:
-        return ep_type_lookup["n2v"].get(
-            fully_qualified_name(obj()), INVALID_EP_TYPE_VALUE
-        )
+        return ep_type_lookup["n2v"].get(fully_qualified_name(obj()), INVALID_EP_TYPE_VALUE)
     if vault_t == vtype.OBJECT:
-        return ep_type_lookup["n2v"].get(
-            fully_qualified_name(obj), INVALID_EP_TYPE_VALUE
-        )
+        return ep_type_lookup["n2v"].get(fully_qualified_name(obj), INVALID_EP_TYPE_VALUE)
     if vault_t == vtype.INSTANCE_STR:
         try:
-            ep_type_name: str = fully_qualified_name(
-                eval(obj)
-            )  # pylint: disable=eval-used
+            ep_type_name: str = fully_qualified_name(eval(obj))  # pylint: disable=eval-used
         except NameError:
             # If it looks like a GC type instanciation assume it is OK.
             ep_type_name = INVALID_EP_TYPE_NAME
@@ -389,9 +363,7 @@ def instance_str(ep_type_i: int, param_str: str = "") -> str:
     return inst_str
 
 
-def interface_definition(
-    xputs: Iterable[Any], value_t: vtype = vtype.TYPE_OBJECT
-) -> tuple[tuple[int, ...], list[int], bytes]:
+def interface_definition(xputs: Iterable[Any], value_t: vtype = vtype.TYPE_OBJECT) -> tuple[tuple[int, ...], list[int], bytes]:
     """Create an interface definition from xputs.
 
     Used to define the inputs or outputs of a GC from an iterable
@@ -412,9 +384,7 @@ def interface_definition(
     return xput_eps, xput_types, bytes([xput_types.index(x) for x in xput_eps])
 
 
-def unordered_interface_hash(
-    input_eps: Iterable[int], output_eps: Iterable[int]
-) -> int:
+def unordered_interface_hash(input_eps: Iterable[int], output_eps: Iterable[int]) -> int:
     """Create a 64-bit hash of the population interface definition.
 
     The interface hash is order agnostic i.e.
@@ -504,29 +474,21 @@ def validate_value(value_str: str, ep_type_int: int) -> bool:
         return True
 
     try:
-        retval: bool = eval(
-            f"isinstance({value_str}, {tstr})"
-        )  # pylint: disable=eval-used
+        retval: bool = eval(f"isinstance({value_str}, {tstr})")  # pylint: disable=eval-used
     except (NameError, SyntaxError):
         if _LOG_DEBUG:
             try:
                 typ: str = eval(f"type({value_str})")  # pylint: disable=eval-used
             except (NameError, SyntaxError):
-                _logger.debug(
-                    f"isinstance({value_str}, {tstr}) is False. {value_str} is not a valid object."
-                )
+                _logger.debug(f"isinstance({value_str}, {tstr}) is False. {value_str} is not a valid object.")
             else:
-                _logger.debug(
-                    f"isinstance({value_str}, {tstr}) is False. {value_str} is of type {typ}"
-                )
+                _logger.debug(f"isinstance({value_str}, {tstr}) is False. {value_str} is of type {typ}")
         return False
     if _LOG_DEBUG:
         if retval:
             _logger.debug(f"retval = isinstance({value_str}, {tstr}) is True")
         else:
             typ: str = eval(f"type({value_str})")  # pylint: disable=eval-used
-            _logger.debug(
-                f"retval = isinstance({value_str}, {tstr}) is False. {value_str} is of type {typ}."
-            )
+            _logger.debug(f"retval = isinstance({value_str}, {tstr}) is False. {value_str} is of type {typ}.")
 
     return retval

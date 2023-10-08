@@ -20,7 +20,7 @@ from json import loads, load
 from egp_types.ep_type import interface_definition, ordered_interface_hash, unordered_interface_hash, vtype
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = ArgumentParser(
         description="""Generate the ordered and unordered interface hashes. The interface definition
                     must be a JSON file with the following structure:\n
@@ -28,27 +28,26 @@ if __name__ == '__main__':
                     where ep_type is an endpoint type string and the first list the GC input interface, the second the GC output.
                     An empty list is allowed for the input or output interface.\nExamples:\n
                     \t[[], ["int", "float", "str"]],\n\t[["int", "float", "str"], []],\n\t[["int", "float", "str"], ["int", "float", "str"]]
-        """)
-    parser.add_argument('file', metavar='FILE', help='JSON file with the interface definition or "-" to read from stdin')
+        """
+    )
+    parser.add_argument("file", metavar="FILE", help='JSON file with the interface definition or "-" to read from stdin')
     args: Namespace = parser.parse_args()
-    if args.file == '-':
+    if args.file == "-":
         try:
             interface: list[list[str]] = loads(input())
         except ValueError:
-            print('Invalid JSON.')
+            print("Invalid JSON.")
             exit(1)
     else:
-        with open(args.file, 'r', encoding="utf-8") as f:
+        with open(args.file, "r", encoding="utf-8") as f:
             try:
                 interface = load(f)
             except ValueError:
-                print('Invalid JSON.')
+                print("Invalid JSON.")
                 exit(1)
 
     in_eps, _, ins = interface_definition(interface[0], vtype.EP_TYPE_STR)
     out_eps, _, outs = interface_definition(interface[1], vtype.EP_TYPE_STR)
 
-    print('Ordered hash:   {}'.format(ordered_interface_hash(in_eps, out_eps, ins, outs)))
-    print('Unordered hash: {}'.format(unordered_interface_hash(in_eps, out_eps)))
-
-
+    print("Ordered hash:   {}".format(ordered_interface_hash(in_eps, out_eps, ins, outs)))
+    print("Unordered hash: {}".format(unordered_interface_hash(in_eps, out_eps)))

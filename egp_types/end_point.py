@@ -102,14 +102,8 @@ class end_point(generic_end_point):
 
     def _del_invalid_refs(self, ep: Self, row: Row, has_f: bool = False) -> None:
         """Remove any invalid references"""
-        valid_ref_rows: tuple[Row, ...] = (
-            VALID_ROW_SOURCES[has_f][row]
-            if ep.cls == DST_EP
-            else VALID_ROW_DESTINATIONS[has_f][row]
-        )
-        for vidx in reversed(
-            [idx for idx, ref in enumerate(ep.refs) if ref.row not in valid_ref_rows]
-        ):
+        valid_ref_rows: tuple[Row, ...] = VALID_ROW_SOURCES[has_f][row] if ep.cls == DST_EP else VALID_ROW_DESTINATIONS[has_f][row]
+        for vidx in reversed([idx for idx, ref in enumerate(ep.refs) if ref.row not in valid_ref_rows]):
             del ep.refs[vidx]
 
     def key(self) -> EndPointHash:
@@ -127,11 +121,7 @@ class end_point(generic_end_point):
 
     def copy(self, clean: bool = False) -> Self:
         """Return a copy of the end point with no references."""
-        return (
-            end_point(self.row, self.idx, self.typ, self.cls)
-            if clean
-            else deepcopy(self)
-        )
+        return end_point(self.row, self.idx, self.typ, self.cls) if clean else deepcopy(self)
 
     def move_copy(self, row: Row, clean: bool = False, has_f: bool = False) -> Self:
         """Return a copy of the end point with the row changed.
@@ -144,9 +134,7 @@ class end_point(generic_end_point):
             self._del_invalid_refs(ep, row, has_f)
         return ep
 
-    def move_cls_copy(
-        self, row: Row, cls: EndPointClass, clean: bool = False, has_f: bool = False
-    ) -> Self:
+    def move_cls_copy(self, row: Row, cls: EndPointClass, clean: bool = False, has_f: bool = False) -> Self:
         """Return a copy of the end point with the row & cls changed."""
         ep: Self = self.copy(clean)
         ep.row = row

@@ -1,5 +1,5 @@
 """Common Erasmus GP Types."""
-from typing import Literal, Any, TypeGuard, TypedDict, NotRequired
+from typing import Literal, Any, TypeGuard, TypedDict, NotRequired, cast
 from enum import IntEnum
 from graph_tool import Vertex as gt_vertex
 from graph_tool import Edge as gt_edge
@@ -28,9 +28,7 @@ ROWS: tuple[Row, ...] = tuple(sorted({*SOURCE_ROWS, *DESTINATION_ROWS}))
 
 # Valid source rows for a given row.
 # The valid source rows depends on whether there is a row F
-VALID_ROW_SOURCES: tuple[
-    dict[Row, tuple[SourceRow, ...]], dict[Row, tuple[SourceRow, ...]]
-] = (
+VALID_ROW_SOURCES: tuple[dict[Row, tuple[SourceRow, ...]], dict[Row, tuple[SourceRow, ...]]] = (
     # No row F
     {
         "I": tuple(),
@@ -62,28 +60,12 @@ def isDestinationRow(row: Row) -> TypeGuard[DestinationRow]:
 
 # Valid destination rows for a given row.
 # The valid destination rows depends on whether there is a row F
-VALID_ROW_DESTINATIONS: tuple[
-    dict[Row, tuple[DestinationRow, ...]], dict[Row, tuple[DestinationRow, ...]]
-] = (
+VALID_ROW_DESTINATIONS: tuple[dict[Row, tuple[DestinationRow, ...]], dict[Row, tuple[DestinationRow, ...]]] = (
     # No row F
-    {
-        k: tuple(
-            d
-            for d, s in VALID_ROW_SOURCES[False].items()
-            if k in s and isDestinationRow(d)
-        )
-        for k in ROWS
-    },
+    {k: tuple(d for d, s in VALID_ROW_SOURCES[False].items() if k in s and isDestinationRow(d)) for k in ROWS},
     # Has row F
     # F determines if the path through A or B is chosen
-    {
-        k: tuple(
-            d
-            for d, s in VALID_ROW_SOURCES[True].items()
-            if k in s and isDestinationRow(d)
-        )
-        for k in ROWS
-    },
+    {k: tuple(d for d, s in VALID_ROW_SOURCES[True].items() if k in s and isDestinationRow(d)) for k in ROWS},
 )
 
 
@@ -122,8 +104,7 @@ ConnectionPair = tuple[DestinationRow, ConnectionRow]
 ConstantPair = tuple[Literal["C"], ConstantRow]
 JSONGraph = dict[
     DestinationRow,
-    list[list[SourceRow | EndPointIndex | EndPointType]]
-    | list[list[ConstantExecStr | EndPointType]],
+    list[list[SourceRow | EndPointIndex | EndPointType]] | list[list[ConstantExecStr | EndPointType]],
 ]
 
 
@@ -141,7 +122,7 @@ class ConnectionGraph(TypedDict):
 
 def json_to_connection_graph(json_graph: JSONGraph) -> ConnectionGraph:
     """convert a JSON connection graph to a ConnectionGraph."""
-    return {k: [tuple(e) for e in v] for k, v in json_graph.items()}  # type: ignore
+    return cast(ConnectionGraph, {k: [tuple(e) for e in v] for k, v in json_graph.items()})
 
 
 def isConstantPair(obj: tuple[str, Any]) -> TypeGuard[ConstantPair]:

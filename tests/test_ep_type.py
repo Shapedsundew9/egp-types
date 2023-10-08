@@ -221,9 +221,7 @@ def test_compatible() -> None:
     assert compatible(2, 2)
 
 
-@pytest.mark.parametrize(
-    "ep_type_int, string", ((2, "int"), (5, "str"), (-1, "egp_types_eGC_eGC"))
-)
+@pytest.mark.parametrize("ep_type_int, string", ((2, "int"), (5, "str"), (-1, "egp_types_eGC_eGC")))
 def test_type_str(ep_type_int, string) -> None:
     """Confirm type_str() works correctly."""
     assert type_str(ep_type_int) == string
