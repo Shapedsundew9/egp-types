@@ -40,14 +40,19 @@ rules_set_registry.extend(
 )
 
 # Storage types schemas
+# NOTE: Cerberus can modfiy a schmea (specifically I noticed "oneof_schema" --> "one_of") so 
+# we deepcopy the schema before creating the validator to ensure it is not modified for other use.
+
 # The Genetic Material Store (GMS) is the abstract common base schema for LGC & GGC
 with open(join(dirname(__file__), "formats/gms_entry_format.json"), "r", encoding="utf8") as file_ptr:
     GMS_ENTRY_SCHEMA: dict[str, dict[str, Any]] = load(file_ptr)
+_GMS_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GMS_ENTRY_SCHEMA)
 
 # LGC is the storage schema for the Genomic Libray
 LGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GMS_ENTRY_SCHEMA)
 with open(join(dirname(__file__), "formats/LGC_entry_format.json"), "r", encoding="utf8") as file_ptr:
     merge(LGC_ENTRY_SCHEMA, load(file_ptr), update=True)
+_LGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(LGC_ENTRY_SCHEMA)
 
 LGC_JSON_LOAD_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(LGC_ENTRY_SCHEMA)
 with open(
@@ -56,6 +61,7 @@ with open(
     encoding="utf8",
 ) as file_ptr:
     merge(LGC_JSON_LOAD_ENTRY_SCHEMA, load(file_ptr), update=True)
+_LGC_JSON_LOAD_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(LGC_JSON_LOAD_ENTRY_SCHEMA)
 
 LGC_JSON_DUMP_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(LGC_ENTRY_SCHEMA)
 with open(
@@ -64,19 +70,23 @@ with open(
     encoding="utf8",
 ) as file_ptr:
     merge(LGC_JSON_DUMP_ENTRY_SCHEMA, load(file_ptr), update=True)
+_LGC_JSON_DUMP_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(LGC_JSON_DUMP_ENTRY_SCHEMA)
 
 # GGC is the storage schema for the Gene Pool
 GGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GMS_ENTRY_SCHEMA)
 with open(join(dirname(__file__), "formats/gGC_entry_format.json"), "r", encoding="utf8") as file_ptr:
     merge(GGC_ENTRY_SCHEMA, load(file_ptr), update=True)
+_GGC_ENTRY_SCHEMA = deepcopy(GGC_ENTRY_SCHEMA)
 
 # XGC_ENTRY_SCHEMA is the superset schema from which transient xGC's can be validated
 XGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GGC_ENTRY_SCHEMA)
 merge(XGC_ENTRY_SCHEMA, LGC_ENTRY_SCHEMA, update=True)
+_XGC_ENTRY_SCHEMA = deepcopy(XGC_ENTRY_SCHEMA)
 
 # Pull the grpah schema out of the GMS schema to create a standalone validator.
 GRAPH_SCHEMA: dict[str, dict[str, Any]] = {"graph": deepcopy(GMS_ENTRY_SCHEMA["graph"])}
 del GRAPH_SCHEMA["graph"]["check_with"]
+_GRAPH_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GRAPH_SCHEMA)
 
 
 class _gms_entry_validator(base_validator):
@@ -508,12 +518,12 @@ class _gGC_entry_validator(_gms_entry_validator):
             self._error(field, "A GC cannot have been created by itself (pgc_ref == ref).")
 
 
-gms_entry_validator: _gms_entry_validator = _gms_entry_validator(GMS_ENTRY_SCHEMA)
-LGC_entry_validator: _LGC_entry_validator = _LGC_entry_validator(LGC_ENTRY_SCHEMA)
-LGC_json_load_entry_validator: _LGC_json_load_entry_validator = _LGC_json_load_entry_validator(LGC_JSON_LOAD_ENTRY_SCHEMA)
-LGC_json_dump_entry_validator: _LGC_json_dump_entry_validator = _LGC_json_dump_entry_validator(LGC_JSON_DUMP_ENTRY_SCHEMA)
-gGC_entry_validator: _gGC_entry_validator = _gGC_entry_validator(GGC_ENTRY_SCHEMA, purge_unknown=True)
-graph_validator: base_validator = base_validator(GRAPH_SCHEMA)
+gms_entry_validator: _gms_entry_validator = _gms_entry_validator(_GMS_ENTRY_SCHEMA)
+LGC_entry_validator: _LGC_entry_validator = _LGC_entry_validator(_LGC_ENTRY_SCHEMA)
+LGC_json_load_entry_validator: _LGC_json_load_entry_validator = _LGC_json_load_entry_validator(_LGC_JSON_LOAD_ENTRY_SCHEMA)
+LGC_json_dump_entry_validator: _LGC_json_dump_entry_validator = _LGC_json_dump_entry_validator(_LGC_JSON_DUMP_ENTRY_SCHEMA)
+gGC_entry_validator: _gGC_entry_validator = _gGC_entry_validator(_GGC_ENTRY_SCHEMA, purge_unknown=True)
+graph_validator: base_validator = base_validator(_GRAPH_SCHEMA)
 
 
 class xgc_validator_generator(_gGC_entry_validator, _LGC_entry_validator):

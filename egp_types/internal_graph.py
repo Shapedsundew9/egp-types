@@ -8,6 +8,7 @@ from .egp_typing import (
     DestinationRow,
     EndPointClass,
     EndPointHash,
+    EndPointType,
     Row,
     SourceRow,
     DST_EP,

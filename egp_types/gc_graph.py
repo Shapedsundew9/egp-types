@@ -8,12 +8,16 @@ defines the rules of the connectivity (the "physics") i.e. what is possible to o
 """
 
 from collections import Counter
+from copy import deepcopy
 from logging import DEBUG, Logger, NullHandler, getLogger
 from math import sqrt
-from random import choice, randint, sample
+from random import choice, randint, sample, uniform
 from typing import Any, Iterable, Literal, LiteralString, Sequence
+from string import ascii_letters
 
 import gi
+from cerberus import Validator
+from surebrec.surebrec import generate
 
 # Needed to prevent something pulling in GtK 4.0 and graph_tool complaining.
 gi.require_version("Gtk", "3.0")  # pylint: disable=wrong-import-position
@@ -21,71 +25,30 @@ gi.require_version("Gtk", "3.0")  # pylint: disable=wrong-import-position
 from itertools import count  # pylint: disable=wrong-import-order
 
 from bokeh.io import output_file, save
-from bokeh.models import (
-    BoxSelectTool,
-    Circle,
-    ColumnDataSource,
-    GraphRenderer,
-    HoverTool,
-    LabelSet,
-    MultiLine,
-    NodesAndLinkedEdges,
-    Range1d,
-    TapTool,
-)
+from bokeh.models import (BoxSelectTool, Circle, ColumnDataSource,
+                          GraphRenderer, HoverTool, LabelSet, MultiLine,
+                          NodesAndLinkedEdges, Range1d, TapTool)
 from bokeh.palettes import Category20_20, Greys9
 from bokeh.plotting import figure, from_networkx
 from cairo import FONT_WEIGHT_BOLD  # pylint: disable=no-name-in-module
 from cairo import FontWeight  # pylint: disable=no-name-in-module
-from text_token import register_token_code, text_token
 from graph_tool import EdgePropertyMap, Graph, VertexPropertyMap
 from graph_tool.draw import graph_draw
-from networkx import (
-    DiGraph,
-    get_node_attributes,  # type: ignore
-    spring_layout,
-)  # type: ignore
+from networkx import get_node_attributes  # type: ignore
+from networkx import DiGraph, spring_layout  # type: ignore
+from text_token import register_token_code, text_token
 
-from .egp_typing import (
-    CPI,
-    CVI,
-    DST_EP,
-    ROWS,
-    SOURCE_ROWS,
-    SRC_EP,
-    VALID_ROW_DESTINATIONS,
-    VALID_ROW_SOURCES,
-    ConnectionGraph,
-    DestinationRow,
-    EndPointClass,
-    EndPointHash,
-    EndPointIndex,
-    EndPointType,
-    GCGraphRows,
-    PairIdx,
-    Row,
-    SourceRow,
-    SrcEndPointHash,
-    isConnectionPair,
-    isConstantPair,
-    vertex,
-)
-from .end_point import (
-    dst_end_point,
-    dst_end_point_ref,
-    end_point,
-    end_point_ref,
-    src_end_point,
-    src_end_point_ref,
-)
-from .ep_type import (
-    REAL_EP_TYPE_VALUES,
-    asint,
-    asstr,
-    compatible,
-    validate,
-    validate_value,
-)
+from .egp_typing import (CPI, CVI, DST_EP, ROWS, SOURCE_ROWS, SRC_EP,
+                         VALID_ROW_DESTINATIONS, VALID_ROW_SOURCES,
+                         ConnectionGraph, ConstantRow, DestinationRow,
+                         EndPointClass, EndPointHash, EndPointIndex,
+                         EndPointType, GCGraphRows, PairIdx, Row, SourceRow,
+                         SrcEndPointHash, isConnectionPair, isConstantPair,
+                         json_to_connection_graph, vertex)
+from .end_point import (dst_end_point, dst_end_point_ref, end_point,
+                        end_point_ref, src_end_point, src_end_point_ref)
+from .ep_type import (REAL_EP_TYPE_VALUES, asint, asstr, compatible,
+                      ep_type_lookup, inst, validate, validate_value)
 from .internal_graph import internal_graph
 
 _logger: Logger = getLogger(__name__)
@@ -285,9 +248,12 @@ class gc_graph:
         "rows",
         "app_graph",
         "status",
+        "has_i",
+        "has_c",
+        "has_f",
         "has_a",
         "has_b",
-        "has_f",
+        "has_o",
     )
     i_graph: internal_graph
     rows: GCGraphRows
@@ -308,9 +274,12 @@ class gc_graph:
             dict(Counter([ep.row for ep in self.i_graph.dst_filter()])),
             dict(Counter([ep.row for ep in self.i_graph.src_filter()])),
         )
-        self.has_a = "A" in self.rows[DST_EP] or "A" in self.rows[SRC_EP]
-        self.has_b = "B" in self.rows[DST_EP] or "B" in self.rows[SRC_EP]
-        self.has_f = "F" in self.rows[DST_EP]
+        self.has_i: bool = "I" in self.rows[SRC_EP]
+        self.has_c: bool = "C" in self.rows[SRC_EP]
+        self.has_f: bool = "F" in self.rows[DST_EP]
+        self.has_a: bool = "A" in self.rows[DST_EP] or "A" in self.rows[SRC_EP]
+        self.has_b: bool = "B" in self.rows[DST_EP] or "B" in self.rows[SRC_EP]
+        self.has_o: bool = "O" in self.rows[DST_EP]
 
     def __repr__(self) -> str:
         """Print the graph in row order sources then destinations in index order."""
@@ -360,12 +329,18 @@ class gc_graph:
         if ep.row not in self.rows[ep.cls]:
             row_counts[ep.row] = 0
             match ep.row:
+                case "I":
+                    self.has_i = True
+                case "C":
+                    self.has_c = True
+                case "F":
+                    self.has_f = True
                 case "A":
                     self.has_a = True
                 case "B":
                     self.has_b = True
-                case "F":
-                    self.has_f = True
+                case "O":
+                    self.has_o = True
         ep.idx = row_counts[ep.row]
         self.i_graph[ep.key()] = ep
         row_counts[ep.row] += 1
@@ -385,13 +360,19 @@ class gc_graph:
             self.rows[ep.cls][ep.row] -= 1
             if not self.rows[ep.cls][ep.row] and not self.rows[not ep.cls].get(ep.row, 0):
                 del self.rows[ep.cls][ep.row]
-                match ep.row:
-                    case "A":
-                        self.has_a = False
-                    case "B":
-                        self.has_b = False
-                    case "F":
-                        self.has_f = False
+            match ep.row:
+                case "I":
+                    self.has_i = False
+                case "C":
+                    self.has_c = False
+                case "F":
+                    self.has_f = False
+                case "A":
+                    self.has_a = False
+                case "B":
+                    self.has_b = False
+                case "O":
+                    self.has_o = False
 
     def connection_graph(self) -> ConnectionGraph:
         """Convert graph to GMS graph (Connection Graph) format."""
@@ -542,7 +523,7 @@ class gc_graph:
             text_font_style="bold",
             text_color="black",
         )  # type: ignore
-        plot.renderers.append(labels)  # type: ignore
+        plot.renderers.append(labels)  # type: ignore pylint: disable=no-member
         output_file(f"{path}.html", title="Erasmus GP GC Internal Graph")
         save(plot)
 
@@ -851,7 +832,7 @@ class gc_graph:
         Remove any destination endpoints that do not have compatible source endpoints.
         This is not a useful function in normal operation.
         """
-        for row in self.rows[DST_EP]:
+        for row in deepcopy(self.rows[DST_EP]):  # self.rows may be modified during iteration
             src_types: set[int] = {ep.typ for ep in self.i_graph.src_rows_filter(VALID_ROW_SOURCES[self.has_f][row])}
             dst_types: set[int] = {ep.typ for ep in self.i_graph.dst_row_filter(row)}
             unconnectable_types: set[int] = dst_types - src_types
@@ -1225,3 +1206,57 @@ class gc_graph:
     def viable_dst_types(self, row: DestinationRow) -> set[int]:
         """Create a tuple of viable destination end point types for row."""
         return {ep.typ for ep in self.i_graph.src_rows_filter(VALID_ROW_SOURCES[self.has_f][row])}
+
+
+def random_constant_str(typ: EndPointType) -> str:
+    """Return a random constant string."""
+    if typ == asint("bool"):
+        return choice(("True", "False"))
+    if typ == asint("int"):
+        return str(randint(-100, 100))
+    if typ == asint("float"):
+        return str(uniform(-100, 100))
+    if typ == asint("str"):
+        return "".join(choice(ascii_letters) for _ in range(randint(1, 10)))    
+    return ep_type_lookup["instanciation"][typ][inst.DEFAULT.value]
+
+
+def random_gc_graph(validator: Validator, validate=False) -> gc_graph:
+    """Create a random GC graph using the validator as a rules set.
+
+    The validator must be a subset of the rules defined for a valid gc_graph.
+    """
+    rc_graph: ConnectionGraph = json_to_connection_graph(generate(validator, 1, validate=validate)[0]["graph"])  # type: ignore
+
+    # Uniquify source reference indexes to prevent random collisions
+    unique = count()
+    for row in rc_graph:
+        if row != "C":
+            rc_graph[row] = [(ref[0], next(unique), ref[2]) for ref in rc_graph[row]]
+    if "F" in rc_graph:
+        # O references A and P reference B - to validate they must have the same types. Easiest to duplicate.
+        if "A" in rc_graph:
+            rc_graph["B"] = deepcopy(rc_graph["A"])
+            # Duplicate A & B sources in U to keep symmetry.
+            if "U" in rc_graph:
+                rc_graph["U"].extend([("B", ref[1], ref[2]) for ref in rc_graph["U"] if ref[0] == "A"])
+                rc_graph["U"].extend([("A", ref[1], ref[2]) for ref in rc_graph["U"] if ref[0] == "B"])
+        if "O" in rc_graph:
+            # P destinations are the same as O destinations when F is defined but cannot reference row A (must be B)
+            rc_graph["P"] = [((ref[0], "B")[ref[0] == "A"], ref[1], ref[2]) for ref in rc_graph["O"]]
+
+    new_constants: ConstantRow = [(random_constant_str(typ), typ) for _, typ in rc_graph.get("C", [])]
+    if new_constants:
+        rc_graph["C"] = new_constants
+
+    gcg = gc_graph(rc_graph)
+    if _LOG_DEBUG:
+        _logger.debug(f"Pre-normalized randomly generated internal graph:\n{gcg}")
+
+    gcg.remove_all_connections()
+    gcg.purge_unconnectable_types()
+    gcg.reindex()
+    gcg.normalize()
+    if validate:
+        assert gcg.validate(), gcg.status
+    return gcg

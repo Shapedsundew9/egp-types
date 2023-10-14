@@ -204,7 +204,8 @@
                         "minlength": 3,
                         "type": "list"
                     },
-                    "type": "list"
+                    "type": "list",
+                    "maxlength":256
                 },
                 "B": {
                     "required": false,
@@ -226,7 +227,8 @@
                         "minlength": 3,
                         "type": "list"
                     },
-                    "type": "list"
+                    "type": "list",
+                    "maxlength":256
                 },
                 "C": {
                     "required": false,
@@ -242,7 +244,8 @@
                         "minlength": 2,
                         "type": "list"
                     },
-                    "type": "list"
+                    "type": "list",
+                    "maxlength":256
                 },
                 "O": {
                     "schema": {
@@ -263,7 +266,8 @@
                         "minlength": 3,
                         "type": "list"
                     },
-                    "type": "list"
+                    "type": "list",
+                    "maxlength":256
                 },
                 "U": {
                     "required": false,
@@ -307,7 +311,8 @@
                         "minlength": 3,
                         "type": "list"
                     },
-                    "type": "list"
+                    "type": "list",
+                    "maxlength":256
                 },
                 "B": {
                     "required": false,
@@ -328,7 +333,8 @@
                         "minlength": 3,
                         "type": "list"
                     },
-                    "type": "list"
+                    "type": "list",
+                    "maxlength":256
                 },
                 "C": {
                     "required": false,
@@ -344,7 +350,8 @@
                         "minlength": 2,
                         "type": "list"
                     },
-                    "type": "list"
+                    "type": "list",
+                    "maxlength":256
                 },
                 "F": {
                     "maxlength": 1,
@@ -391,7 +398,8 @@
                         "minlength": 3,
                         "type": "list"
                     },
-                    "type": "list"
+                    "type": "list",
+                    "maxlength":256
                 },
                 "P": {
                     "required": false,
@@ -413,7 +421,8 @@
                         "minlength": 3,
                         "type": "list"
                     },
-                    "type": "list"
+                    "type": "list",
+                    "maxlength":256
                 },
                 "U": {
                     "required": false,

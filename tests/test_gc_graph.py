@@ -10,24 +10,19 @@ from random import choice, randint, random
 from typing import Any
 
 import pytest
-from surebrec.surebrec import generate
 
 from egp_types import reference, set_reference_generator
 from egp_types.egp_typing import (
     DST_EP,
     SRC_EP,
-    ConnectionGraph,
-    ConstantRow,
     json_to_connection_graph,
 )
 from egp_types.ep_type import (
     EP_TYPE_VALUES,
     INVALID_EP_TYPE_VALUE,
-    asint,
-    ep_type_lookup,
-    inst,
+    asint
 )
-from egp_types.gc_graph import gc_graph
+from egp_types.gc_graph import gc_graph, random_gc_graph
 from egp_types.xgc_validator import graph_validator
 
 _logger: Logger = getLogger(__name__)
@@ -67,53 +62,6 @@ def random_type(probability: float = 0.0) -> int:
         if value != INVALID_EP_TYPE_VALUE:
             return value
     return asint("builtins_int")
-
-
-def random_graph() -> gc_graph:
-    """Create a random graph.
-
-    The graph is not guaranteed to be valid when p > 0.0. If a destination row requires a type that
-    is not present in any valid source row the graph cannot be normalized.
-
-    Args
-    ----
-    probability: 0.0 <= p <= 1.0 probability of choosing a random type on each type selection.
-    """
-    rc_graph: ConnectionGraph = json_to_connection_graph(generate(graph_validator, 1)[0]["graph"])  # type: ignore
-    # print('\nOriginal rc_graph:\n', pformat(rc_graph, indent=4, width=256))
-    # Uniquify source reference indexes to prevent random collisions
-    unique = count()
-    for row in rc_graph:
-        if row != "C":
-            rc_graph[row] = [(ref[0], next(unique), ref[2]) for ref in rc_graph[row]]
-    if "F" in rc_graph:
-        # O references A and P reference B - to validate they must have the same types. Easiest to duplicate.
-        if "A" in rc_graph:
-            rc_graph["B"] = deepcopy(rc_graph["A"])
-            # Duplicate A & B sources in U to keep symmetry.
-            if "U" in rc_graph:
-                rc_graph["U"].extend([("B", ref[1], ref[2]) for ref in rc_graph["U"] if ref[0] == "A"])
-                rc_graph["U"].extend([("A", ref[1], ref[2]) for ref in rc_graph["U"] if ref[0] == "B"])
-        if "O" in rc_graph:
-            # P destinations are the same as O destinations when F is defined but cannot reference row A (must be B)
-            rc_graph["P"] = [((ref[0], "B")[ref[0] == "A"], ref[1], ref[2]) for ref in rc_graph["O"]]
-
-    new_constants: ConstantRow = [(ep_type_lookup["instanciation"][typ][inst.DEFAULT.value], typ) for _, typ in rc_graph.get("C", [])]
-    if new_constants:
-        rc_graph["C"] = new_constants
-    # print('\nNew rc_graph\n', pformat(rc_graph, indent=4, width=256))
-    gcg = gc_graph(rc_graph)
-    if _LOG_DEBUG:
-        _logger.debug(f"Pre-normalized randomly generated internal graph:\n{gcg}")
-    # print("\nPre-normalized\n", gcg)
-    gcg.remove_all_connections()
-    # print("\nRemoved all connections\n", gcg)
-    gcg.purge_unconnectable_types()
-    # print("\nPurged\n", gcg)
-    gcg.reindex()
-    # print("\nReindexed\n", gcg)
-    gcg.normalize()
-    return gcg
 
 
 @pytest.mark.parametrize("i, case", enumerate(results))
@@ -169,7 +117,7 @@ def test_remove_connection_simple(test) -> None:
     # TODO: These random test cases need to be made static when we are confident in them.
     # Generate them into a JSON file.
     _logger.debug(f"Case {test}")
-    graph: gc_graph = random_graph()
+    graph: gc_graph = random_gc_graph(graph_validator)
     assert graph.validate()
 
     # TOD: gc_graphO: Split this out into its own test case when the graphs are staticly defined in a JSON file.
@@ -188,7 +136,7 @@ def test_add_input_simple(_) -> None:
     """
     # TODO: These random test cases need to be made static when we are confident in them.
     # Generate them into a JSON file.
-    graph: gc_graph = random_graph()
+    graph: gc_graph = random_gc_graph(graph_validator)
     assert graph.validate()
 
     before: int = graph.rows[SRC_EP].get("I", 0)
@@ -209,7 +157,7 @@ def test_remove_input_simple(_) -> None:
     """
     # TODO: These random test cases need to be made static when we are confident in them.
     # Generate them into a JSON file.
-    graph: gc_graph = random_graph()
+    graph: gc_graph = random_gc_graph(graph_validator)
     assert graph.validate()
 
     before: int = graph.rows[SRC_EP].get("I", 0)
@@ -236,7 +184,7 @@ def test_add_output_simple(_) -> None:
     """
     # TODO: These random test cases need to be made static when we are confident in them.
     # Generate them into a JSON file.
-    graph: gc_graph = random_graph()
+    graph: gc_graph = random_gc_graph(graph_validator)
     assert graph.validate()
 
     before: int = graph.rows[DST_EP].get("O", 0)
@@ -257,7 +205,7 @@ def test_remove_output_simple(_) -> None:
     """
     # TODO: These random test cases need to be made static when we are confident in them.
     # Generate them into a JSON file.
-    graph: gc_graph = random_graph()
+    graph: gc_graph = random_gc_graph(graph_validator)
     assert graph.validate()
 
     before: int = graph.rows[DST_EP].get("O", 0)
@@ -288,7 +236,7 @@ def test_remove_constant_simple(_) -> None:
     """
     # TODO: These random test cases need to be made static when we are confident in them.
     # Generate them into a JSON file.
-    graph: gc_graph = random_graph()
+    graph: gc_graph = random_gc_graph(graph_validator)
     assert graph.validate()
 
     before: int = graph.rows[SRC_EP].get("C", 0)
@@ -314,7 +262,7 @@ def test_binary_compound_modifications(_) -> None:
     """
     # TODO: These random test cases need to be made static when we are confident in them.
     # Generate them into a JSON file.
-    graph: gc_graph = random_graph()
+    graph: gc_graph = random_gc_graph(graph_validator)
     assert graph.validate()
 
     for _ in range(2):
@@ -352,7 +300,7 @@ def test_nary_compound_modifications(_) -> None:
     """
     # TODO: These random test cases need to be made static when we are confident in them.
     # Generate them into a JSON file.
-    graph: gc_graph = random_graph()
+    graph: gc_graph = random_gc_graph(graph_validator)
     assert graph.validate()
 
     for _ in range(randint(3, 20)):
