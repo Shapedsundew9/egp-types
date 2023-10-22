@@ -81,7 +81,7 @@ class internal_graph(EndPointDict):
 
     def dst_unref_filter(self) -> Generator[dst_end_point, None, None]:
         """Return all the destination end points that are unreferenced."""
-        return (ep for ep in self.values() if isDstEndPoint(ep) and not ep.refs)
+        return (ep for ep in self.values() if not ep.refs and ep.row != "U" and isDstEndPoint(ep))
 
     def src_unref_filter(self) -> Generator[src_end_point, None, None]:
         """Return all the source end points that are unreferenced."""
@@ -89,7 +89,7 @@ class internal_graph(EndPointDict):
 
     def dst_ref_filter(self) -> Generator[dst_end_point, None, None]:
         """Return all the destination end points that are referenced."""
-        return (ep for ep in self.values() if isDstEndPoint(ep) and ep.refs)
+        return (ep for ep in self.values() if ep.row != "U" and ep.refs and isDstEndPoint(ep))
 
     def src_ref_filter(self) -> Generator[src_end_point, None, None]:
         """Return all the source end points that are referenced."""

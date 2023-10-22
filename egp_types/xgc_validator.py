@@ -76,12 +76,12 @@ _LGC_JSON_DUMP_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(LGC_JSON_DUMP_
 GGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GMS_ENTRY_SCHEMA)
 with open(join(dirname(__file__), "formats/gGC_entry_format.json"), "r", encoding="utf8") as file_ptr:
     merge(GGC_ENTRY_SCHEMA, load(file_ptr), update=True)
-_GGC_ENTRY_SCHEMA = deepcopy(GGC_ENTRY_SCHEMA)
+_GGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GGC_ENTRY_SCHEMA)
 
 # XGC_ENTRY_SCHEMA is the superset schema from which transient xGC's can be validated
 XGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GGC_ENTRY_SCHEMA)
 merge(XGC_ENTRY_SCHEMA, LGC_ENTRY_SCHEMA, update=True)
-_XGC_ENTRY_SCHEMA = deepcopy(XGC_ENTRY_SCHEMA)
+_XGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(XGC_ENTRY_SCHEMA)
 
 # Pull the grpah schema out of the GMS schema to create a standalone validator.
 GRAPH_SCHEMA: dict[str, dict[str, Any]] = {"graph": deepcopy(GMS_ENTRY_SCHEMA["graph"])}
@@ -518,12 +518,20 @@ class _gGC_entry_validator(_gms_entry_validator):
             self._error(field, "A GC cannot have been created by itself (pgc_ref == ref).")
 
 
+class _graph_validator(base_validator):
+    # TODO: Make errors ValidationError types for full disclosure
+    # https://docs.python-cerberus.org/en/stable/customize.html#validator-error
+
+    def _check_with_valid_ep_type(self, field: str, value: Any) -> None:
+        if not validate(value):
+            self._error(field, f"ep_type {value} does not exist.")
+
 gms_entry_validator: _gms_entry_validator = _gms_entry_validator(_GMS_ENTRY_SCHEMA)
 LGC_entry_validator: _LGC_entry_validator = _LGC_entry_validator(_LGC_ENTRY_SCHEMA)
 LGC_json_load_entry_validator: _LGC_json_load_entry_validator = _LGC_json_load_entry_validator(_LGC_JSON_LOAD_ENTRY_SCHEMA)
 LGC_json_dump_entry_validator: _LGC_json_dump_entry_validator = _LGC_json_dump_entry_validator(_LGC_JSON_DUMP_ENTRY_SCHEMA)
 gGC_entry_validator: _gGC_entry_validator = _gGC_entry_validator(_GGC_ENTRY_SCHEMA, purge_unknown=True)
-graph_validator: base_validator = base_validator(_GRAPH_SCHEMA)
+graph_validator: _graph_validator = _graph_validator(_GRAPH_SCHEMA)
 
 
 class xgc_validator_generator(_gGC_entry_validator, _LGC_entry_validator):

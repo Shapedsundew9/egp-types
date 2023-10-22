@@ -219,6 +219,22 @@ register_token_code(
     "E01023",
     'Row "P" endpoint {p_hash} is not the same type as row "O" {o_hash} and is required to be.',
 )
+register_token_code(
+    "E01024",
+    'Row "F" must have 1 and only 1 destination endpoint.',
+)
+register_token_code(
+    "E01025",
+    'Row "F" must have no source endpoints.',
+)
+register_token_code(
+    "E01026",
+    'Row "F"s single destination endpoint must be of type bool.',
+)
+register_token_code(
+    "E01027",
+    'Row "U" cannot have any sources.',
+)
 
 register_token_code("I01000", '"I" row endpoint appended of UNKNOWN_EP_TYPE_VALUE.')
 register_token_code("I01001", '"I" row endpoint removed.')
@@ -259,9 +275,6 @@ class gc_graph:
     rows: GCGraphRows
     app_graph: Any  # TODO: This should be on demand
     status: Any
-    has_a: bool
-    has_b: bool
-    has_f: bool
 
     def __init__(
         self,
@@ -299,6 +312,12 @@ class gc_graph:
         Types are stored in integer format for efficiency.
         """
         i_graph: internal_graph = internal_graph()
+
+        # Row C needs to be imported before any other row to ensure references exist.
+        for index, c_point in enumerate(c_graph.get("C", [])):
+            src_ep: end_point = src_end_point("C", index, c_point[CVI.TYP.value], refs=[], val=c_point[CVI.VAL.value])
+            i_graph[src_ep.key()] = src_ep
+
         for connection_graph_pair in c_graph.items():
             if isConnectionPair(connection_graph_pair):
                 row: DestinationRow = connection_graph_pair[PairIdx.ROW.value]
@@ -309,15 +328,11 @@ class gc_graph:
                     dst_ep: dst_end_point = dst_end_point(row, index, cp_typ, refs=[src_end_point_ref(cp_row, cp_idx)])
                     i_graph[dst_ep.key()] = dst_ep
                     src_ep_hash: SrcEndPointHash = dst_ep.refs[0].key()
-                    if src_ep_hash in i_graph:
+                    if src_ep_hash in i_graph and row != "U":
                         i_graph[src_ep_hash].refs.append(dst_end_point_ref(row, index))
                     elif cp_row != "C":
                         refs: list[dst_end_point_ref] = [dst_end_point_ref(row, index)] if row != "U" else []
                         i_graph[src_ep_hash] = src_end_point(cp_row, cp_idx, cp_typ, refs=refs)
-            elif isConstantPair(connection_graph_pair):
-                for index, c_point in enumerate(connection_graph_pair[PairIdx.VALUES.value]):
-                    src_ep: end_point = src_end_point("C", index, c_point[CVI.TYP.value], val=c_point[CVI.VAL.value])
-                    i_graph[src_ep.key()] = src_ep
         return i_graph
 
     def _add_ep(self, ep: end_point) -> None:
@@ -892,6 +907,7 @@ class gc_graph:
         -------
         True if the graph is in a steady state.
         """
+        # TODO: next() in try?
         return not tuple(self.i_graph.dst_unref_filter())
 
     def validate(self) -> bool:  # noqa: C901
@@ -902,7 +918,7 @@ class gc_graph:
         This function is not intended to be fast.
         Genetic code graphs MUST obey the following rules:
             1. All connections are referenced at source (except row 'U') and destination
-            2. All sunreferenced ources are referenced by the unconnected 'U' row.
+            2. All unreferenced sources are referenced by the unconnected 'U' row.
             3a. All destinations are connected.
             3b. All destinations are only connected once.
             4. Types are valid.
@@ -921,6 +937,12 @@ class gc_graph:
             14. If row 'F' is defined:
                 a. Row 'P' must have the same number & type of elements as row 'O'.
                 b. Row 'I' must have at least 1 bool source
+                c. Row 'F' must have 1 destination
+                d. Row 'F' must have no source endpoints
+                e. Row 'F' must have 1 bool destination
+            15. If row 'U' exists:
+                a. Row 'U' must have at least 1 destination endpoint
+                b. Row 'U' must have no source endpoints
 
         Args
         ----
@@ -1061,8 +1083,8 @@ class gc_graph:
                 if ref.row not in VALID_ROW_DESTINATIONS[self.has_f][ep.row]:
                     self.status.append(text_token({"E01017": {"ref1": ep.key(), "ref2": ref.key()}}))
 
-        # 14a
         if self.has_f:
+            # 14a
             len_p: int = self.i_graph.num_eps("P", DST_EP)
             len_o: int = self.i_graph.num_eps("O", DST_EP)
             if len_p != len_o:
@@ -1071,10 +1093,25 @@ class gc_graph:
                 if o_ep.typ != p_ep.typ:
                     self.status.append(text_token({"E01023": {"p_hash": p_ep.key(), "o_hash": o_ep.key()}}))
 
-        # 14b
-        if self.has_f:
+            # 14b
             if not [ep.typ == asint("bool") for ep in self.i_graph.row_filter("I")]:
                 self.status.append(text_token({"E01016": {}}))
+
+            # 14c
+            if not self.i_graph.num_eps("F", DST_EP):
+                self.status.append(text_token({"E01024": {}}))
+
+            # 14d
+            if  self.i_graph.num_eps("P", SRC_EP):
+                self.status.append(text_token({"E01025": {}}))
+
+            # 14e
+            if not [ep.typ == asint("bool") for ep in self.i_graph.row_filter("F")]:
+                self.status.append(text_token({"E01026": {}}))
+
+        # 15a
+        if self.i_graph.num_eps("U", SRC_EP):
+            self.status.append(text_token({"E01027": {}}))
 
         if _LOG_DEBUG:
             if self.status:
@@ -1116,7 +1153,10 @@ class gc_graph:
         dst_ep_seq: An iterable of destination endpoints to disconnect.
         """
         # Row U is the unconnected row and not referenced in the source row (because it is unconnected!)
-        for dst_ep in filter(lambda x: x.row != "U", dst_ep_iter):
+        for dst_ep in dst_ep_iter:
+            if _LOG_DEBUG:
+                _logger.debug(f"Removing connection from destination endpoint: {dst_ep}")
+                assert dst_ep.row != "U"
             self.i_graph[dst_ep.refs[0].key()].refs.remove(dst_end_point_ref(dst_ep.row, dst_ep.idx))
             dst_ep.refs = []
 
@@ -1183,6 +1223,22 @@ class gc_graph:
             _logger.debug(f"No viable source endpoints for destination endpoint: {dst_ep}")
         return False
 
+    def row_if(self, row: Row) -> tuple[list[int], list[int]]:
+        """Return the row interface definition.
+
+        Args
+        ----
+        row: One of gc_graph.rows.
+
+        Returns
+        -------
+        A tuple of lists of integers (src, dst) which are ep_type_ints in the order defined in the graph.
+        """
+        return (
+            [ep.typ for ep in sorted(self.i_graph.src_row_filter(row), key=lambda x: x.idx)],
+            [ep.typ for ep in sorted(self.i_graph.dst_row_filter(row), key=lambda x: x.idx)],
+        )
+
     def input_if(self) -> list[int]:
         """Return the input interface definition.
 
@@ -1217,16 +1273,16 @@ def random_constant_str(typ: EndPointType) -> str:
     if typ == asint("float"):
         return str(uniform(-100, 100))
     if typ == asint("str"):
-        return "".join(choice(ascii_letters) for _ in range(randint(1, 10)))    
+        return '"' + "".join(choice(ascii_letters) for _ in range(randint(1, 10))) + '"'
     return ep_type_lookup["instanciation"][typ][inst.DEFAULT.value]
 
 
-def random_gc_graph(validator: Validator, validate=False) -> gc_graph:
+def random_gc_graph(validator: Validator, verify: bool = False, seed: int | None = None) -> gc_graph:
     """Create a random GC graph using the validator as a rules set.
 
     The validator must be a subset of the rules defined for a valid gc_graph.
     """
-    rc_graph: ConnectionGraph = json_to_connection_graph(generate(validator, 1, validate=validate)[0]["graph"])  # type: ignore
+    rc_graph: ConnectionGraph = json_to_connection_graph(generate(validator, 1, seed, verify)[0]["graph"])  # type: ignore
 
     # Uniquify source reference indexes to prevent random collisions
     unique = count()
@@ -1257,6 +1313,6 @@ def random_gc_graph(validator: Validator, validate=False) -> gc_graph:
     gcg.purge_unconnectable_types()
     gcg.reindex()
     gcg.normalize()
-    if validate:
+    if verify:
         assert gcg.validate(), gcg.status
     return gcg

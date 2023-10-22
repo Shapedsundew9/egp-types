@@ -181,10 +181,16 @@
     "graph": {
         "check_with": "valid_graph",
         "meta": {
-            "description": "Defines the sub-codes of the genetic code and how they are connected together."
+            "description": "Defines the sub-codes of the genetic code and how they are connected together.",
+            "schema_descriptions": [
+                "Memory modifiying eGC with no inputs or outputs.",
+                "Memory modifying codon or eGC with no inputs or outputs.",
+                "Memory modifying eGC with inputs."
+            ]
         },
         "required": true,
-        "oneof_schema": [
+        "allow_unknown": false,
+        "anyof_schema": [
             {
                 "A": {
                     "required": false,
@@ -205,7 +211,8 @@
                         "type": "list"
                     },
                     "type": "list",
-                    "maxlength":256
+                    "minlength": 1,
+                    "maxlength": 256
                 },
                 "B": {
                     "required": false,
@@ -228,7 +235,8 @@
                         "type": "list"
                     },
                     "type": "list",
-                    "maxlength":256
+                    "minlength": 1,
+                    "maxlength": 256
                 },
                 "C": {
                     "required": false,
@@ -245,9 +253,11 @@
                         "type": "list"
                     },
                     "type": "list",
-                    "maxlength":256
+                    "minlength": 1,
+                    "maxlength": 256
                 },
                 "O": {
+                    "required": false,
                     "schema": {
                         "items": [
                             {
@@ -267,7 +277,8 @@
                         "type": "list"
                     },
                     "type": "list",
-                    "maxlength":256
+                    "minlength": 1,
+                    "maxlength": 256
                 },
                 "U": {
                     "required": false,
@@ -289,12 +300,14 @@
                         "minlength": 3,
                         "type": "list"
                     },
-                    "type": "list"
+                    "type": "list",
+                    "minlength": 1,
+                    "maxlength": 256
                 }
             },
             {
                 "A": {
-                    "required": true,
+                    "required": false,
                     "schema": {
                         "items": [
                             {
@@ -312,7 +325,8 @@
                         "type": "list"
                     },
                     "type": "list",
-                    "maxlength":256
+                    "minlength": 1,
+                    "maxlength": 256
                 },
                 "B": {
                     "required": false,
@@ -322,7 +336,8 @@
                             {
                                 "allowed": [
                                     "I",
-                                    "C"
+                                    "C",
+                                    "A"
                                 ],
                                 "type": "string"
                             },
@@ -334,7 +349,8 @@
                         "type": "list"
                     },
                     "type": "list",
-                    "maxlength":256
+                    "minlength": 1,
+                    "maxlength": 256
                 },
                 "C": {
                     "required": false,
@@ -351,7 +367,8 @@
                         "type": "list"
                     },
                     "type": "list",
-                    "maxlength":256
+                    "minlength": 1,
+                    "maxlength": 256
                 },
                 "F": {
                     "maxlength": 1,
@@ -399,7 +416,8 @@
                         "type": "list"
                     },
                     "type": "list",
-                    "maxlength":256
+                    "minlength": 1,
+                    "maxlength": 256
                 },
                 "P": {
                     "required": false,
@@ -422,7 +440,8 @@
                         "type": "list"
                     },
                     "type": "list",
-                    "maxlength":256
+                    "minlength": 1,
+                    "maxlength": 256
                 },
                 "U": {
                     "required": false,
@@ -444,7 +463,148 @@
                         "minlength": 3,
                         "type": "list"
                     },
+                    "type": "list",
+                    "minlength": 1,
+                    "maxlength": 256
+                }
+            },
+            {
+                "A": {
+                    "required": false,
+                    "schema": {
+                        "items": [
+                            {
+                                "allowed": [
+                                    "I",
+                                    "C"
+                                ],
+                                "type": "string"
+                            },
+                            "ep_idx",
+                            "ep_type"
+                        ],
+                        "maxlength": 3,
+                        "minlength": 3,
+                        "type": "list"
+                    },
+                    "type": "list",
+                    "minlength": 1,
+                    "maxlength": 256
+                },
+                "C": {
+                    "required": false,
+                    "schema": {
+                        "items": [
+                            {
+                                "regex": "[a-zA-Z][a-zA-Z0-9_]{1,64}",
+                                "type": "string"
+                            },
+                            "ep_type"
+                        ],
+                        "maxlength": 2,
+                        "minlength": 2,
+                        "type": "list"
+                    },
+                    "type": "list",
+                    "minlength": 1,
+                    "maxlength": 256
+                },
+                "F": {
+                    "maxlength": 1,
+                    "minlength": 1,
+                    "required": true,
+                    "schema": {
+                        "items": [
+                            {
+                                "allowed": [
+                                    "I"
+                                ],
+                                "type": "string"
+                            },
+                            "ep_idx",
+                            {
+                                "allowed": [
+                                    1
+                                ],
+                                "type": "integer"
+                            }
+                        ],
+                        "maxlength": 3,
+                        "minlength": 3,
+                        "type": "list"
+                    },
                     "type": "list"
+                },
+                "O": {
+                    "required": false,
+                    "schema": {
+                        "items": [
+                            {
+                                "allowed": [
+                                    "I",
+                                    "C",
+                                    "A"
+                                ],
+                                "type": "string"
+                            },
+                            "ep_idx",
+                            "ep_type"
+                        ],
+                        "maxlength": 3,
+                        "minlength": 3,
+                        "type": "list"
+                    },
+                    "type": "list",
+                    "minlength": 1,
+                    "maxlength": 256
+                },
+                "P": {
+                    "required": false,
+                    "dependencies": ["O"],
+                    "schema": {
+                        "items": [
+                            {
+                                "allowed": [
+                                    "I",
+                                    "C",
+                                    "A"
+                                ],
+                                "type": "string"
+                            },
+                            "ep_idx",
+                            "ep_type"
+                        ],
+                        "maxlength": 3,
+                        "minlength": 3,
+                        "type": "list"
+                    },
+                    "type": "list",
+                    "minlength": 1,
+                    "maxlength": 256
+                },
+                "U": {
+                    "required": false,
+                    "schema": {
+                        "items": [
+                            {
+                                "allowed": [
+                                    "I",
+                                    "C",
+                                    "A",
+                                    "B"
+                                ],
+                                "type": "string"
+                            },
+                            "ep_idx",
+                            "ep_type"
+                        ],
+                        "maxlength": 3,
+                        "minlength": 3,
+                        "type": "list"
+                    },
+                    "type": "list",
+                    "minlength": 1,
+                    "maxlength": 256
                 }
             }
         ],

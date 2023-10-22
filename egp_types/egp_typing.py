@@ -125,6 +125,11 @@ def json_to_connection_graph(json_graph: JSONGraph) -> ConnectionGraph:
     return cast(ConnectionGraph, {k: [tuple(e) for e in v] for k, v in json_graph.items()})
 
 
+def connection_graph_to_json(connection_graph: ConnectionGraph) -> JSONGraph:
+    """convert a JSON connection graph to a ConnectionGraph."""
+    return cast(JSONGraph, {k: [list(e) for e in v] for k, v in connection_graph.items()})  # type: ignore
+
+
 def isConstantPair(obj: tuple[str, Any]) -> TypeGuard[ConstantPair]:
     """Narrow a connection graph key:value pair to a constant row."""
     return obj[0] == "C"
