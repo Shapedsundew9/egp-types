@@ -40,7 +40,7 @@ rules_set_registry.extend(
 )
 
 # Storage types schemas
-# NOTE: Cerberus can modfiy a schmea (specifically I noticed "oneof_schema" --> "one_of") so 
+# NOTE: Cerberus can modfiy a schmea (specifically I noticed "oneof_schema" --> "one_of") so
 # we deepcopy the schema before creating the validator to ensure it is not modified for other use.
 
 # The Genetic Material Store (GMS) is the abstract common base schema for LGC & GGC
@@ -83,7 +83,7 @@ XGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GGC_ENTRY_SCHEMA)
 merge(XGC_ENTRY_SCHEMA, LGC_ENTRY_SCHEMA, update=True)
 _XGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(XGC_ENTRY_SCHEMA)
 
-# Pull the grpah schema out of the GMS schema to create a standalone validator.
+# Pull the graph schema out of the GMS schema to create a standalone validator.
 GRAPH_SCHEMA: dict[str, dict[str, Any]] = {"graph": deepcopy(GMS_ENTRY_SCHEMA["graph"])}
 del GRAPH_SCHEMA["graph"]["check_with"]
 _GRAPH_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GRAPH_SCHEMA)
@@ -449,8 +449,8 @@ class _LGC_json_load_entry_validator(_LGC_entry_validator):
     def _normalize_coerce_properties_dict_to_int(self, value) -> int:
         return encode_properties(value)
 
-    def _normalize_coerce_type_indices_str_to_binary(self, value) -> bytes:
-        return bytes.fromhex(value)
+    def _normalize_coerce_type_indices_str_to_binary(self, value: str | bytes) -> bytes:
+        return bytes.fromhex(value) if isinstance(value, str) else value
 
 
 class _LGC_json_dump_entry_validator(_LGC_entry_validator):
@@ -460,8 +460,8 @@ class _LGC_json_dump_entry_validator(_LGC_entry_validator):
     def _normalize_coerce_properties_int_to_dict(self, value) -> dict[str, bool]:
         return decode_properties(value)
 
-    def _normalize_coerce_type_indices_binary_to_str(self, value) -> str | None:
-        return value.hex()
+    def _normalize_coerce_type_indices_binary_to_str(self, value: str | bytes) -> str | None:
+        return value.hex() if isinstance(value, (bytes, memoryview, bytearray)) else value
 
 
 class _gGC_entry_validator(_gms_entry_validator):
@@ -525,6 +525,7 @@ class _graph_validator(base_validator):
     def _check_with_valid_ep_type(self, field: str, value: Any) -> None:
         if not validate(value):
             self._error(field, f"ep_type {value} does not exist.")
+
 
 gms_entry_validator: _gms_entry_validator = _gms_entry_validator(_GMS_ENTRY_SCHEMA)
 LGC_entry_validator: _LGC_entry_validator = _LGC_entry_validator(_LGC_ENTRY_SCHEMA)

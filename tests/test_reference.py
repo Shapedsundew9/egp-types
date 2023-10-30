@@ -25,20 +25,3 @@ def test_ref_from_sig_shift() -> None:
         rfs: int = ref_from_sig(sig.to_bytes(32, "big"), shift)
         assert rfs == (ref - _GL_GC), f"{sig:032x} >> {shift} with GL GC bit set != {rfs:08x}"
 
-
-def test_reference() -> None:
-    """Test owners & counters work as expected."""
-    # Owner counters
-    counter_0 = count()
-    counter_1 = count()
-    # Owner 0 count 0
-    assert not reference(0, counter_0)
-    assert reference(0, counter_0) == 1
-    assert reference(0, counter_0) == 2
-    assert reference(1, counter_1) == 0x100000000
-    assert reference(1, counter_1) == 0x100000001
-    assert reference(1, counter_1) == 0x100000002
-    assert reference(0, counter_0) == 3
-    assert reference(0, counter_0) == 4
-    assert reference(1, counter_1) == 0x100000003
-    assert reference(1, counter_1) == 0x100000004

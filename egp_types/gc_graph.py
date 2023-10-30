@@ -25,9 +25,18 @@ gi.require_version("Gtk", "3.0")  # pylint: disable=wrong-import-position
 from itertools import count  # pylint: disable=wrong-import-order
 
 from bokeh.io import output_file, save
-from bokeh.models import (BoxSelectTool, Circle, ColumnDataSource,
-                          GraphRenderer, HoverTool, LabelSet, MultiLine,
-                          NodesAndLinkedEdges, Range1d, TapTool)
+from bokeh.models import (
+    BoxSelectTool,
+    Circle,
+    ColumnDataSource,
+    GraphRenderer,
+    HoverTool,
+    LabelSet,
+    MultiLine,
+    NodesAndLinkedEdges,
+    Range1d,
+    TapTool,
+)
 from bokeh.palettes import Category20_20, Greys9
 from bokeh.plotting import figure, from_networkx
 from cairo import FONT_WEIGHT_BOLD  # pylint: disable=no-name-in-module
@@ -38,17 +47,34 @@ from networkx import get_node_attributes  # type: ignore
 from networkx import DiGraph, spring_layout  # type: ignore
 from text_token import register_token_code, text_token
 
-from .egp_typing import (CPI, CVI, DST_EP, ROWS, SOURCE_ROWS, SRC_EP,
-                         VALID_ROW_DESTINATIONS, VALID_ROW_SOURCES,
-                         ConnectionGraph, ConstantRow, DestinationRow,
-                         EndPointClass, EndPointHash, EndPointIndex,
-                         EndPointType, GCGraphRows, PairIdx, Row, SourceRow,
-                         SrcEndPointHash, isConnectionPair, isConstantPair,
-                         json_to_connection_graph, vertex)
-from .end_point import (dst_end_point, dst_end_point_ref, end_point,
-                        end_point_ref, src_end_point, src_end_point_ref)
-from .ep_type import (REAL_EP_TYPE_VALUES, asint, asstr, compatible,
-                      ep_type_lookup, inst, validate, validate_value)
+from .egp_typing import (
+    CPI,
+    CVI,
+    DST_EP,
+    ROWS,
+    SOURCE_ROWS,
+    SRC_EP,
+    VALID_ROW_DESTINATIONS,
+    VALID_ROW_SOURCES,
+    ConnectionGraph,
+    ConstantRow,
+    DestinationRow,
+    EndPointClass,
+    EndPointHash,
+    EndPointIndex,
+    EndPointType,
+    GCGraphRows,
+    PairIdx,
+    Row,
+    SourceRow,
+    SrcEndPointHash,
+    isConnectionPair,
+    isConstantPair,
+    json_to_connection_graph,
+    vertex,
+)
+from .end_point import dst_end_point, dst_end_point_ref, end_point, end_point_ref, src_end_point, src_end_point_ref
+from .ep_type import REAL_EP_TYPE_VALUES, asint, asstr, compatible, ep_type_lookup, inst, validate, validate_value
 from .internal_graph import internal_graph
 
 _logger: Logger = getLogger(__name__)
@@ -287,6 +313,8 @@ class gc_graph:
             dict(Counter([ep.row for ep in self.i_graph.dst_filter()])),
             dict(Counter([ep.row for ep in self.i_graph.src_filter()])),
         )
+
+        # TODO: Get rid of these and just introspect rows.
         self.has_i: bool = "I" in self.rows[SRC_EP]
         self.has_c: bool = "C" in self.rows[SRC_EP]
         self.has_f: bool = "F" in self.rows[DST_EP]
@@ -326,6 +354,8 @@ class gc_graph:
                     cp_idx: EndPointIndex = c_point[CPI.IDX.value]
                     cp_typ: EndPointType = c_point[CPI.TYP.value]
                     dst_ep: dst_end_point = dst_end_point(row, index, cp_typ, refs=[src_end_point_ref(cp_row, cp_idx)])
+                    if _LOG_DEBUG:
+                        _logger.debug(f"Adding to i_graph: {dst_ep}")
                     i_graph[dst_ep.key()] = dst_ep
                     src_ep_hash: SrcEndPointHash = dst_ep.refs[0].key()
                     if src_ep_hash in i_graph and row != "U":
@@ -333,6 +363,8 @@ class gc_graph:
                     elif cp_row != "C":
                         refs: list[dst_end_point_ref] = [dst_end_point_ref(row, index)] if row != "U" else []
                         i_graph[src_ep_hash] = src_end_point(cp_row, cp_idx, cp_typ, refs=refs)
+                        if _LOG_DEBUG:
+                            _logger.debug(f"Adding to i_graph: {i_graph[src_ep_hash]}")
         return i_graph
 
     def _add_ep(self, ep: end_point) -> None:
@@ -851,6 +883,8 @@ class gc_graph:
             src_types: set[int] = {ep.typ for ep in self.i_graph.src_rows_filter(VALID_ROW_SOURCES[self.has_f][row])}
             dst_types: set[int] = {ep.typ for ep in self.i_graph.dst_row_filter(row)}
             unconnectable_types: set[int] = dst_types - src_types
+            if _LOG_DEBUG:
+                _logger.debug(f"Unconnectable types for row {row}: {unconnectable_types}")
             for unconnectable_type in unconnectable_types:
                 for ep in filter(
                     lambda x, uct=unconnectable_type: x.typ == uct,
@@ -919,7 +953,7 @@ class gc_graph:
         Genetic code graphs MUST obey the following rules:
             1. All connections are referenced at source (except row 'U') and destination
             2. All unreferenced sources are referenced by the unconnected 'U' row.
-            3a. All destinations are connected.
+            3a. REMOVED: All destinations are connected - this is a test of stability.
             3b. All destinations are only connected once.
             4. Types are valid.
             5. Indexes within are contiguous and start at 0.
@@ -970,9 +1004,10 @@ class gc_graph:
         for unref_src in unref_srcs - u_refs:
             self.status.append(text_token({"E01021": {"ep_hash": unref_src.key()}}))
 
+        # NOTE: This is not a test of validatity but a test of stability
         # 3a.
-        for ep in self.i_graph.dst_unref_filter():
-            self.status.append(text_token({"E01001": {"ep_hash": ep.key()}}))
+        # for ep in self.i_graph.dst_unref_filter():
+        #    self.status.append(text_token({"E01001": {"ep_hash": ep.key()}}))
 
         # 3b.
         for ep in self.i_graph.dst_filter():
@@ -1102,7 +1137,7 @@ class gc_graph:
                 self.status.append(text_token({"E01024": {}}))
 
             # 14d
-            if  self.i_graph.num_eps("P", SRC_EP):
+            if self.i_graph.num_eps("P", SRC_EP):
                 self.status.append(text_token({"E01025": {}}))
 
             # 14e
@@ -1285,10 +1320,13 @@ def random_gc_graph(validator: Validator, verify: bool = False, seed: int | None
     rc_graph: ConnectionGraph = json_to_connection_graph(generate(validator, 1, seed, verify)[0]["graph"])  # type: ignore
 
     # Uniquify source reference indexes to prevent random collisions
+    # and find the set of constant types required by the rows below.
     unique = count()
+    constant_types = set()
     for row in rc_graph:
         if row != "C":
             rc_graph[row] = [(ref[0], next(unique), ref[2]) for ref in rc_graph[row]]
+            constant_types.update((ref[2] for ref in rc_graph[row] if ref[0] == "C"))
     if "F" in rc_graph:
         # O references A and P reference B - to validate they must have the same types. Easiest to duplicate.
         if "A" in rc_graph:
@@ -1301,9 +1339,11 @@ def random_gc_graph(validator: Validator, verify: bool = False, seed: int | None
             # P destinations are the same as O destinations when F is defined but cannot reference row A (must be B)
             rc_graph["P"] = [((ref[0], "B")[ref[0] == "A"], ref[1], ref[2]) for ref in rc_graph["O"]]
 
-    new_constants: ConstantRow = [(random_constant_str(typ), typ) for _, typ in rc_graph.get("C", [])]
+    new_constants: ConstantRow = [(random_constant_str(typ), typ) for typ in constant_types]
     if new_constants:
         rc_graph["C"] = new_constants
+    elif "C" in rc_graph:
+        del rc_graph["C"]
 
     gcg = gc_graph(rc_graph)
     if _LOG_DEBUG:

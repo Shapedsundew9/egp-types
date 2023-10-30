@@ -3,38 +3,31 @@
 from copy import deepcopy
 from functools import partial
 from itertools import count
-from json import load, dump
-from logging import DEBUG, Logger, NullHandler, getLogger, INFO
-from os.path import dirname, join, exists
-from random import choice, randint, random
-from typing import Any
-from tqdm import trange
+from json import dump, load
+from logging import DEBUG, INFO, Logger, NullHandler, getLogger
+from os.path import dirname, exists, join
 from pprint import pformat
+from random import choice, randint, random, seed, sample
+from typing import Any
+
 import pytest
+from tqdm import trange
 
 from egp_types import reference, set_reference_generator
-from egp_types.egp_typing import (
-    DST_EP,
-    SRC_EP,
-    json_to_connection_graph,
-    connection_graph_to_json,
-    JSONGraph
-)
-from egp_types.ep_type import (
-    EP_TYPE_VALUES,
-    INVALID_EP_TYPE_VALUE,
-    asint
-)
+from egp_types.egp_typing import DST_EP, SRC_EP, JSONGraph, ConnectionGraph, connection_graph_to_json, json_to_connection_graph
+from egp_types.ep_type import EP_TYPE_VALUES, INVALID_EP_TYPE_VALUE, asint
 from egp_types.gc_graph import gc_graph, random_gc_graph
 from egp_types.xgc_validator import graph_validator
 
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
 _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
-getLogger('surebrec').setLevel(INFO)
+getLogger("surebrec").setLevel(INFO)
+getLogger("eGC").setLevel(INFO)
+getLogger("ep_type").setLevel(INFO)
 _TEST_RESULTS_JSON = "data/test_gc_graph_results.json"
 _RANDOM_GRAPHS_JSON = "data/random_graphs.json"
-
+NUM_TEST_CASES = 200
 
 # Reference generation for eGC's
 ref_generator = partial(reference, gpspuid=127, counter=count())
@@ -43,14 +36,19 @@ set_reference_generator(ref_generator)
 
 # Generating graphs is slow so we generate them once as needed
 if not exists(join(dirname(__file__), _RANDOM_GRAPHS_JSON)):
-    json_graphs: list[JSONGraph] = [connection_graph_to_json(random_gc_graph(graph_validator, True, i).connection_graph()) for i in trange(1000)]
-    with open(join(dirname(__file__),  _RANDOM_GRAPHS_JSON), "w", encoding="utf-8") as random_file:
+    json_graphs: list[JSONGraph] = [
+        connection_graph_to_json(random_gc_graph(graph_validator, True, i).connection_graph()) for i in trange(1000)
+    ]
+    with open(join(dirname(__file__), _RANDOM_GRAPHS_JSON), "w", encoding="utf-8") as random_file:
         dump(json_graphs, random_file, indent=4)
 
 _logger.debug("Loading random graphs (can take a while)...")
-with open(join(dirname(__file__),  _RANDOM_GRAPHS_JSON), "r", encoding="utf-8") as random_file:
-    json_graphs: list[JSONGraph] = load(random_file)
-random_graphs: list[gc_graph] = [gc_graph(json_to_connection_graph(random_graph)) for random_graph in json_graphs]
+with open(join(dirname(__file__), _RANDOM_GRAPHS_JSON), "r", encoding="utf-8") as random_file:
+    connection_graphs: list[ConnectionGraph] = [json_to_connection_graph(j_graph) for j_graph in load(random_file)]
+random_graphs: list[gc_graph] = []
+for idx, random_graph in enumerate(connection_graphs):
+    _logger.debug(f"Random graph index: {idx}")
+    random_graphs.append(gc_graph(random_graph))
 _logger.debug("Random graphs loaded.")
 
 
@@ -124,7 +122,7 @@ def test_graph_draw(i, case) -> None:
 
 
 @pytest.mark.parametrize("i, case", enumerate(results))
-def test_graph_internal(i, case) -> None:
+def test_graph_internal_simple(i, case) -> None:
     """Verification initializing with an internal representation is self consistent."""
     gcg = gc_graph(case["graph"])
     _logger.debug(f"Case {i}")
@@ -132,7 +130,7 @@ def test_graph_internal(i, case) -> None:
 
 
 @pytest.mark.parametrize("i, case", enumerate(results))
-def test_graph_conversion(i, case) -> None:
+def test_graph_conversion_simple(i, case) -> None:
     """Verification that converting to internal format and back again is the identity operation."""
     gcg = gc_graph(case["graph"])
     assert i == case["i"]
@@ -140,36 +138,52 @@ def test_graph_conversion(i, case) -> None:
         assert case["graph"] == gcg.connection_graph()
 
 
-@pytest.mark.parametrize("test", range(100))
+@pytest.mark.parametrize("i, gcg", enumerate(sample(random_graphs, NUM_TEST_CASES)))
+def test_graph_internal(i, gcg) -> None:
+    """Verification initializing with an internal representation is self consistent."""
+    _logger.debug(f"Case {i}")
+    assert gcg.connection_graph() == gc_graph(i_graph=deepcopy(gcg.i_graph)).connection_graph()
+
+
+@pytest.mark.parametrize("i, case", enumerate(sample(list(range(len(random_graphs))), NUM_TEST_CASES)))
+def test_graph_conversion(i, case) -> None:
+    """Verification that converting to internal format and back again is the identity operation."""
+    _logger.debug(f"Case {i}")
+    assert connection_graphs[case] == random_graphs[case].connection_graph()
+
+
+@pytest.mark.parametrize("test", range(NUM_TEST_CASES))
 def test_remove_connection_simple(test) -> None:
     """Verify adding connections makes valid graphs.
 
     Create a random graph remove some connections & re-normalise.
     To keep it simple all the endpoints -> None have the same type ("int").
     """
-    index: int = randint(0, len(random_graphs) - 1)
+    seed(0)
+    index: int = randint(0, len(random_graphs) - 1) if NUM_TEST_CASES != len(random_graphs) else test
     _logger.debug(f"Case {test}: Random graph index: {index}")
     graph: gc_graph = random_graphs[index]
 
     graph.random_remove_connection(int(sum(graph.rows[DST_EP].values()) / 2))
     graph.normalize()
-    passed: bool =  graph.validate()
+    passed: bool = graph.validate()
     if not passed:
-        _logger.debug(f"Initial JSON graph:\n{pformat(json_graphs[index])}")
+        _logger.debug(f"Initial JSON graph:\n{pformat(connection_graphs[index])}")
         _logger.debug(f"Initial graph:\n{random_graphs[index]}")
         _logger.debug(f"Modified graph:\n{graph}")
         assert False
     # graph.draw(join(_log_location, 'graph_' + str(test)))
 
 
-@pytest.mark.parametrize("test", range(100))
+@pytest.mark.parametrize("test", range(NUM_TEST_CASES))
 def test_add_input_simple(test) -> None:
     """Verify adding inputs makes valid graphs.
 
     Create a random graph, add an input & re-normalise.
     To keep it simple all the endpoints have the same type ("int").
     """
-    index: int = randint(0, len(random_graphs) - 1)
+    seed(1)
+    index: int = randint(0, len(random_graphs) - 1) if NUM_TEST_CASES != len(random_graphs) else test
     _logger.debug(f"Case {test}: Random graph index: {index}")
     graph: gc_graph = random_graphs[index]
 
@@ -178,23 +192,24 @@ def test_add_input_simple(test) -> None:
     graph.normalize()
     after: int = graph.rows[SRC_EP].get("I", 0)
     assert after == before + 1
-    passed: bool =  graph.validate()
+    passed: bool = graph.validate()
     if not passed:
-        _logger.debug(f"Initial JSON graph:\n{pformat(json_graphs[index])}")
+        _logger.debug(f"Initial JSON graph:\n{pformat(connection_graphs[index])}")
         _logger.debug(f"Initial graph:\n{random_graphs[index]}")
         _logger.debug(f"Modified graph:\n{graph}")
         assert False
     # graph.draw(join(_log_location, 'graph_' + str(test)))
 
 
-@pytest.mark.parametrize("test", range(100))
+@pytest.mark.parametrize("test", range(NUM_TEST_CASES))
 def test_remove_input_simple(test) -> None:
     """Verify removing inputs makes valid graphs.
 
     Create a random graph, remove an input & re-normalise.
     To keep it simple all the endpoints have the same type ("int").
     """
-    index: int = randint(0, len(random_graphs) - 1)
+    seed(2)
+    index: int = randint(0, len(random_graphs) - 1) if NUM_TEST_CASES != len(random_graphs) else test
     _logger.debug(f"Case {test}: Random graph index: {index}")
     graph: gc_graph = random_graphs[index]
 
@@ -205,9 +220,9 @@ def test_remove_input_simple(test) -> None:
 
     # E1001 & E01016 are a legit error when removing an input.
     assert after == before - 1 if before else after == before == 0
-    passed: bool =  graph.validate()
+    passed: bool = graph.validate()
     if not passed:
-        _logger.debug(f"Initial JSON graph:\n{pformat(json_graphs[index])}")
+        _logger.debug(f"Initial JSON graph:\n{pformat(connection_graphs[index])}")
         _logger.debug(f"Initial graph:\n{random_graphs[index]}")
         _logger.debug(f"Modified graph:\n{graph}")
         codes = set([t.code for t in graph.status])
@@ -217,14 +232,15 @@ def test_remove_input_simple(test) -> None:
     # graph.draw(join(_log_location, 'graph_' + str(test)))
 
 
-@pytest.mark.parametrize("test", range(100))
+@pytest.mark.parametrize("test", range(NUM_TEST_CASES))
 def test_add_output_simple(test) -> None:
     """Verify adding outputs makes valid graphs.
 
     Create a random graph, add an output & re-normalise.
     To keep it simple all the endpoints have the same type ("int").
     """
-    index: int = randint(0, len(random_graphs) - 1)
+    seed(3)
+    index: int = randint(0, len(random_graphs) - 1) if NUM_TEST_CASES != len(random_graphs) else test
     _logger.debug(f"Case {test}: Random graph index: {index}")
     graph: gc_graph = random_graphs[index]
 
@@ -232,24 +248,24 @@ def test_add_output_simple(test) -> None:
     graph.add_output()
     graph.normalize()
     after: int = graph.rows[DST_EP].get("O", 0)
-    assert after == before + 1
-    passed: bool =  graph.validate()
+    passed: bool = graph.validate() and after == before + 1
     if not passed:
-        _logger.debug(f"Initial JSON graph:\n{pformat(json_graphs[index])}")
+        _logger.debug(f"Initial JSON graph:\n{pformat(connection_graphs[index])}")
         _logger.debug(f"Initial graph:\n{random_graphs[index]}")
         _logger.debug(f"Modified graph:\n{graph}")
         assert False
     # graph.draw(join(_log_location, 'graph_' + str(test)))
 
 
-@pytest.mark.parametrize("test", range(100))
+@pytest.mark.parametrize("test", range(NUM_TEST_CASES))
 def test_remove_output_simple(test) -> None:
     """Verify removing outputs makes valid graphs.
 
     Create a random graph, remove an output & re-normalise.
     To keep it simple all the endpoints have the same type ("int").
     """
-    index: int = randint(0, len(random_graphs) - 1)
+    seed(4)
+    index: int = randint(0, len(random_graphs) - 1) if NUM_TEST_CASES != len(random_graphs) else test
     _logger.debug(f"Case {test}: Random graph index: {index}")
     graph: gc_graph = random_graphs[index]
 
@@ -259,9 +275,9 @@ def test_remove_output_simple(test) -> None:
     after: int = graph.rows[DST_EP].get("O", 0)
 
     # E1000 is a legit error when removing an output (no row O).
-    passed: bool =  graph.validate()
+    passed: bool = graph.validate() and after == before - 1 if before else after == before == 0
     if not passed:
-        _logger.debug(f"Initial JSON graph:\n{pformat(json_graphs[index])}")
+        _logger.debug(f"Initial JSON graph:\n{pformat(connection_graphs[index])}")
         _logger.debug(f"Initial graph:\n{random_graphs[index]}")
         _logger.debug(f"Modified graph:\n{graph}")
         codes = set([t.code for t in graph.status])
@@ -272,14 +288,15 @@ def test_remove_output_simple(test) -> None:
     # graph.draw(join(_log_location, 'graph_' + str(test)))
 
 
-@pytest.mark.parametrize("test", range(100))
+@pytest.mark.parametrize("test", range(NUM_TEST_CASES))
 def test_remove_constant_simple(test) -> None:
     """Verify removing contants makes valid graphs.
 
     Create a random graph, remove a constant & re-normalise.
     To keep it simple all the endpoints have the same type ("int").
     """
-    index: int = randint(0, len(random_graphs) - 1)
+    seed(5)
+    index: int = randint(0, len(random_graphs) - 1) if NUM_TEST_CASES != len(random_graphs) else test
     _logger.debug(f"Case {test}: Random graph index: {index}")
     graph: gc_graph = random_graphs[index]
 
@@ -297,14 +314,15 @@ def test_remove_constant_simple(test) -> None:
     # graph.draw(join(_log_location, 'graph_' + str(test)))
 
 
-@pytest.mark.parametrize("test", range(100))
+@pytest.mark.parametrize("test", range(NUM_TEST_CASES))
 def test_binary_compound_modifications(test) -> None:
     """Verify compounding modifications still makes valid graphs.
 
     Create a random graph, do 2 random modifications & re-normalise.
     To keep it simple all the endpoints have the same type ("int").
     """
-    index: int = randint(0, len(random_graphs) - 1)
+    seed(6)
+    index: int = randint(0, len(random_graphs) - 1) if NUM_TEST_CASES != len(random_graphs) else test
     _logger.debug(f"Case {test}: Random graph index: {index}")
     graph: gc_graph = random_graphs[index]
 
@@ -334,14 +352,15 @@ def test_binary_compound_modifications(test) -> None:
         assert not codes
 
 
-@pytest.mark.parametrize("test", range(100))
+@pytest.mark.parametrize("test", range(NUM_TEST_CASES))
 def test_nary_compound_modifications(test) -> None:
     """Verify compounding modifications still makes valid graphs.
 
     Create a random graph, do 3 to 20 random modifications & re-normalise.
     To keep it simple all the endpoints have the same type ("int").
     """
-    index: int = randint(0, len(random_graphs) - 1)
+    seed(7)
+    index: int = randint(0, len(random_graphs) - 1) if NUM_TEST_CASES != len(random_graphs) else test
     _logger.debug(f"Case {test}: Random graph index: {index}")
     graph: gc_graph = random_graphs[index]
 

@@ -1,0 +1,184 @@
+{
+    "internal_graph": {
+        "type": "dict",
+        "oneof": [
+            {
+                "keysrules": {
+                    "type": "string",
+                    "regex": "I[0-9]{3}s"
+                },
+                "valuesrules": {
+                    "type": "list",
+                    "oneof": [
+                        {
+                            "items": [
+                                {
+                                    "type": "string",
+                                    "allowed": ["I"]
+                                },
+                                {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 255
+                                },
+                                {
+                                    "type": "integer",
+                                    "oneof": [
+                                        {
+                                            "minimum": 2,
+                                            "maximum": 32767
+                                        },
+                                        {
+                                            "minimum": -32768,
+                                            "maximum": 0
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "boolean",
+                                    "allowed": [true]
+                                },
+                                {
+                                    "type": "string",
+                                    "allowed": ["None"]
+                                },
+                                {
+                                    "type": "list",
+                                    "minlength": 0,
+                                    "maxlength": 255,
+                                    "schema": {
+                                        "type": "list",
+                                        "items": [
+                                            {
+                                                "type": "string",
+                                                "allowed": ["A", "B", "O", "P", "U"]
+                                            },
+                                            {
+                                                "type": "integer",
+                                                "minimum": 0,
+                                                "maximum": 255
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "items": [
+                                {
+                                    "type": "string",
+                                    "allowed": ["I"]
+                                },
+                                {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 255
+                                },
+                                {
+                                    "type": "integer",
+                                    "allowed": [1]
+                                },
+                                {
+                                    "type": "boolean",
+                                    "allowed": [true]
+                                },
+                                {
+                                    "type": "string",
+                                    "allowed": ["None"]
+                                },
+                                {
+                                    "type": "list",
+                                    "minlength": 0,
+                                    "maxlength": 255,
+                                    "schema": {
+                                        "type": "list",
+                                        "oneof": [
+                                            {
+                                                "items": [
+                                                    {
+                                                        "type": "string",
+                                                        "allowed": ["A", "B", "O", "P", "U"]
+                                                    },
+                                                    {
+                                                        "type": "integer",
+                                                        "minimum": 0,
+                                                        "maximum": 255
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "items": [
+                                                    {
+                                                        "type": "string",
+                                                        "allowed": ["F"]
+                                                    },
+                                                    {
+                                                        "type": "integer",
+                                                        "allowed": [0]
+                                                    }
+                                                ]
+                                            }
+
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            {
+                "keysrules": {
+                    "type": "string",
+                    "regex": "C[0-9]{3}s"
+                },
+                "valuesrules": {
+                    "type": "list",
+                    "items": [
+                        {
+                            "type": "string",
+                            "allowed": ["C"]
+                        },
+                        {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                        },
+                        {
+                            "type": "integer",
+                            "minimum": -32768,
+                            "maximum": 32767
+                        },
+                        {
+                            "type": "boolean",
+                            "allowed": [true]
+                        },
+                        {
+                            "type": "string",
+                            "regex": "[a-zA-Z][a-zA-Z0-9_]{1,64}"
+                        },
+                        {
+                            "type": "list",
+                            "minlength": 0,
+                            "maxlength": 255,
+                            "schema": {
+                                "type": "list",
+                                "items": [
+                                    {
+                                        "type": "string",
+                                        "allowed": ["A", "B", "O", "P", "U"]
+                                    },
+                                    {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 255
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+}

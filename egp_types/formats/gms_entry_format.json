@@ -181,12 +181,7 @@
     "graph": {
         "check_with": "valid_graph",
         "meta": {
-            "description": "Defines the sub-codes of the genetic code and how they are connected together.",
-            "schema_descriptions": [
-                "Memory modifiying eGC with no inputs or outputs.",
-                "Memory modifying codon or eGC with no inputs or outputs.",
-                "Memory modifying eGC with inputs."
-            ]
+            "description": "Defines the sub-codes of the genetic code and how they are connected together."
         },
         "required": true,
         "allow_unknown": false,
@@ -216,7 +211,6 @@
                 },
                 "B": {
                     "required": false,
-                    "dependencies": "A",
                     "schema": {
                         "items": [
                             {
@@ -330,14 +324,12 @@
                 },
                 "B": {
                     "required": false,
-                    "dependencies": "A",
                     "schema": {
                         "items": [
                             {
                                 "allowed": [
                                     "I",
-                                    "C",
-                                    "A"
+                                    "C"
                                 ],
                                 "type": "string"
                             },
@@ -590,8 +582,7 @@
                                 "allowed": [
                                     "I",
                                     "C",
-                                    "A",
-                                    "B"
+                                    "A"
                                 ],
                                 "type": "string"
                             },

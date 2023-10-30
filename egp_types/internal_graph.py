@@ -8,7 +8,6 @@ from .egp_typing import (
     DestinationRow,
     EndPointClass,
     EndPointHash,
-    EndPointType,
     Row,
     SourceRow,
     DST_EP,
@@ -34,6 +33,10 @@ class internal_graph(EndPointDict):
     """Convinient structure for GC graph manipulation."""
 
     # TODO: Be clear on rules regarding which method modify the structure
+
+    def json_obj(self) -> dict[str, list[str | int | bool | list[list[str | int]]]]:
+        """Return a json serializable object."""
+        return {ep.key(): ep.json_obj() for ep in self.values()}
 
     def next_idx(self, row: Row, cls: EndPointClass) -> int:
         """Return the next endpoint index for the class in the row."""

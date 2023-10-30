@@ -28,6 +28,10 @@ class generic_end_point:
     row: Row
     idx: EndPointIndex
 
+    def json_obj(self) -> list[str | int]:
+        """Return a json serializable object."""
+        return [self.row, self.idx]
+
     def key_base(self) -> str:
         """Base end point hash."""
         return f"{self.row}{self.idx:03d}"
@@ -105,6 +109,10 @@ class end_point(generic_end_point):
         valid_ref_rows: tuple[Row, ...] = VALID_ROW_SOURCES[has_f][row] if ep.cls == DST_EP else VALID_ROW_DESTINATIONS[has_f][row]
         for vidx in reversed([idx for idx, ref in enumerate(ep.refs) if ref.row not in valid_ref_rows]):
             del ep.refs[vidx]
+
+    def json_obj(self) -> list[str | int | list[list[str | int]]]:
+        """Return a json serializable object."""
+        return [self.row, self.idx, self.typ, self.cls, str(self.val), [ref.json_obj() for ref in self.refs]]
 
     def key(self) -> EndPointHash:
         """Create a unique key to use in the internal graph."""
