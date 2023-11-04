@@ -15,9 +15,10 @@ from tqdm import trange
 
 from egp_types import reference, set_reference_generator
 from egp_types.egp_typing import DST_EP, SRC_EP, JSONGraph, ConnectionGraph, connection_graph_to_json, json_to_connection_graph
-from egp_types.ep_type import EP_TYPE_VALUES, INVALID_EP_TYPE_VALUE, asint
+from egp_types.ep_type import EP_TYPE_VALUES, INVALID_EP_TYPE_VALUE, asint, ep_type_lookup
 from egp_types.gc_graph import gc_graph, random_gc_graph
-from egp_types.xgc_validator import graph_validator
+from egp_types.graph_validators import graph_validator
+
 
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
@@ -92,6 +93,14 @@ def random_type(probability: float = 0.0) -> int:
         if value != INVALID_EP_TYPE_VALUE:
             return value
     return asint("builtins_int")
+
+
+def test_ep_type_int_of_bool() -> None:
+    """These tests assume bool is EP type 1.
+    
+    If that is not the case correct the test_gc_graph_results.json file 'F' rows
+    """
+    assert ep_type_lookup["n2v"]["bool"] == 1
 
 
 @pytest.mark.parametrize("i, case", enumerate(results))

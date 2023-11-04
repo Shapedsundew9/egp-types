@@ -110,9 +110,9 @@ class end_point(generic_end_point):
         for vidx in reversed([idx for idx, ref in enumerate(ep.refs) if ref.row not in valid_ref_rows]):
             del ep.refs[vidx]
 
-    def json_obj(self) -> list[str | int | list[list[str | int]]]:
+    def json_obj(self) -> list[str | int | bool | list[list[str | int]]]:
         """Return a json serializable object."""
-        return [self.row, self.idx, self.typ, self.cls, str(self.val), [ref.json_obj() for ref in self.refs]]
+        return [self.row, self.idx, self.typ, self.cls, [ref.json_obj() for ref in self.refs], str(self.val)]
 
     def key(self) -> EndPointHash:
         """Create a unique key to use in the internal graph."""

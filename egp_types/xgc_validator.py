@@ -8,36 +8,12 @@ from typing import Any, cast
 
 from egp_utils.base_validator import base_validator
 from egp_utils.common import merge
-from cerberus import rules_set_registry
 
 from .conversions import encode_properties, decode_properties
-from .ep_type import validate, MIN_EP_TYPE_VALUE, MAX_EP_TYPE_VALUE
+from .ep_type import validate
 from .gc_graph import gc_graph
 from .gc_type_tools import PROPERTIES, define_signature, PHYSICAL_PROPERTY
 
-# End point type values are used in may places. Making a rule
-# helps keep things consistent.
-rules_set_registry.extend(
-    (
-        (
-            "ep_type",
-            {
-                "type": "integer",
-                "min": MIN_EP_TYPE_VALUE,
-                "max": MAX_EP_TYPE_VALUE,
-                "check_with": "valid_ep_type",
-            },
-        ),
-        (
-            "ep_idx",
-            {
-                "type": "integer",
-                "min": 0,
-                "max": 255,
-            },
-        ),
-    )
-)
 
 # Storage types schemas
 # NOTE: Cerberus can modfiy a schmea (specifically I noticed "oneof_schema" --> "one_of") so
@@ -81,12 +57,6 @@ _GGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GGC_ENTRY_SCHEMA)
 # XGC_ENTRY_SCHEMA is the superset schema from which transient xGC's can be validated
 XGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GGC_ENTRY_SCHEMA)
 merge(XGC_ENTRY_SCHEMA, LGC_ENTRY_SCHEMA, update=True)
-_XGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(XGC_ENTRY_SCHEMA)
-
-# Pull the graph schema out of the GMS schema to create a standalone validator.
-GRAPH_SCHEMA: dict[str, dict[str, Any]] = {"graph": deepcopy(GMS_ENTRY_SCHEMA["graph"])}
-del GRAPH_SCHEMA["graph"]["check_with"]
-_GRAPH_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GRAPH_SCHEMA)
 
 
 class _gms_entry_validator(base_validator):
@@ -518,21 +488,11 @@ class _gGC_entry_validator(_gms_entry_validator):
             self._error(field, "A GC cannot have been created by itself (pgc_ref == ref).")
 
 
-class _graph_validator(base_validator):
-    # TODO: Make errors ValidationError types for full disclosure
-    # https://docs.python-cerberus.org/en/stable/customize.html#validator-error
-
-    def _check_with_valid_ep_type(self, field: str, value: Any) -> None:
-        if not validate(value):
-            self._error(field, f"ep_type {value} does not exist.")
-
-
 gms_entry_validator: _gms_entry_validator = _gms_entry_validator(_GMS_ENTRY_SCHEMA)
 LGC_entry_validator: _LGC_entry_validator = _LGC_entry_validator(_LGC_ENTRY_SCHEMA)
 LGC_json_load_entry_validator: _LGC_json_load_entry_validator = _LGC_json_load_entry_validator(_LGC_JSON_LOAD_ENTRY_SCHEMA)
 LGC_json_dump_entry_validator: _LGC_json_dump_entry_validator = _LGC_json_dump_entry_validator(_LGC_JSON_DUMP_ENTRY_SCHEMA)
 gGC_entry_validator: _gGC_entry_validator = _gGC_entry_validator(_GGC_ENTRY_SCHEMA, purge_unknown=True)
-graph_validator: _graph_validator = _graph_validator(_GRAPH_SCHEMA)
 
 
 class xgc_validator_generator(_gGC_entry_validator, _LGC_entry_validator):

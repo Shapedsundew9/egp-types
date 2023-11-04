@@ -3,7 +3,12 @@
 from typing import Generator, Iterable, Literal
 from itertools import count
 from copy import deepcopy
+from logging import DEBUG, Logger, NullHandler, getLogger
+from pprint import pformat
+from egp_utils.base_validator import base_validator
+from surebrec.surebrec import generate
 
+from .graph_validators import igraph_validator
 from .egp_typing import (
     DestinationRow,
     EndPointClass,
@@ -23,6 +28,12 @@ from .end_point import (
 )
 
 
+# Logging
+_logger: Logger = getLogger(__name__)
+_logger.addHandler(NullHandler())
+_LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
+
+
 # Compound types
 EndPointDict = dict[EndPointHash, end_point]
 SrcEndPointDict = dict[SrcEndPointHash, src_end_point]
@@ -33,7 +44,6 @@ class internal_graph(EndPointDict):
     """Convinient structure for GC graph manipulation."""
 
     # TODO: Be clear on rules regarding which method modify the structure
-
     def json_obj(self) -> dict[str, list[str | int | bool | list[list[str | int]]]]:
         """Return a json serializable object."""
         return {ep.key(): ep.json_obj() for ep in self.values()}
@@ -160,3 +170,70 @@ class internal_graph(EndPointDict):
         """An incomplete reference is when a destination references a source but the source does not reference the destination."""
         for dst_ep in self.dst_ref_filter():
             self[dst_ep.refs[0].key()].safe_add_ref(dst_ep.as_ref())
+
+    def remove_all_refs(self) -> None:
+        """Remove all references from all endpoints."""
+        for ep in self.values():
+            ep.refs.clear()
+
+    def remove_row(self, row: Row) -> None:
+        """Remove all endpoints in row."""
+        for key in tuple(self.keys()):
+            if self[key].row == row:
+                del self[key]
+
+    def reindex(self) -> None:
+        """Reindex all endpoints."""
+        counts: dict[str, int] = {}
+        for k, ep in deepcopy(self).items():
+            key: str = ep.row + ("d", "s")[ep.cls]
+            ep.idx = counts.setdefault(key, 0)
+            counts[key] += 1
+            del self[k]
+            self[ep.key()] = ep
+
+    def has_row(self, row: Row) -> bool:
+        """Return True if the internal graph has the row."""
+        return any(ep.row == row for ep in self.values())
+
+    def validate(self) -> bool:
+        """Validate the internal graph. This function is not built for speed."""
+        validation_structure: dict[str, dict[str, dict[str, list[str | int | bool | list[list[str | int]]]]]] = {
+            'internal_graph': {k: {k: v} for k, v in self.json_obj().items()}}
+        valid: bool =  igraph_validator.validate(validation_structure) and all(k == v.key() for k, v in self.items())
+        if not valid and _LOG_DEBUG:
+            _logger.debug(f"Validation JSON:\n{pformat(validation_structure, 4)}")
+            _logger.debug(f"Internal graph:\n{pformat(self, 4)}")
+            _logger.debug(f"Internal graph validation failed:\n{igraph_validator.error_str()}")
+        return valid
+
+
+def random_internal_graph(validator: base_validator, verify: bool = False, seed: int | None = None) -> internal_graph:
+    """Create a random internal graph using the validator as a rules set.
+
+    The validator must be a subset of the rules defined for a valid internal_graph.
+    """
+    json_igraph: list[end_point] = [
+        end_point(*next(iter(v.values()))) for v in generate(validator, 1, seed, verify)[0]["internal_graph"].values()]
+    igraph: internal_graph = internal_graph({ep.key(): ep for ep in json_igraph})
+    _logger.debug(f"Random internal graph:\n{pformat(igraph, 4)}")
+    igraph.remove_all_refs()
+
+    # Only corner is if there is a row F or P
+    if igraph.has_row("F"):
+        if igraph.has_row("O"):
+            igraph.remove_row("P")
+            igraph.update(igraph.move_row("O", "P", True))
+        elif igraph.has_row("P"):
+            igraph.remove_row("O")
+            igraph.update(igraph.move_row("P", "O", True))
+    else:
+        igraph.remove_row("P")
+
+    # Make sure all the indices are correct
+    igraph.reindex()
+
+    # Validate the internal graph
+    if not igraph.validate():
+        raise ValueError(f"Invalid random internal graph:\n{pformat(igraph, 4)}")
+    return igraph

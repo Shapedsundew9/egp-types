@@ -16,7 +16,6 @@ from typing import Any, Iterable, Literal, LiteralString, Sequence
 from string import ascii_letters
 
 import gi
-from cerberus import Validator
 from surebrec.surebrec import generate
 
 # Needed to prevent something pulling in GtK 4.0 and graph_tool complaining.
@@ -47,6 +46,7 @@ from networkx import get_node_attributes  # type: ignore
 from networkx import DiGraph, spring_layout  # type: ignore
 from text_token import register_token_code, text_token
 
+from egp_utils.base_validator import base_validator
 from .egp_typing import (
     CPI,
     CVI,
@@ -69,7 +69,6 @@ from .egp_typing import (
     SourceRow,
     SrcEndPointHash,
     isConnectionPair,
-    isConstantPair,
     json_to_connection_graph,
     vertex,
 )
@@ -261,6 +260,10 @@ register_token_code(
     "E01027",
     'Row "U" cannot have any sources.',
 )
+register_token_code(
+    "E01028",
+    'Internal graph failed validation.',
+)
 
 register_token_code("I01000", '"I" row endpoint appended of UNKNOWN_EP_TYPE_VALUE.')
 register_token_code("I01001", '"I" row endpoint removed.')
@@ -290,12 +293,6 @@ class gc_graph:
         "rows",
         "app_graph",
         "status",
-        "has_i",
-        "has_c",
-        "has_f",
-        "has_a",
-        "has_b",
-        "has_o",
     )
     i_graph: internal_graph
     rows: GCGraphRows
@@ -313,14 +310,6 @@ class gc_graph:
             dict(Counter([ep.row for ep in self.i_graph.dst_filter()])),
             dict(Counter([ep.row for ep in self.i_graph.src_filter()])),
         )
-
-        # TODO: Get rid of these and just introspect rows.
-        self.has_i: bool = "I" in self.rows[SRC_EP]
-        self.has_c: bool = "C" in self.rows[SRC_EP]
-        self.has_f: bool = "F" in self.rows[DST_EP]
-        self.has_a: bool = "A" in self.rows[DST_EP] or "A" in self.rows[SRC_EP]
-        self.has_b: bool = "B" in self.rows[DST_EP] or "B" in self.rows[SRC_EP]
-        self.has_o: bool = "O" in self.rows[DST_EP]
 
     def __repr__(self) -> str:
         """Print the graph in row order sources then destinations in index order."""
@@ -375,19 +364,6 @@ class gc_graph:
         row_counts: dict[Row, int] = self.rows[ep.cls]
         if ep.row not in self.rows[ep.cls]:
             row_counts[ep.row] = 0
-            match ep.row:
-                case "I":
-                    self.has_i = True
-                case "C":
-                    self.has_c = True
-                case "F":
-                    self.has_f = True
-                case "A":
-                    self.has_a = True
-                case "B":
-                    self.has_b = True
-                case "O":
-                    self.has_o = True
         ep.idx = row_counts[ep.row]
         self.i_graph[ep.key()] = ep
         row_counts[ep.row] += 1
@@ -407,19 +383,10 @@ class gc_graph:
             self.rows[ep.cls][ep.row] -= 1
             if not self.rows[ep.cls][ep.row] and not self.rows[not ep.cls].get(ep.row, 0):
                 del self.rows[ep.cls][ep.row]
-            match ep.row:
-                case "I":
-                    self.has_i = False
-                case "C":
-                    self.has_c = False
-                case "F":
-                    self.has_f = False
-                case "A":
-                    self.has_a = False
-                case "B":
-                    self.has_b = False
-                case "O":
-                    self.has_o = False
+
+    def has_row(self, row: Row) -> bool:
+        """Return True if the row exists in the graph."""
+        return row in self.rows[SRC_EP] or row in self.rows[DST_EP]
 
     def connection_graph(self) -> ConnectionGraph:
         """Convert graph to GMS graph (Connection Graph) format."""
@@ -718,7 +685,7 @@ class gc_graph:
             nep_type = ep_type
         o_index: int = self.rows[DST_EP].get("O", 0)
         self._add_ep(dst_end_point("O", o_index, nep_type))
-        if self.has_f:
+        if self.has_row("F"):
             self._add_ep(dst_end_point("P", o_index, nep_type))
 
     def remove_output(self, idx: int | None = None) -> None:
@@ -742,7 +709,7 @@ class gc_graph:
                 self.i_graph[ref.key()].refs.remove(ep_ref)
 
             # If F exists then must deal with P
-            if self.has_f:
+            if self.has_row("F"):
                 ep_ref: dst_end_point_ref = dst_end_point_ref("P", nidx)
                 if _LOG_DEBUG:
                     _logger.debug(f"Removing output {ep_ref}.")
@@ -754,7 +721,7 @@ class gc_graph:
             # Only re-index row O if it was not the last endpoint that was removed (optimisation)
             if idx != num_outputs - 1:
                 self.reindex_row("O")
-                if self.has_f:
+                if self.has_row("F"):
                     self.reindex_row("P")
 
     def remove_constant(self, idx=None) -> None:
@@ -880,7 +847,7 @@ class gc_graph:
         This is not a useful function in normal operation.
         """
         for row in deepcopy(self.rows[DST_EP]):  # self.rows may be modified during iteration
-            src_types: set[int] = {ep.typ for ep in self.i_graph.src_rows_filter(VALID_ROW_SOURCES[self.has_f][row])}
+            src_types: set[int] = {ep.typ for ep in self.i_graph.src_rows_filter(VALID_ROW_SOURCES[self.has_row("F")][row])}
             dst_types: set[int] = {ep.typ for ep in self.i_graph.dst_row_filter(row)}
             unconnectable_types: set[int] = dst_types - src_types
             if _LOG_DEBUG:
@@ -944,7 +911,7 @@ class gc_graph:
         # TODO: next() in try?
         return not tuple(self.i_graph.dst_unref_filter())
 
-    def validate(self) -> bool:  # noqa: C901
+    def validate(self, validate_igraph: bool = False) -> bool:  # noqa: C901
         """Check if the graph is valid.
 
         The graph should be in a steady state before calling.
@@ -974,13 +941,17 @@ class gc_graph:
                 c. Row 'F' must have 1 destination
                 d. Row 'F' must have no source endpoints
                 e. Row 'F' must have 1 bool destination
+                f. Row 'B' cannot connect to row 'A'
+                g. Row 'P' cannot connect to row 'A'
+                h. Row 'O' cannot connect to row 'B'
             15. If row 'U' exists:
                 a. Row 'U' must have at least 1 destination endpoint
                 b. Row 'U' must have no source endpoints
+            16. Internal graph validates
 
         Args
         ----
-        Set to True if the graph is for a codon genetic code.
+        validate_igraph: Validating the igraph is slow. Set to True to so so.
 
         Returns
         -------
@@ -1053,7 +1024,7 @@ class gc_graph:
             )
 
         # 7
-        if "P" in self.rows[DST_EP] and not self.has_f:
+        if "P" in self.rows[DST_EP] and not self.has_row("F"):
             self.status.append(text_token({"E01006": {}}))
 
         # 8
@@ -1109,16 +1080,16 @@ class gc_graph:
         # 13a
         for ep in self.i_graph.dst_filter():
             for ref in ep.refs:
-                if ref.row not in VALID_ROW_SOURCES[self.has_f].get(ep.row, tuple()):
+                if ref.row not in VALID_ROW_SOURCES[self.has_row("F")].get(ep.row, tuple()):
                     self.status.append(text_token({"E01010": {"ref1": ep.key(), "ref2": ref.key()}}))
 
         # 13b
         for ep in self.i_graph.src_filter():
             for ref in ep.refs:
-                if ref.row not in VALID_ROW_DESTINATIONS[self.has_f][ep.row]:
+                if ref.row not in VALID_ROW_DESTINATIONS[self.has_row("F")][ep.row]:
                     self.status.append(text_token({"E01017": {"ref1": ep.key(), "ref2": ref.key()}}))
 
-        if self.has_f:
+        if self.has_row("F"):
             # 14a
             len_p: int = self.i_graph.num_eps("P", DST_EP)
             len_o: int = self.i_graph.num_eps("O", DST_EP)
@@ -1148,6 +1119,10 @@ class gc_graph:
         if self.i_graph.num_eps("U", SRC_EP):
             self.status.append(text_token({"E01027": {}}))
 
+        # 16
+        if validate_igraph and not self.i_graph.validate():
+            self.status.append(text_token({"E01028": {}}))
+
         if _LOG_DEBUG:
             if self.status:
                 _logger.debug(f"Graph internal format:\n{self}")
@@ -1155,11 +1130,6 @@ class gc_graph:
                     _logger.debug(str(status))
 
         return not self.status
-
-    def remove_all_connections(self) -> None:
-        """Remove all connections."""
-        for ep in self.i_graph.values():
-            ep.refs.clear()
 
     def random_remove_connection(self, num: int = 1) -> None:
         """Randomly choose n connections and remove them.
@@ -1245,7 +1215,7 @@ class gc_graph:
             _logger.debug(f"The destination endpoint requiring a connection: {dst_ep}")
 
         filter_func = self.i_graph.src_unref_filter if unreferenced else self.i_graph.src_filter
-        eligible_rows = tuple(row for row in VALID_ROW_SOURCES[self.has_f][dst_ep.row] if row in allowed_rows)
+        eligible_rows = tuple(row for row in VALID_ROW_SOURCES[self.has_row("F")][dst_ep.row] if row in allowed_rows)
         src_eps = tuple(src_ep for src_ep in filter_func() if src_ep.row in eligible_rows and compatible(src_ep.typ, dst_ep.typ))
         if src_eps:
             src_ep: src_end_point = choice(src_eps)
@@ -1296,7 +1266,7 @@ class gc_graph:
 
     def viable_dst_types(self, row: DestinationRow) -> set[int]:
         """Create a tuple of viable destination end point types for row."""
-        return {ep.typ for ep in self.i_graph.src_rows_filter(VALID_ROW_SOURCES[self.has_f][row])}
+        return {ep.typ for ep in self.i_graph.src_rows_filter(VALID_ROW_SOURCES[self.has_row("F")][row])}
 
 
 def random_constant_str(typ: EndPointType) -> str:
@@ -1312,7 +1282,7 @@ def random_constant_str(typ: EndPointType) -> str:
     return ep_type_lookup["instanciation"][typ][inst.DEFAULT.value]
 
 
-def random_gc_graph(validator: Validator, verify: bool = False, seed: int | None = None) -> gc_graph:
+def random_gc_graph(validator: base_validator, verify: bool = False, seed: int | None = None) -> gc_graph:
     """Create a random GC graph using the validator as a rules set.
 
     The validator must be a subset of the rules defined for a valid gc_graph.
@@ -1349,10 +1319,11 @@ def random_gc_graph(validator: Validator, verify: bool = False, seed: int | None
     if _LOG_DEBUG:
         _logger.debug(f"Pre-normalized randomly generated internal graph:\n{gcg}")
 
-    gcg.remove_all_connections()
+    gcg.i_graph.remove_all_refs()
     gcg.purge_unconnectable_types()
     gcg.reindex()
     gcg.normalize()
     if verify:
-        assert gcg.validate(), gcg.status
+        _logger.debug(f"Post-normalized randomly generated internal graph:\n{gcg}")
+        assert gcg.validate(True), gcg.status
     return gcg
