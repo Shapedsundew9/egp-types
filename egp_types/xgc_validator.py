@@ -5,6 +5,7 @@ from datetime import datetime
 from json import load
 from os.path import dirname, join
 from typing import Any, cast
+from logging import DEBUG, Logger, NullHandler, getLogger
 
 from egp_utils.base_validator import base_validator
 from egp_utils.common import merge
@@ -13,6 +14,13 @@ from .conversions import encode_properties, decode_properties
 from .ep_type import validate
 from .gc_graph import gc_graph
 from .gc_type_tools import PROPERTIES, define_signature, PHYSICAL_PROPERTY
+from .graph_validators import GRAPH_REGISTRY
+
+
+# Logging
+_logger: Logger = getLogger(__name__)
+_logger.addHandler(NullHandler())
+_LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
 
 # Storage types schemas
@@ -288,7 +296,9 @@ class _gms_entry_validator(base_validator):
     def _normalize_default_setter_set_input_types(self, document) -> list[int]:
         # Gather all the input endpoint types. Reduce in a set then order the list.
         inputs: list[int] = []
-        for row in document["graph"].values():
+        # Row C only has 2 values in the ep list and does not reference any row let alone I
+        # However row could randomly have a string "I" in it so we need to explicitly exclude it.
+        for _, row in filter(lambda x: x[0] != "C", document["graph"].items()):
             inputs.extend([ep[2] for ep in filter(lambda x: x[0] == "I", row)])
         return sorted(set(inputs))
 
@@ -299,7 +309,9 @@ class _gms_entry_validator(base_validator):
     def _normalize_default_setter_set_input_indices(self, document) -> bytes:
         # Get the type list then find all the inputs in order & look them up.
         type_list: list[int] = self._normalize_default_setter_set_input_types(document)
-        inputs: set[tuple[str | int, ...]] = {tuple(ep) for row in document["graph"].values() for ep in filter(lambda x: x[0] == "I", row)}
+        # Row C only has 2 values in the ep list and does not reference any row let alone I
+        # However row could randomly have a string "I" in it so we need to explicitly exclude it.
+        inputs: set[tuple[str | int, ...]] = {tuple(ep) for _, row in filter(lambda x: x[0] != "C", document["graph"].items()) for ep in filter(lambda x: x[0] == "I", row)}
         return bytes((type_list.index(cast(int, ep[2])) for ep in sorted(inputs, key=lambda x: x[1])))
 
     def _normalize_default_setter_set_output_indices(self, document) -> bytes:
@@ -488,11 +500,23 @@ class _gGC_entry_validator(_gms_entry_validator):
             self._error(field, "A GC cannot have been created by itself (pgc_ref == ref).")
 
 
-gms_entry_validator: _gms_entry_validator = _gms_entry_validator(_GMS_ENTRY_SCHEMA)
-LGC_entry_validator: _LGC_entry_validator = _LGC_entry_validator(_LGC_ENTRY_SCHEMA)
-LGC_json_load_entry_validator: _LGC_json_load_entry_validator = _LGC_json_load_entry_validator(_LGC_JSON_LOAD_ENTRY_SCHEMA)
-LGC_json_dump_entry_validator: _LGC_json_dump_entry_validator = _LGC_json_dump_entry_validator(_LGC_JSON_DUMP_ENTRY_SCHEMA)
-gGC_entry_validator: _gGC_entry_validator = _gGC_entry_validator(_GGC_ENTRY_SCHEMA, purge_unknown=True)
+gms_entry_validator: _gms_entry_validator = _gms_entry_validator()
+LGC_entry_validator: _LGC_entry_validator = _LGC_entry_validator()
+LGC_json_load_entry_validator: _LGC_json_load_entry_validator = _LGC_json_load_entry_validator()
+LGC_json_dump_entry_validator: _LGC_json_dump_entry_validator = _LGC_json_dump_entry_validator()
+gGC_entry_validator: _gGC_entry_validator = _gGC_entry_validator(purge_unknown=True)
+
+gms_entry_validator.rules_set_registry = GRAPH_REGISTRY
+LGC_entry_validator.rules_set_registry = GRAPH_REGISTRY
+LGC_json_load_entry_validator.rules_set_registry = GRAPH_REGISTRY
+LGC_json_dump_entry_validator.rules_set_registry = GRAPH_REGISTRY
+gGC_entry_validator.rules_set_registry = GRAPH_REGISTRY
+
+gms_entry_validator.schema = GMS_ENTRY_SCHEMA
+LGC_entry_validator.schema = _LGC_ENTRY_SCHEMA
+LGC_json_load_entry_validator.schema = _LGC_JSON_LOAD_ENTRY_SCHEMA
+LGC_json_dump_entry_validator.schema = _LGC_JSON_DUMP_ENTRY_SCHEMA
+gGC_entry_validator.schema = _GGC_ENTRY_SCHEMA
 
 
 class xgc_validator_generator(_gGC_entry_validator, _LGC_entry_validator):

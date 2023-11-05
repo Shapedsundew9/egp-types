@@ -1,9 +1,17 @@
 """Test cases for the internal graph module."""
+from functools import partial
+from itertools import count
 from json import dump, load
 from logging import DEBUG, INFO, Logger, NullHandler, getLogger
 from os.path import dirname, exists, join
+
+import pytest
 from tqdm import trange
 
+from egp_types.reference import reference
+from egp_types.eGC import set_reference_generator
+from egp_types.end_point import dst_end_point, src_end_point
+from egp_types.gc_graph import gc_graph
 from egp_types.graph_validators import limited_igraph_validator as liv
 from egp_types.internal_graph import internal_graph, random_internal_graph
 
@@ -16,11 +24,26 @@ getLogger("eGC").setLevel(INFO)
 getLogger("ep_type").setLevel(INFO)
 
 
+# Reference generation for eGC's
+ref_generator = partial(reference, gpspuid=127, counter=count())
+set_reference_generator(ref_generator)
+
+
 NUM_RANDOM_GRAPHS = 1000
-FILENAME = join(dirname(__file__), "data/random_internal_graph.json")
+FILENAME: str = join(dirname(__file__), "data/random_internal_graph.json")
 if not exists(FILENAME):
     with open(FILENAME, "w", encoding="utf-8") as f:
         dump([random_internal_graph(liv, True, 1).json_obj() for _ in trange(NUM_RANDOM_GRAPHS)], f, indent=4, sort_keys=True)
 
 with open(FILENAME, "r", encoding="utf-8") as f:
-    RANDOM_GRAPHS: list[internal_graph] = [internal_graph({ep.key(): ep for ep in json_igraph}) for json_igraph in load(f)]
+    RANDOM_GRAPHS: list[internal_graph] = [
+        internal_graph({key: (dst_end_point, src_end_point)[ep[3]](*ep) for key, ep in json_igraph.items()}) for json_igraph in load(f)
+    ]
+
+
+@pytest.mark.parametrize("igraph", RANDOM_GRAPHS)
+def test_random_internal_graph_as_gc_graph(igraph) -> None:
+    """Test that a random internal graph is a valid (but not necessarily stable) gc_graph."""
+    gcg = gc_graph(i_graph=igraph)
+    gcg.normalize()
+    assert gcg.validate()

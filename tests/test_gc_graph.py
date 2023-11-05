@@ -13,7 +13,8 @@ from typing import Any
 import pytest
 from tqdm import trange
 
-from egp_types import reference, set_reference_generator
+from egp_types.reference import reference
+from egp_types.eGC import set_reference_generator
 from egp_types.egp_typing import DST_EP, SRC_EP, JSONGraph, ConnectionGraph, connection_graph_to_json, json_to_connection_graph
 from egp_types.ep_type import EP_TYPE_VALUES, INVALID_EP_TYPE_VALUE, asint, ep_type_lookup
 from egp_types.gc_graph import gc_graph, random_gc_graph

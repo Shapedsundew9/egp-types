@@ -47,6 +47,7 @@ from networkx import DiGraph, spring_layout  # type: ignore
 from text_token import register_token_code, text_token
 
 from egp_utils.base_validator import base_validator
+from .common import random_constant_str
 from .egp_typing import (
     CPI,
     CVI,
@@ -1267,19 +1268,6 @@ class gc_graph:
     def viable_dst_types(self, row: DestinationRow) -> set[int]:
         """Create a tuple of viable destination end point types for row."""
         return {ep.typ for ep in self.i_graph.src_rows_filter(VALID_ROW_SOURCES[self.has_row("F")][row])}
-
-
-def random_constant_str(typ: EndPointType) -> str:
-    """Return a random constant string."""
-    if typ == asint("bool"):
-        return choice(("True", "False"))
-    if typ == asint("int"):
-        return str(randint(-100, 100))
-    if typ == asint("float"):
-        return str(uniform(-100, 100))
-    if typ == asint("str"):
-        return '"' + "".join(choice(ascii_letters) for _ in range(randint(1, 10))) + '"'
-    return ep_type_lookup["instanciation"][typ][inst.DEFAULT.value]
 
 
 def random_gc_graph(validator: base_validator, verify: bool = False, seed: int | None = None) -> gc_graph:

@@ -1,6 +1,6 @@
 """The internal_graph class."""
 
-from typing import Generator, Iterable, Literal
+from typing import Generator, Iterable, Literal, Any
 from itertools import count
 from copy import deepcopy
 from logging import DEBUG, Logger, NullHandler, getLogger
@@ -9,6 +9,8 @@ from egp_utils.base_validator import base_validator
 from surebrec.surebrec import generate
 
 from .graph_validators import igraph_validator
+from .common import random_constant_str
+from .ep_type import asint
 from .egp_typing import (
     DestinationRow,
     EndPointClass,
@@ -16,6 +18,7 @@ from .egp_typing import (
     Row,
     SourceRow,
     DST_EP,
+    SRC_EP,
     SrcEndPointHash,
     DstEndPointHash,
 )
@@ -185,7 +188,7 @@ class internal_graph(EndPointDict):
     def reindex(self) -> None:
         """Reindex all endpoints."""
         counts: dict[str, int] = {}
-        for k, ep in deepcopy(self).items():
+        for k, ep in sorted(self.items()):
             key: str = ep.row + ("d", "s")[ep.cls]
             ep.idx = counts.setdefault(key, 0)
             counts[key] += 1
@@ -200,7 +203,13 @@ class internal_graph(EndPointDict):
         """Validate the internal graph. This function is not built for speed."""
         validation_structure: dict[str, dict[str, dict[str, list[str | int | bool | list[list[str | int]]]]]] = {
             'internal_graph': {k: {k: v} for k, v in self.json_obj().items()}}
+
+        # Valid structure and hash keys
         valid: bool =  igraph_validator.validate(validation_structure) and all(k == v.key() for k, v in self.items())
+
+        # Valid reference types
+        valid = valid and all(isinstance(ep_ref, (src_end_point, dst_end_point)[ep.cls]) for ep in self.values() for ep_ref in ep.refs)
+
         if not valid and _LOG_DEBUG:
             _logger.debug(f"Validation JSON:\n{pformat(validation_structure, 4)}")
             _logger.debug(f"Internal graph:\n{pformat(self, 4)}")
@@ -213,11 +222,12 @@ def random_internal_graph(validator: base_validator, verify: bool = False, seed:
 
     The validator must be a subset of the rules defined for a valid internal_graph.
     """
-    json_igraph: list[end_point] = [
-        end_point(*next(iter(v.values()))) for v in generate(validator, 1, seed, verify)[0]["internal_graph"].values()]
-    igraph: internal_graph = internal_graph({ep.key(): ep for ep in json_igraph})
-    _logger.debug(f"Random internal graph:\n{pformat(igraph, 4)}")
-    igraph.remove_all_refs()
+    json_igraph_lists: list[list[Any]] = [v.popitem()[1] for v in generate(validator, 1, seed, verify)[0]["internal_graph"].values()]
+    json_igraph_eps: list[end_point] = [dst_end_point(*ep_list) for ep_list in json_igraph_lists if ep_list[3] == DST_EP]
+    json_igraph_eps.extend([src_end_point(*ep_list) for ep_list in json_igraph_lists if ep_list[3] == SRC_EP])
+    igraph: internal_graph = internal_graph({ep.key(): ep for ep in json_igraph_eps})
+    if _LOG_DEBUG:
+        _logger.debug(f"Random internal graph pre-refactor:\n{pformat(igraph, 4)}")
 
     # Only corner is if there is a row F or P
     if igraph.has_row("F"):
@@ -227,11 +237,23 @@ def random_internal_graph(validator: base_validator, verify: bool = False, seed:
         elif igraph.has_row("P"):
             igraph.remove_row("O")
             igraph.update(igraph.move_row("P", "O", True))
+
+        # Row F requires a bool in row I. Since indexes are random at this stage we can just add it
+        if asint("bool") not in {ep.typ for ep in igraph.row_filter("I")}:
+            igraph.update({"I255s": src_end_point("I", 255, asint("bool"))})
+
     else:
         igraph.remove_row("P")
 
+    # Make sure all the constant strings are valid
+    for const_ep in igraph.row_filter("C"):
+        const_ep.val = random_constant_str(const_ep.typ)
+
     # Make sure all the indices are correct
+    igraph.remove_all_refs()
     igraph.reindex()
+    if _LOG_DEBUG:
+        _logger.debug(f"Random internal graph post-refactor:\n{pformat(igraph, 4)}")
 
     # Validate the internal graph
     if not igraph.validate():
