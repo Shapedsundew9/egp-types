@@ -11,9 +11,8 @@ from collections import Counter
 from copy import deepcopy
 from logging import DEBUG, Logger, NullHandler, getLogger
 from math import sqrt
-from random import choice, randint, sample, uniform
-from typing import Any, Iterable, Literal, LiteralString, Sequence
-from string import ascii_letters
+from random import choice, randint, sample
+from typing import Any, Iterable, Literal, LiteralString, Sequence, cast
 
 import gi
 from surebrec.surebrec import generate
@@ -73,8 +72,8 @@ from .egp_typing import (
     json_to_connection_graph,
     vertex,
 )
-from .end_point import dst_end_point, dst_end_point_ref, end_point, end_point_ref, src_end_point, src_end_point_ref
-from .ep_type import REAL_EP_TYPE_VALUES, asint, asstr, compatible, ep_type_lookup, inst, validate, validate_value
+from .end_point import dst_end_point, dst_end_point_ref, x_end_point, end_point_ref, src_end_point, src_end_point_ref
+from .ep_type import REAL_EP_TYPE_VALUES, asint, asstr, compatible, validate, validate_value
 from .internal_graph import internal_graph
 
 _logger: Logger = getLogger(__name__)
@@ -297,7 +296,7 @@ class gc_graph:
     )
     i_graph: internal_graph
     rows: GCGraphRows
-    app_graph: Any  # TODO: This should be on demand
+    app_graph: ConnectionGraph
     status: Any
 
     def __init__(
@@ -305,8 +304,8 @@ class gc_graph:
         c_graph: ConnectionGraph | None = None,
         i_graph: internal_graph | None = None,
     ) -> None:
-        nc_graph: ConnectionGraph = {} if c_graph is None else c_graph
-        self.i_graph = i_graph if i_graph is not None else self._convert_to_internal(nc_graph)
+        self.app_graph: ConnectionGraph = {} if c_graph is None else c_graph
+        self.i_graph = i_graph if i_graph is not None else self._convert_to_internal(self.app_graph)
         self.rows = (
             dict(Counter([ep.row for ep in self.i_graph.dst_filter()])),
             dict(Counter([ep.row for ep in self.i_graph.src_filter()])),
@@ -318,7 +317,7 @@ class gc_graph:
         str_list: list[str] = [f"Rows: {self.rows}"]
         for row in ROWS:
             for ep_class in (False, True):
-                row_dict: dict[str, end_point] = {k: v for k, v in self.i_graph.items() if v.cls == ep_class and v.row == row}
+                row_dict: dict[str, x_end_point] = {k: v for k, v in self.i_graph.items() if v.cls == ep_class and v.row == row}
                 str_list.extend(["'" + k + "': " + str(v) for k, v in sorted(row_dict.items(), key=lambda x: x[1].idx)])
         return "\n".join(str_list)
 
@@ -333,7 +332,7 @@ class gc_graph:
 
         # Row C needs to be imported before any other row to ensure references exist.
         for index, c_point in enumerate(c_graph.get("C", [])):
-            src_ep: end_point = src_end_point("C", index, c_point[CVI.TYP.value], refs=[], val=c_point[CVI.VAL.value])
+            src_ep: x_end_point = src_end_point("C", index, c_point[CVI.TYP.value], refs=[], val=c_point[CVI.VAL.value])
             i_graph[src_ep.key()] = src_ep
 
         for connection_graph_pair in c_graph.items():
@@ -357,7 +356,7 @@ class gc_graph:
                             _logger.debug(f"Adding to i_graph: {i_graph[src_ep_hash]}")
         return i_graph
 
-    def _add_ep(self, ep: end_point) -> None:
+    def _add_ep(self, ep: x_end_point) -> None:
         """Add an endpoint to the internal graph format structure.
 
         Other than _convert_to_internal() this MUST be the only way to add end points.
@@ -369,7 +368,7 @@ class gc_graph:
         self.i_graph[ep.key()] = ep
         row_counts[ep.row] += 1
 
-    def _remove_ep(self, ep: end_point, check: bool = True) -> None:
+    def _remove_ep(self, ep: x_end_point, check: bool = True) -> None:
         """Remove an endpoint to the internal graph format structure.
 
         Other than _convert_to_internal() this MUST be the only way to remove end points.
@@ -663,10 +662,10 @@ class gc_graph:
             ep_ref: src_end_point_ref = src_end_point_ref("I", nidx)
             if _LOG_DEBUG:
                 _logger.debug(f"Removing input {ep_ref}.")
-            ep: src_end_point = self.i_graph[ep_ref.key()]  # type: ignore
+            ep: src_end_point = cast(src_end_point, self.i_graph[ep_ref.key()])
             self._remove_ep(ep, False)
             for ref in ep.refs:
-                self.i_graph[ref.key()].refs.remove(ep_ref)
+                cast(dst_end_point, self.i_graph[ref.key()]).refs.remove(ep_ref)
 
             # Only re-index row I if it was not the last endpoint that was removed (optimisation)
             if nidx != num_inputs - 1:
@@ -704,20 +703,21 @@ class gc_graph:
             ep_ref: dst_end_point_ref = dst_end_point_ref("O", nidx)
             if _LOG_DEBUG:
                 _logger.debug(f"Removing output {ep_ref}.")
-            ep: dst_end_point = self.i_graph[ep_ref.key()]  # type: ignore
+            # We know from the ep_ref type which endpoint type will be returned
+            ep: dst_end_point = cast(dst_end_point, self.i_graph[ep_ref.key()])
             self._remove_ep(ep, False)
             for ref in ep.refs:
-                self.i_graph[ref.key()].refs.remove(ep_ref)
+                cast(src_end_point, self.i_graph[ref.key()]).refs.remove(ep_ref)
 
             # If F exists then must deal with P
             if self.has_row("F"):
                 ep_ref: dst_end_point_ref = dst_end_point_ref("P", nidx)
                 if _LOG_DEBUG:
                     _logger.debug(f"Removing output {ep_ref}.")
-                ep: dst_end_point = self.i_graph[ep_ref.key()]  # type: ignore
+                ep: dst_end_point = cast(dst_end_point, self.i_graph[ep_ref.key()])
                 self._remove_ep(ep, False)
                 for ref in ep.refs:
-                    self.i_graph[ref.key()].refs.remove(ep_ref)
+                    cast(src_end_point, self.i_graph[ref.key()]).refs.remove(ep_ref)
 
             # Only re-index row O if it was not the last endpoint that was removed (optimisation)
             if idx != num_outputs - 1:
@@ -740,10 +740,10 @@ class gc_graph:
             ep_ref: src_end_point_ref = src_end_point_ref("C", nidx)
             if _LOG_DEBUG:
                 _logger.debug(f"Removing constant {ep_ref}.")
-            ep: src_end_point = self.i_graph[ep_ref.key()]  # type: ignore
+            ep: src_end_point = cast(src_end_point, self.i_graph[ep_ref.key()])
             self._remove_ep(ep, False)
             for ref in ep.refs:
-                self.i_graph[ref.key()].refs.remove(ep_ref)
+                cast(dst_end_point, self.i_graph[ref.key()]).refs.remove(ep_ref)
 
             # Only re-index row I if it was not the last endpoint that was removed (optimisation)
             if nidx != num_constants - 1:
@@ -807,7 +807,7 @@ class gc_graph:
         """
         # Its necessary to sort the indices so we do not map an index twice.
         if cls is None:
-            eps: list[end_point] = sorted(self.i_graph.row_filter(row), key=lambda x: x.idx)
+            eps: list[x_end_point] = sorted(self.i_graph.row_filter(row), key=lambda x: x.idx)
         elif cls == DST_EP:
             eps = sorted(self.i_graph.dst_row_filter(row), key=lambda x: x.idx)
         else:
@@ -1064,7 +1064,7 @@ class gc_graph:
         # 12
         for dst_ep in self.i_graph.dst_filter():
             for ref in dst_ep.refs:
-                src_ep: end_point | None = self.i_graph.get(ref.key())
+                src_ep: x_end_point | None = self.i_graph.get(ref.key())
                 if src_ep is not None and not compatible(src_ep.typ, dst_ep.typ):
                     self.status.append(
                         text_token(
@@ -1163,7 +1163,7 @@ class gc_graph:
             if _LOG_DEBUG:
                 _logger.debug(f"Removing connection from destination endpoint: {dst_ep}")
                 assert dst_ep.row != "U"
-            self.i_graph[dst_ep.refs[0].key()].refs.remove(dst_end_point_ref(dst_ep.row, dst_ep.idx))
+            cast(src_end_point, self.i_graph[dst_ep.refs[0].key()]).refs.remove(dst_end_point_ref(dst_ep.row, dst_ep.idx))
             dst_ep.refs = []
 
     def random_add_connection(self) -> None:

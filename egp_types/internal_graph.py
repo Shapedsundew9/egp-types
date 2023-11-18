@@ -2,7 +2,6 @@
 
 from typing import Generator, Iterable, Literal, Any
 from itertools import count
-from copy import deepcopy
 from logging import DEBUG, Logger, NullHandler, getLogger
 from pprint import pformat
 from egp_utils.base_validator import base_validator
@@ -14,7 +13,6 @@ from .ep_type import asint
 from .egp_typing import (
     DestinationRow,
     EndPointClass,
-    EndPointHash,
     Row,
     SourceRow,
     DST_EP,
@@ -24,10 +22,10 @@ from .egp_typing import (
 )
 from .end_point import (
     dst_end_point,
-    end_point,
     isDstEndPoint,
     isSrcEndPoint,
     src_end_point,
+    x_end_point
 )
 
 
@@ -38,7 +36,7 @@ _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
 
 # Compound types
-EndPointDict = dict[EndPointHash, end_point]
+EndPointDict = dict[SrcEndPointHash | DstEndPointHash, x_end_point]
 SrcEndPointDict = dict[SrcEndPointHash, src_end_point]
 DstEndPointDict = dict[DstEndPointHash, dst_end_point]
 
@@ -55,7 +53,7 @@ class internal_graph(EndPointDict):
         """Return the next endpoint index for the class in the row."""
         return len(tuple(self.row_cls_filter(row, cls)))
 
-    def cls_filter(self, cls: EndPointClass) -> Generator[end_point, None, None]:
+    def cls_filter(self, cls: EndPointClass) -> Generator[x_end_point, None, None]:
         """Return all the end points in with cls cls."""
         return (ep for ep in self.values() if ep.cls == cls)
 
@@ -67,15 +65,15 @@ class internal_graph(EndPointDict):
         """Return all the source end points."""
         return (ep for ep in self.values() if isSrcEndPoint(ep))
 
-    def row_filter(self, row: Row) -> Generator[end_point, None, None]:
+    def row_filter(self, row: Row) -> Generator[x_end_point, None, None]:
         """Return all the end points in row."""
         return (ep for ep in self.values() if ep.row == row)
 
-    def row_cls_filter(self, row: Row, cls: EndPointClass) -> Generator[end_point, None, None]:
+    def row_cls_filter(self, row: Row, cls: EndPointClass) -> Generator[x_end_point, None, None]:
         """Return all the end points in row."""
         return (ep for ep in self.values() if ep.row == row and ep.cls == cls)
 
-    def rows_filter(self, rows: Iterable[Row]) -> Generator[end_point, None, None]:
+    def rows_filter(self, rows: Iterable[Row]) -> Generator[x_end_point, None, None]:
         """Return all the end points in row."""
         return (ep for ep in self.values() if ep.row in rows)
 
@@ -166,8 +164,8 @@ class internal_graph(EndPointDict):
 
     def insert_row_as(self, row: Literal["A", "B"]) -> EndPointDict:
         """Create a row with the input & output interface of self."""
-        io_if: Generator[end_point, None, None] = self.rows_filter(("I", "O"))
-        return {n.key(): n for n in (end_point(row, ep.idx, ep.typ, not ep.cls, deepcopy(ep.refs)) for ep in io_if)}
+        io_if: Generator[x_end_point, None, None] = self.rows_filter(("I", "O"))
+        return {n.key(): n for n in ((dst_end_point, src_end_point)[not ep.cls](row, ep.idx, ep.typ) for ep in io_if)}
 
     def complete_references(self) -> None:
         """An incomplete reference is when a destination references a source but the source does not reference the destination."""
@@ -217,15 +215,21 @@ class internal_graph(EndPointDict):
         return valid
 
 
+def internal_graph_from_json(json_igraph: dict[str, list[str | int | bool | list[list[str | int]]]]) -> internal_graph:
+    """Create an internal graph from a json object."""
+    json_igraph_lists: list[list[Any]] = list(json_igraph.values())
+    json_igraph_eps: list[x_end_point] = [dst_end_point(*ep_list) for ep_list in json_igraph_lists if ep_list[3] == DST_EP]
+    json_igraph_eps.extend([src_end_point(*ep_list) for ep_list in json_igraph_lists if ep_list[3] == SRC_EP])
+    return internal_graph({ep.key(): ep for ep in json_igraph_eps})
+
+
 def random_internal_graph(validator: base_validator, verify: bool = False, seed: int | None = None) -> internal_graph:
     """Create a random internal graph using the validator as a rules set.
 
     The validator must be a subset of the rules defined for a valid internal_graph.
     """
-    json_igraph_lists: list[list[Any]] = [v.popitem()[1] for v in generate(validator, 1, seed, verify)[0]["internal_graph"].values()]
-    json_igraph_eps: list[end_point] = [dst_end_point(*ep_list) for ep_list in json_igraph_lists if ep_list[3] == DST_EP]
-    json_igraph_eps.extend([src_end_point(*ep_list) for ep_list in json_igraph_lists if ep_list[3] == SRC_EP])
-    igraph: internal_graph = internal_graph({ep.key(): ep for ep in json_igraph_eps})
+    json_igraph = {k: v for i in generate(validator, 1, seed, seed, verify)[0]["internal_graph"].values() for k, v in i.items()}
+    igraph: internal_graph = internal_graph_from_json(json_igraph)
     if _LOG_DEBUG:
         _logger.debug(f"Random internal graph pre-refactor:\n{pformat(igraph, 4)}")
 

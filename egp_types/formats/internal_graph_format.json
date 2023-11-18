@@ -21,7 +21,7 @@
                     "valuesrules": {
                         "required": true,
                         "type": "list",
-                        "oneof": [
+                        "anyof": [
                             {
                                 "items": [
                                     {
@@ -168,10 +168,7 @@
                                 "type": "integer",
                                 "allowed": [0]
                             },
-                            {
-                                "type": "integer",
-                                "allowed": [1]
-                            },
+                            "ep_type_only_bool",
                             {
                                 "type": "boolean",
                                 "allowed": [false]

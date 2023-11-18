@@ -92,15 +92,15 @@ _INTERNAL_GRAPH_SCHEMA: dict[str, dict[str, Any]] = deepcopy(INTERNAL_GRAPH_SCHE
 LIMITED_INTERNAL_GRAPH_SCHEMA: dict[str, dict[str, Any]] = deepcopy(INTERNAL_GRAPH_SCHEMA)
 LIMITED_INTERNAL_GRAPH_SCHEMA["internal_graph"]["maxlength"] = 64
 for ep in LIMITED_INTERNAL_GRAPH_SCHEMA["internal_graph"]["valuesrules"]["oneof"]:
-    if "oneof" in ep["valuesrules"]:
-        for epdef in ep["valuesrules"]["oneof"]:
+    if "anyof" in ep["valuesrules"]:
+        for epdef in ep["valuesrules"]["anyof"]:
             epdef["items"][4]["maxlength"] = 8
     else:
         ep["valuesrules"]["items"][4]["maxlength"] = 8
 _LIMITED_INTERNAL_GRAPH_SCHEMA: dict[str, dict[str, Any]] = deepcopy(LIMITED_INTERNAL_GRAPH_SCHEMA)
 
 
-class _graph_validator(base_validator):
+class base_graph_validator(base_validator):
     # TODO: Make errors ValidationError types for full disclosure
     # https://docs.python-cerberus.org/en/stable/customize.html#validator-error
 
@@ -109,9 +109,9 @@ class _graph_validator(base_validator):
             self._error(field, f"ep_type {value} does not exist.")
 
 
-graph_validator: _graph_validator = _graph_validator()
-igraph_validator: _graph_validator = _graph_validator()
-limited_igraph_validator: _graph_validator = _graph_validator()
+graph_validator: base_graph_validator = base_graph_validator()
+igraph_validator: base_graph_validator = base_graph_validator()
+limited_igraph_validator: base_graph_validator = base_graph_validator()
 graph_validator.rules_set_registry = GRAPH_REGISTRY
 igraph_validator.rules_set_registry = GRAPH_REGISTRY
 limited_igraph_validator.rules_set_registry = GRAPH_REGISTRY
