@@ -110,9 +110,9 @@ class end_point(generic_end_point):
         for vidx in reversed([idx for idx, ref in enumerate(ep.refs) if ref.row not in valid_ref_rows]):
             del ep.refs[vidx]
 
-    def json_obj(self) -> list[str | int | bool | list[list[str | int]]]:
+    def json_obj(self) -> list[str | int | bool | list[list[str | int]] | None]:
         """Return a json serializable object."""
-        return [self.row, self.idx, self.typ, self.cls, [ref.json_obj() for ref in self.refs], str(self.val)]
+        return [self.row, self.idx, self.typ, self.cls, [ref.json_obj() for ref in self.refs], self.val]
 
     def key(self) -> EndPointHash:
         """Create a unique key to use in the internal graph."""
@@ -182,6 +182,10 @@ class dst_end_point(end_point):
         """Return a reference to this end point."""
         return dst_end_point_ref(self.row, self.idx)
 
+    def copy(self, clean: bool = False) -> Self:
+        """Return a copy of the end point with no references."""
+        return dst_end_point(self.row, self.idx, self.typ, self.cls, val=self.val) if clean else deepcopy(self)
+
     def clean_copy(self) -> Self:
         """Return a copy of the end point with no references."""
         return dst_end_point(self.row, self.idx, self.typ)
@@ -206,6 +210,10 @@ class src_end_point(end_point):
     def as_ref(self) -> src_end_point_ref:
         """Return a reference to this end point."""
         return src_end_point_ref(self.row, self.idx)
+
+    def copy(self, clean: bool = False) -> Self:
+        """Return a copy of the end point with no references."""
+        return src_end_point(self.row, self.idx, self.typ, self.cls, val=self.val) if clean else deepcopy(self)
 
     def clean_copy(self) -> Self:
         """Return a copy of the end point with no references."""

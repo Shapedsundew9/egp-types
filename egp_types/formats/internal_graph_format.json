@@ -50,8 +50,8 @@
                                         }
                                     },
                                     {
-                                        "type": "string",
-                                        "allowed": ["None"]
+                                        "nullable": true,
+                                        "allowed": [null]
                                     }
                                 ]
                             },
@@ -99,8 +99,8 @@
                                         }
                                     },
                                     {
-                                        "type": "string",
-                                        "allowed": ["None"]
+                                        "nullable": true,
+                                        "allowed": [null]
                                     }
                                 ]
                             }
@@ -189,8 +189,8 @@
                                 }
                             },
                             {
-                                "type": "string",
-                                "allowed": ["None"]
+                                "nullable": true,
+                                "allowed": [null]
                             }
                         ]
                     }
@@ -233,8 +233,8 @@
                                 }
                             },
                             {
-                                "type": "string",
-                                "allowed": ["None"]
+                                "nullable": true,
+                                "allowed": [null]
                             }
                         ]
                     }
@@ -277,8 +277,8 @@
                                 }
                             },
                             {
-                                "type": "string",
-                                "allowed": ["None"]
+                                "nullable": true,
+                                "allowed": [null]
                             }
                         ]
                     }
@@ -321,8 +321,8 @@
                                 }
                             },
                             {
-                                "type": "string",
-                                "allowed": ["None"]
+                                "nullable": true,
+                                "allowed": [null]
                             }
                         ]
                     }
@@ -365,8 +365,8 @@
                                 }
                             },
                             {
-                                "type": "string",
-                                "allowed": ["None"]
+                                "nullable": true,
+                                "allowed": [null]
                             }
                         ]
                     }
@@ -409,8 +409,8 @@
                                 }
                             },
                             {
-                                "type": "string",
-                                "allowed": ["None"]
+                                "nullable": true,
+                                "allowed": [null]
                             }
                         ]
                     }
@@ -453,8 +453,8 @@
                                 }
                             },
                             {
-                                "type": "string",
-                                "allowed": ["None"]
+                                "nullable": true,
+                                "allowed": [null]
                             }
                         ]
                     }
@@ -497,9 +497,9 @@
                                 }
                             },
                             {
-                                "type": "string",
-                                "allowed": ["None"]
-                            }
+                                "nullable": true,
+                                "allowed": [null]
+                           }
                         ]
                     }
                 }

@@ -4,17 +4,18 @@ from itertools import count
 from json import dump, load
 from logging import DEBUG, INFO, Logger, NullHandler, getLogger
 from os.path import dirname, exists, join
+from pprint import pformat
 
 import pytest
 from tqdm import trange
 
-from egp_types.reference import reference
 from egp_types.eGC import set_reference_generator
 from egp_types.end_point import dst_end_point, src_end_point
 from egp_types.gc_graph import gc_graph
 from egp_types.graph_validators import limited_igraph_validator as liv
-from egp_types.internal_graph import internal_graph, random_internal_graph
-
+from egp_types.internal_graph import (internal_graph, internal_graph_from_json,
+                                      random_internal_graph)
+from egp_types.reference import reference
 
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
@@ -42,8 +43,21 @@ with open(FILENAME, "r", encoding="utf-8") as f:
 
 
 @pytest.mark.parametrize("igraph", RANDOM_GRAPHS)
+def test_to_json_from_json(igraph: internal_graph) -> None:
+    """Test that a random internal graph is a valid (but not necessarily stable) gc_graph."""
+    json_igraph: dict[str, list[str | int | bool | list[list[str | int]] | None]] = igraph.json_obj()
+    igraph2: internal_graph = internal_graph_from_json(json_igraph)
+    if _LOG_DEBUG and igraph != igraph2:
+        _logger.debug(f"json_igraph:\n{pformat(json_igraph)}")
+        _logger.debug(f"igraph:\n{igraph}")
+        _logger.debug(f"igraph2:\n{igraph2}")
+    assert igraph == igraph2
+
+
+@pytest.mark.parametrize("igraph", RANDOM_GRAPHS)
 def test_random_internal_graph_as_gc_graph(igraph) -> None:
     """Test that a random internal graph is a valid (but not necessarily stable) gc_graph."""
     gcg = gc_graph(i_graph=igraph)
     gcg.normalize()
     assert gcg.validate()
+

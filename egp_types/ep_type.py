@@ -189,6 +189,7 @@ for i in tuple(filter(func2, ep_type_lookup["instanciation"].values())):
 # Must be defined after the imports
 EP_TYPE_NAMES: set[str] = set(ep_type_lookup["n2v"].keys())
 EP_TYPE_VALUES: set[int] = set(ep_type_lookup["v2n"].keys())
+EP_TYPE_VALUES_TUPLE: tuple[int, ...] = tuple(sorted(EP_TYPE_VALUES))
 
 
 def validate(obj: Any, value_t: vtype = vtype.EP_TYPE_INT) -> bool:

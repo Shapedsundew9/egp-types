@@ -1,15 +1,17 @@
 """The internal_graph class."""
 
 from typing import Generator, Iterable, Literal, Any
+from pprint import pformat
 from itertools import count
 from logging import DEBUG, Logger, NullHandler, getLogger
 from pprint import pformat
+from random import choice, randint, seed
 from egp_utils.base_validator import base_validator
 from surebrec.surebrec import generate
 
 from .graph_validators import igraph_validator
 from .common import random_constant_str
-from .ep_type import asint
+from .ep_type import asint, EP_TYPE_VALUES_TUPLE
 from .egp_typing import (
     DestinationRow,
     EndPointClass,
@@ -19,12 +21,17 @@ from .egp_typing import (
     SRC_EP,
     SrcEndPointHash,
     DstEndPointHash,
+    VALID_ROW_SOURCES,
+    SOURCE_ROWS,
+    DESTINATION_ROWS
 )
 from .end_point import (
     dst_end_point,
+    dst_end_point_ref,
     isDstEndPoint,
     isSrcEndPoint,
     src_end_point,
+    src_end_point_ref,
     x_end_point
 )
 
@@ -44,8 +51,16 @@ DstEndPointDict = dict[DstEndPointHash, dst_end_point]
 class internal_graph(EndPointDict):
     """Convinient structure for GC graph manipulation."""
 
+    def __repr__(self) -> str:
+        """Return a string representation of the internal graph."""
+        return pformat(dict(self), sort_dicts=True, width=180)
+    
+    def add(self, ep: x_end_point) -> None:
+        """Add an end point to the internal graph."""
+        self[ep.key()] = ep
+
     # TODO: Be clear on rules regarding which method modify the structure
-    def json_obj(self) -> dict[str, list[str | int | bool | list[list[str | int]]]]:
+    def json_obj(self) -> dict[str, list[str | int | bool | list[list[str | int]] | None]]:
         """Return a json serializable object."""
         return {ep.key(): ep.json_obj() for ep in self.values()}
 
@@ -199,7 +214,7 @@ class internal_graph(EndPointDict):
 
     def validate(self) -> bool:
         """Validate the internal graph. This function is not built for speed."""
-        validation_structure: dict[str, dict[str, dict[str, list[str | int | bool | list[list[str | int]]]]]] = {
+        validation_structure: dict[str, dict[str, dict[str, list[str | int | bool | list[list[str | int]] | None]]]] = {
             'internal_graph': {k: {k: v} for k, v in self.json_obj().items()}}
 
         # Valid structure and hash keys
@@ -215,20 +230,73 @@ class internal_graph(EndPointDict):
         return valid
 
 
-def internal_graph_from_json(json_igraph: dict[str, list[str | int | bool | list[list[str | int]]]]) -> internal_graph:
+def internal_graph_from_json(json_igraph: dict[str, list[str | int | bool | list[list[str | int]] | None]]) -> internal_graph:
     """Create an internal graph from a json object."""
-    json_igraph_lists: list[list[Any]] = list(json_igraph.values())
+    json_igraph_lists: list[list[Any]] = [[*v[:4], [(src_end_point_ref, dst_end_point_ref)[v[3]](*r) for r in v[4]], v[5]]  # type: ignore
+                                          for v in json_igraph.values()]
     json_igraph_eps: list[x_end_point] = [dst_end_point(*ep_list) for ep_list in json_igraph_lists if ep_list[3] == DST_EP]
     json_igraph_eps.extend([src_end_point(*ep_list) for ep_list in json_igraph_lists if ep_list[3] == SRC_EP])
     return internal_graph({ep.key(): ep for ep in json_igraph_eps})
 
 
-def random_internal_graph(validator: base_validator, verify: bool = False, seed: int | None = None) -> internal_graph:
+def random_internal_graph_alt(rows: str, ep_types: tuple[int, ...] = tuple(), max_row_eps: int = 8, verify: bool = False, rseed: int | None = None) -> internal_graph:
+    """Alternative random internal graph generator."""
+    # Start with some quick sanity checking
+    has_f: bool = "F" in rows
+    has_i: bool = "I" in rows
+    has_o: bool = "O" in rows
+    has_p: bool = "P" in rows
+    assert has_f == has_i, "Row F requires row I"
+    if has_o:
+        assert has_f == has_p, "Row F requires row P if there is a row O"
+    else:
+        assert not has_p, "Row P requires row O"
+    igraph: internal_graph = internal_graph()
+
+    # Set defaults
+    if not ep_types:
+        ep_types = EP_TYPE_VALUES_TUPLE
+    if seed is not None:
+        seed(rseed)
+
+    # For each row to be generated add them to the internal graph
+    for row in rows.replace("P", ""):
+        # Row F is a bit special
+        if row == "F":
+            igraph.add(src_end_point("I", 0, asint("bool")))
+            igraph.add(dst_end_point("F", 0, asint("bool")))
+        elif row in DESTINATION_ROWS and any(vsr in VALID_ROW_SOURCES[has_f][row] for vsr in rows):
+            # For destinations rows make sure there is a valid source row to reference
+            for _ in range(randint(1, max_row_eps)):
+                igraph.add(dst_end_point(row, 0, choice(ep_types)))
+        if row in SOURCE_ROWS:
+            for _ in range(randint(1, max_row_eps)):
+                igraph.add(src_end_point(row, 0, choice(ep_types)))
+
+    # Only corner is if there is a row F or P
+    if has_f and has_o:
+        igraph.update(igraph.move_row("O", "P", True))
+
+    # Make sure all the constant strings are valid
+    for const_ep in igraph.row_filter("C"):
+        const_ep.val = random_constant_str(const_ep.typ)
+
+    igraph.reindex()
+    if _LOG_DEBUG:
+        _logger.debug(f"Random internal graph post-refactor:\n{pformat(igraph, 4, width=180)}")
+
+    # Validate the internal graph
+    if verify and not igraph.validate():
+        raise ValueError(f"Invalid random internal graph:\n{pformat(igraph, 4, width=180)}")
+    return igraph
+
+
+def random_internal_graph(validator: base_validator, verify: bool = False, rseed: int | None = None) -> internal_graph:
     """Create a random internal graph using the validator as a rules set.
 
     The validator must be a subset of the rules defined for a valid internal_graph.
     """
-    json_igraph = {k: v for i in generate(validator, 1, seed, seed, verify)[0]["internal_graph"].values() for k, v in i.items()}
+    json_igraph = {k: v for i in generate(validator, 1, rseed, rseed, verify)[0]["internal_graph"].values() for k, v in i.items()}
     igraph: internal_graph = internal_graph_from_json(json_igraph)
     if _LOG_DEBUG:
         _logger.debug(f"Random internal graph pre-refactor:\n{pformat(igraph, 4)}")
