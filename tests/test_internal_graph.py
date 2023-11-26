@@ -5,7 +5,7 @@ from json import dump, load
 from logging import DEBUG, INFO, Logger, NullHandler, getLogger
 from os.path import dirname, exists, join
 from pprint import pformat
-
+from random import seed, choice
 import pytest
 from tqdm import trange
 
@@ -16,6 +16,8 @@ from egp_types.graph_validators import limited_igraph_validator as liv
 from egp_types.internal_graph import (internal_graph, internal_graph_from_json,
                                       random_internal_graph)
 from egp_types.reference import reference
+from egp_types.egp_typing import VALID_GRAPH_ROW_COMBINATIONS
+
 
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
@@ -30,16 +32,16 @@ ref_generator = partial(reference, gpspuid=127, counter=count())
 set_reference_generator(ref_generator)
 
 
-NUM_RANDOM_GRAPHS = 1000
+NUM_RANDOM_GRAPHS = 4000
 FILENAME: str = join(dirname(__file__), "data/random_internal_graph.json")
+COMBOS = tuple(VALID_GRAPH_ROW_COMBINATIONS)
 if not exists(FILENAME):
+    seed(1)
     with open(FILENAME, "w", encoding="utf-8") as f:
-        dump([random_internal_graph(liv, True, 1).json_obj() for _ in trange(NUM_RANDOM_GRAPHS)], f, indent=4, sort_keys=True)
+        dump([random_internal_graph(choice(COMBOS), verify=True, rseed=rseed).json_obj() for rseed in trange(NUM_RANDOM_GRAPHS)], f, indent=4, sort_keys=True)
 
 with open(FILENAME, "r", encoding="utf-8") as f:
-    RANDOM_GRAPHS: list[internal_graph] = [
-        internal_graph({key: (dst_end_point, src_end_point)[ep[3]](*ep) for key, ep in json_igraph.items()}) for json_igraph in load(f)
-    ]
+    RANDOM_GRAPHS: list[internal_graph] = [internal_graph_from_json(json_igraph) for json_igraph in load(f)]
 
 
 @pytest.mark.parametrize("igraph", RANDOM_GRAPHS)

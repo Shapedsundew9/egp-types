@@ -239,25 +239,30 @@ def internal_graph_from_json(json_igraph: dict[str, list[str | int | bool | list
     return internal_graph({ep.key(): ep for ep in json_igraph_eps})
 
 
-def random_internal_graph_alt(rows: str, ep_types: tuple[int, ...] = tuple(), max_row_eps: int = 8, verify: bool = False, rseed: int | None = None) -> internal_graph:
-    """Alternative random internal graph generator."""
-    # Start with some quick sanity checking
+def random_internal_graph(
+        rows: str,
+        ep_types: tuple[int, ...] = tuple(),
+        max_row_eps: int = 8, verify: bool = False,
+        rseed: int | None = None,
+        row_stablization: bool = False) -> internal_graph:
+    """Alternative random internal graph generator.
+
+    Row stabilization ensures that the graph has no rows with destinations that cannot be reached from a source.
+    This is not full stabilization as a source row may be available but not have the correct endpoint types. This
+    can be mitigated by definiting only one type.    
+    """
     has_f: bool = "F" in rows
-    has_i: bool = "I" in rows
     has_o: bool = "O" in rows
-    has_p: bool = "P" in rows
-    assert has_f == has_i, "Row F requires row I"
-    if has_o:
-        assert has_f == has_p, "Row F requires row P if there is a row O"
-    else:
-        assert not has_p, "Row P requires row O"
     igraph: internal_graph = internal_graph()
 
     # Set defaults
     if not ep_types:
-        ep_types = EP_TYPE_VALUES_TUPLE
+        ep_types = EP_TYPE_VALUES_TUPLE[2:]
     if seed is not None:
         seed(rseed)
+
+    if _LOG_DEBUG:
+        _logger.debug(f"rows: {rows}, ep_types: {ep_types}, max_row_eps: {max_row_eps}, verify: {verify}, rseed: {rseed}, row_stablization: {row_stablization}")
 
     # For each row to be generated add them to the internal graph
     for row in rows.replace("P", ""):
@@ -265,13 +270,13 @@ def random_internal_graph_alt(rows: str, ep_types: tuple[int, ...] = tuple(), ma
         if row == "F":
             igraph.add(src_end_point("I", 0, asint("bool")))
             igraph.add(dst_end_point("F", 0, asint("bool")))
-        elif row in DESTINATION_ROWS and any(vsr in VALID_ROW_SOURCES[has_f][row] for vsr in rows):
-            # For destinations rows make sure there is a valid source row to reference
-            for _ in range(randint(1, max_row_eps)):
-                igraph.add(dst_end_point(row, 0, choice(ep_types)))
+        # For destinations rows make sure there is a valid source row to reference
+        elif row_stablization and (row in DESTINATION_ROWS and any(vsr in VALID_ROW_SOURCES[has_f][row] for vsr in rows)):
+            for idx in range(randint(1, max_row_eps)):
+                igraph.add(dst_end_point(row, idx, choice(ep_types)))
         if row in SOURCE_ROWS:
-            for _ in range(randint(1, max_row_eps)):
-                igraph.add(src_end_point(row, 0, choice(ep_types)))
+            for idx in range(randint(1, max_row_eps)):
+                igraph.add(src_end_point(row, idx, choice(ep_types)))
 
     # Only corner is if there is a row F or P
     if has_f and has_o:
@@ -287,47 +292,6 @@ def random_internal_graph_alt(rows: str, ep_types: tuple[int, ...] = tuple(), ma
 
     # Validate the internal graph
     if verify and not igraph.validate():
+        _logger.debug(f"Validator error:\n{igraph_validator.error_str()}")
         raise ValueError(f"Invalid random internal graph:\n{pformat(igraph, 4, width=180)}")
-    return igraph
-
-
-def random_internal_graph(validator: base_validator, verify: bool = False, rseed: int | None = None) -> internal_graph:
-    """Create a random internal graph using the validator as a rules set.
-
-    The validator must be a subset of the rules defined for a valid internal_graph.
-    """
-    json_igraph = {k: v for i in generate(validator, 1, rseed, rseed, verify)[0]["internal_graph"].values() for k, v in i.items()}
-    igraph: internal_graph = internal_graph_from_json(json_igraph)
-    if _LOG_DEBUG:
-        _logger.debug(f"Random internal graph pre-refactor:\n{pformat(igraph, 4)}")
-
-    # Only corner is if there is a row F or P
-    if igraph.has_row("F"):
-        if igraph.has_row("O"):
-            igraph.remove_row("P")
-            igraph.update(igraph.move_row("O", "P", True))
-        elif igraph.has_row("P"):
-            igraph.remove_row("O")
-            igraph.update(igraph.move_row("P", "O", True))
-
-        # Row F requires a bool in row I. Since indexes are random at this stage we can just add it
-        if asint("bool") not in {ep.typ for ep in igraph.row_filter("I")}:
-            igraph.update({"I255s": src_end_point("I", 255, asint("bool"))})
-
-    else:
-        igraph.remove_row("P")
-
-    # Make sure all the constant strings are valid
-    for const_ep in igraph.row_filter("C"):
-        const_ep.val = random_constant_str(const_ep.typ)
-
-    # Make sure all the indices are correct
-    igraph.remove_all_refs()
-    igraph.reindex()
-    if _LOG_DEBUG:
-        _logger.debug(f"Random internal graph post-refactor:\n{pformat(igraph, 4)}")
-
-    # Validate the internal graph
-    if not igraph.validate():
-        raise ValueError(f"Invalid random internal graph:\n{pformat(igraph, 4)}")
     return igraph
