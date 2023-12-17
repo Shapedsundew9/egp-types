@@ -52,15 +52,18 @@ VALID_ROW_SOURCES: tuple[dict[Row, tuple[SourceRow, ...]], dict[Row, tuple[Sourc
     },
 )
 
-# Valid graph row combinations
+# Valid graph row combinations.
+# NB: These rules define a valid graph not necessarily a stable graph.
 # Rules:
 #   1. If row F is present then row I must be present & an implied row A at least (0 inputs & 0 outputs, GCA defined)
 #   2. If row F and row O are present then row P must be present
 #   3. P cannot be present unless F and O is present
-#   4. Row O cannot exist without any source rows.
-#   5. If row B is present then row A must be implied present (0 inputs, 0 outputs, GCA defined)
-#   6. Row A and row B are the only rows that can be implied present (0 inputs, 0 outputs, GCA and/or GCB defined) all
-#      other rows are explicit
+#   4. Row B cannot exist without row A
+#   5. Row F cannot exists without row A
+#   6. A graph must have an interface i.e. row I or row O (or both)
+#   7. Row O cannot exist without any source rows.
+#   8. A null graph (one with no rows) is invalid.
+#   9. Rows must be explicitly defined (no implied rows)
 #
 # Derived by:
 """
@@ -73,12 +76,17 @@ for c in [''.join(sorted(s)) for n in range(7) for s in combinations("ABCFIOP", 
         continue
     if "P" in c and ("F" not in c or "O" not in c):
         continue
+    if ("F" in c or "B" in c) and "A" not in c:
+        continue
+    if "O" not in c and "I" not in c:
+        continue
+    if c == "" or c == "O":
+        continue
     combos.append(c)
 """
 VALID_GRAPH_ROW_COMBINATIONS: set[str] = {
-    '', 'A', 'AB', 'ABC', 'ABCFI', 'ABCI', 'ABCIO', 'ABCO', 'ABFI', 'ABFIOP', 'ABI', 'ABIO', 'ABO', 'AC', 'ACFI', 'ACFIOP',
-    'ACI', 'ACIO', 'ACO', 'AFI', 'AFIOP', 'AI', 'AIO', 'AO', 'B', 'BC', 'BCFI', 'BCFIOP', 'BCI', 'BCIO', 'BCO', 'BFI',
-    'BFIOP', 'BI', 'BIO', 'BO', 'C', 'CFI', 'CFIOP', 'CI', 'CIO', 'CO', 'FI', 'FIOP', 'I', 'IO', 'O'
+    'I', 'AI', 'AO', 'IO', 'ABI', 'ABO', 'ACI', 'ACO', 'AFI', 'AIO', 'ABCI', 'ABCO',
+    'ABFI', 'ABIO', 'ACFI', 'ACIO', 'ABCFI', 'ABCIO', 'AFIOP', 'ABFIOP', 'ACFIOP'
 }
 
 

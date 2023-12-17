@@ -54,7 +54,7 @@ class internal_graph(EndPointDict):
     def __repr__(self) -> str:
         """Return a string representation of the internal graph."""
         return pformat(dict(self), sort_dicts=True, width=180)
-    
+
     def add(self, ep: x_end_point) -> None:
         """Add an end point to the internal graph."""
         self[ep.key()] = ep
@@ -177,15 +177,32 @@ class internal_graph(EndPointDict):
         for ep in self.row_cls_filter(row, cls):
             ep.redirect_refs(old_ref_row, new_ref_row)
 
-    def insert_row_as(self, row: Literal["A", "B"]) -> EndPointDict:
+    def as_row(self, row: Literal["A", "B"]) -> EndPointDict:
         """Create a row with the input & output interface of self."""
         io_if: Generator[x_end_point, None, None] = self.rows_filter(("I", "O"))
         return {n.key(): n for n in ((dst_end_point, src_end_point)[not ep.cls](row, ep.idx, ep.typ) for ep in io_if)}
 
+    def interface_from(self, row: Row) -> EndPointDict:
+        """Create an interface graph (rows I and O) from row."""
+        io_if: Generator[x_end_point, None, None] = self.row_filter(row)
+        return {n.key(): n for n in ((src_end_point, dst_end_point)[ep.cls]("IO"[ep.cls], ep.idx, ep.typ) for ep in io_if)}  # type: ignore
+
+    def embed(self, f_row: Row, t_row: Row) -> EndPointDict:
+        """Embed f_row as t_row in a graph with direct connections to row I and O"""
+        new_dict: EndPointDict = self.move_row(f_row, t_row, True)
+        if_dict: EndPointDict = self.interface_from(f_row)
+        new_dict.update(if_dict)
+        for dst_ep in filter((lambda x: x.cls == DST_EP), if_dict.values()):
+            new_dict[dst_ep.key()].refs.append(src_end_point_ref(("I", t_row)[dst_ep.row == "O"], dst_ep.idx))  # type: ignore
+        return new_dict
+
     def complete_references(self) -> None:
-        """An incomplete reference is when a destination references a source but the source does not reference the destination."""
+        """An incomplete reference is when only one end of the connection references the other."""
         for dst_ep in self.dst_ref_filter():
             self[dst_ep.refs[0].key()].safe_add_ref(dst_ep.as_ref())
+        for src_ep in self.src_ref_filter():
+            for src_ref in src_ep.refs:
+                self[src_ref.key()].safe_add_ref(src_ep.as_ref())
 
     def remove_all_refs(self) -> None:
         """Remove all references from all endpoints."""
