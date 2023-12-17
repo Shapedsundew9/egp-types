@@ -262,7 +262,7 @@ register_token_code(
 )
 register_token_code(
     "E01028",
-    'Internal graph failed validation.',
+    "Internal graph failed validation.",
 )
 
 register_token_code("I01000", '"I" row endpoint appended of UNKNOWN_EP_TYPE_VALUE.')

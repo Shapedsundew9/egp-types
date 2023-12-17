@@ -1,7 +1,7 @@
 """End point and end point reference classes."""
 
 from dataclasses import dataclass, field
-from typing import Any, TypeGuard, Self
+from typing import Any, TypeGuard, Self, cast
 from copy import deepcopy
 
 from .egp_typing import (
@@ -18,6 +18,8 @@ from .egp_typing import (
     SrcEndPointHash,
     VALID_ROW_DESTINATIONS,
     VALID_ROW_SOURCES,
+    SOURCE_ROWS,
+    DESTINATION_ROWS,
 )
 
 
@@ -144,22 +146,19 @@ class end_point(generic_end_point):
 
     def move_cls_copy(self, row: Row, cls: EndPointClass, clean: bool = False, has_f: bool = False) -> Self:
         """Return a copy of the end point with the row & cls changed."""
-        ep: Self = self.copy(clean)
-        ep.row = row
-        ep.cls = cls
-        if not clean:
-            self._del_invalid_refs(ep, row, has_f)
-        return ep
+        if cls == self.cls:
+            return self.move_copy(row, clean, has_f)
+        # If the class of the endpoint has changed then the references must be invalid and are not copied.
+        if cls == SRC_EP:
+            assert row in SOURCE_ROWS, "Invalid row for source endpoint"
+            return src_end_point(cast(SourceRow, row), self.idx, self.typ, val=self.val)
+        assert row in DESTINATION_ROWS, "Invalid row for destination endpoint"
+        return dst_end_point(cast(DestinationRow, row), self.idx, self.typ, val=self.val)
 
     def redirect_refs(self, old_ref_row, new_ref_row) -> None:
         """Redirect all references to old_ref_row to new_ref_row."""
         for ref in filter(lambda x: x.row == old_ref_row, self.refs):
             ref.row = new_ref_row
-
-    def safe_add_ref(self, ref: end_point_ref) -> None:
-        """Check if a reference exists before adding it."""
-        if ref not in self.refs:
-            self.refs.append(ref)
 
 
 @dataclass(slots=True)
@@ -190,6 +189,14 @@ class dst_end_point(end_point):
         """Return a copy of the end point with no references."""
         return dst_end_point(self.row, self.idx, self.typ)
 
+    def safe_add_ref(self, ref: src_end_point_ref) -> None:
+        """Check destination endpoint has a reference before adding it."""
+        if not self.refs:
+            self.refs.append(ref)
+        else:
+            # OK if it is the same reference (though inefficient)
+            assert self.refs[0] == ref, "Destination endpoint already has a reference."
+
 
 @dataclass(slots=True)
 class src_end_point(end_point):
@@ -218,6 +225,11 @@ class src_end_point(end_point):
     def clean_copy(self) -> Self:
         """Return a copy of the end point with no references."""
         return src_end_point(self.row, self.idx, self.typ, val=self.val)
+
+    def safe_add_ref(self, ref: dst_end_point_ref) -> None:
+        """Check if a reference exists before adding it."""
+        if ref not in self.refs:
+            self.refs.append(ref)
 
 
 def isDstEndPoint(ep: end_point) -> TypeGuard[dst_end_point]:

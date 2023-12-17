@@ -98,7 +98,7 @@ def random_type(probability: float = 0.0) -> int:
 
 def test_ep_type_int_of_bool() -> None:
     """These tests assume bool is EP type 1.
-    
+
     If that is not the case correct the test_gc_graph_results.json file 'F' rows
     """
     assert ep_type_lookup["n2v"]["bool"] == 1

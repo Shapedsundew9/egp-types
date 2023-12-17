@@ -85,8 +85,27 @@ for c in [''.join(sorted(s)) for n in range(7) for s in combinations("ABCFIOP", 
     combos.append(c)
 """
 VALID_GRAPH_ROW_COMBINATIONS: set[str] = {
-    'I', 'AI', 'AO', 'IO', 'ABI', 'ABO', 'ACI', 'ACO', 'AFI', 'AIO', 'ABCI', 'ABCO',
-    'ABFI', 'ABIO', 'ACFI', 'ACIO', 'ABCFI', 'ABCIO', 'AFIOP', 'ABFIOP', 'ACFIOP'
+    "I",
+    "AI",
+    "AO",
+    "IO",
+    "ABI",
+    "ABO",
+    "ACI",
+    "ACO",
+    "AFI",
+    "AIO",
+    "ABCI",
+    "ABCO",
+    "ABFI",
+    "ABIO",
+    "ACFI",
+    "ACIO",
+    "ABCFI",
+    "ABCIO",
+    "AFIOP",
+    "ABFIOP",
+    "ACFIOP",
 }
 
 

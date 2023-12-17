@@ -1,6 +1,6 @@
 """The internal_graph class."""
 
-from typing import Generator, Iterable, Literal, Any
+from typing import Generator, Iterable, Literal, Any, cast
 from pprint import pformat
 from itertools import count
 from logging import DEBUG, Logger, NullHandler, getLogger
@@ -23,17 +23,9 @@ from .egp_typing import (
     DstEndPointHash,
     VALID_ROW_SOURCES,
     SOURCE_ROWS,
-    DESTINATION_ROWS
+    DESTINATION_ROWS,
 )
-from .end_point import (
-    dst_end_point,
-    dst_end_point_ref,
-    isDstEndPoint,
-    isSrcEndPoint,
-    src_end_point,
-    src_end_point_ref,
-    x_end_point
-)
+from .end_point import dst_end_point, dst_end_point_ref, isDstEndPoint, isSrcEndPoint, src_end_point, src_end_point_ref, x_end_point
 
 
 # Logging
@@ -59,7 +51,8 @@ class internal_graph(EndPointDict):
         """Add an end point to the internal graph."""
         self[ep.key()] = ep
 
-    # TODO: Be clear on rules regarding which method modify the structure
+    # TODO: Be clear on rules regarding which methods modify the structure & which return a new structure
+    # TODO: Be consistent on whether self modifying method maintains internal consistency
     def json_obj(self) -> dict[str, list[str | int | bool | list[list[str | int]] | None]]:
         """Return a json serializable object."""
         return {ep.key(): ep.json_obj() for ep in self.values()}
@@ -192,17 +185,21 @@ class internal_graph(EndPointDict):
         new_dict: EndPointDict = self.move_row(f_row, t_row, True)
         if_dict: EndPointDict = self.interface_from(f_row)
         new_dict.update(if_dict)
-        for dst_ep in filter((lambda x: x.cls == DST_EP), if_dict.values()):
-            new_dict[dst_ep.key()].refs.append(src_end_point_ref(("I", t_row)[dst_ep.row == "O"], dst_ep.idx))  # type: ignore
+        for iep in filter((lambda x: x.row == "I"), if_dict.values()):
+            cast(src_end_point, iep).refs.append(dst_end_point_ref(cast(DestinationRow, t_row), iep.idx))
+            cast(dst_end_point, new_dict[iep.refs[-1].key()]).refs.append(src_end_point_ref("I", iep.idx))
+        for oep in filter((lambda x: x.row == "O"), if_dict.values()):
+            cast(dst_end_point, oep).refs.append(src_end_point_ref(cast(SourceRow, t_row), oep.idx))
+            cast(src_end_point, new_dict[oep.refs[-1].key()]).refs.append(dst_end_point_ref("O", oep.idx))
         return new_dict
 
     def complete_references(self) -> None:
         """An incomplete reference is when only one end of the connection references the other."""
         for dst_ep in self.dst_ref_filter():
-            self[dst_ep.refs[0].key()].safe_add_ref(dst_ep.as_ref())
+            cast(src_end_point, self[dst_ep.refs[0].key()]).safe_add_ref(dst_ep.as_ref())
         for src_ep in self.src_ref_filter():
             for src_ref in src_ep.refs:
-                self[src_ref.key()].safe_add_ref(src_ep.as_ref())
+                cast(dst_end_point, self[src_ref.key()]).safe_add_ref(src_ep.as_ref())
 
     def remove_all_refs(self) -> None:
         """Remove all references from all endpoints."""
@@ -232,10 +229,11 @@ class internal_graph(EndPointDict):
     def validate(self) -> bool:
         """Validate the internal graph. This function is not built for speed."""
         validation_structure: dict[str, dict[str, dict[str, list[str | int | bool | list[list[str | int]] | None]]]] = {
-            'internal_graph': {k: {k: v} for k, v in self.json_obj().items()}}
+            "internal_graph": {k: {k: v} for k, v in self.json_obj().items()}
+        }
 
         # Valid structure and hash keys
-        valid: bool =  igraph_validator.validate(validation_structure) and all(k == v.key() for k, v in self.items())
+        valid: bool = igraph_validator.validate(validation_structure) and all(k == v.key() for k, v in self.items())
 
         # Valid reference types
         valid = valid and all(isinstance(ep_ref, (src_end_point, dst_end_point)[ep.cls]) for ep in self.values() for ep_ref in ep.refs)
@@ -249,24 +247,36 @@ class internal_graph(EndPointDict):
 
 def internal_graph_from_json(json_igraph: dict[str, list[str | int | bool | list[list[str | int]] | None]]) -> internal_graph:
     """Create an internal graph from a json object."""
-    json_igraph_lists: list[list[Any]] = [[*v[:4], [(src_end_point_ref, dst_end_point_ref)[v[3]](*r) for r in v[4]], v[5]]  # type: ignore
-                                          for v in json_igraph.values()]
+    if _LOG_DEBUG:
+        for k, v in json_igraph.items():
+            assert k[0] == v[0], f"Key {k} first character does not match record row {v[0]}"
+            assert int(k[1:4]) == v[1], f"Key {k} index does not match record index {v[1]}"
+            assert k[4] == ("d", "s")[cast(int, v[3])], f"Key {k} class does not match record class {v[3]}"
+    json_igraph_lists: list[list[Any]] = [
+        [*v[:4], [(src_end_point_ref, dst_end_point_ref)[cast(int, v[3])](*r) for r in cast(list, v[4])], v[5]]
+        for v in json_igraph.values()
+    ]
     json_igraph_eps: list[x_end_point] = [dst_end_point(*ep_list) for ep_list in json_igraph_lists if ep_list[3] == DST_EP]
     json_igraph_eps.extend([src_end_point(*ep_list) for ep_list in json_igraph_lists if ep_list[3] == SRC_EP])
     return internal_graph({ep.key(): ep for ep in json_igraph_eps})
 
 
 def random_internal_graph(
-        rows: str,
-        ep_types: tuple[int, ...] = tuple(),
-        max_row_eps: int = 8, verify: bool = False,
-        rseed: int | None = None,
-        row_stablization: bool = False) -> internal_graph:
-    """Alternative random internal graph generator.
+    rows: str,
+    ep_types: tuple[int, ...] = tuple(),
+    max_row_eps: int = 8,
+    verify: bool = False,
+    rseed: int | None = None,
+    row_stablization: bool = False,
+) -> internal_graph:
+    """Random internal graph generator.
+
+    All rows specified will have at least one endpoint. The number of endpoints or each class per row is randomly generated
+    between 1 and max_row_eps. The endpoint types are randomly selected from ep_types. If ep_types is not specified.
 
     Row stabilization ensures that the graph has no rows with destinations that cannot be reached from a source.
     This is not full stabilization as a source row may be available but not have the correct endpoint types. This
-    can be mitigated by definiting only one type.    
+    can be mitigated by defining only one type.
     """
     has_f: bool = "F" in rows
     has_o: bool = "O" in rows
@@ -279,7 +289,9 @@ def random_internal_graph(
         seed(rseed)
 
     if _LOG_DEBUG:
-        _logger.debug(f"rows: {rows}, ep_types: {ep_types}, max_row_eps: {max_row_eps}, verify: {verify}, rseed: {rseed}, row_stablization: {row_stablization}")
+        _logger.debug(
+            f"rows: {rows}, ep_types: {ep_types}, max_row_eps: {max_row_eps}, verify: {verify}, rseed: {rseed}, row_stablization: {row_stablization}"
+        )
 
     # For each row to be generated add them to the internal graph
     for row in rows.replace("P", ""):

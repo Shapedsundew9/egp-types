@@ -311,7 +311,9 @@ class _gms_entry_validator(base_validator):
         type_list: list[int] = self._normalize_default_setter_set_input_types(document)
         # Row C only has 2 values in the ep list and does not reference any row let alone I
         # However row could randomly have a string "I" in it so we need to explicitly exclude it.
-        inputs: set[tuple[str | int, ...]] = {tuple(ep) for _, row in filter(lambda x: x[0] != "C", document["graph"].items()) for ep in filter(lambda x: x[0] == "I", row)}
+        inputs: set[tuple[str | int, ...]] = {
+            tuple(ep) for _, row in filter(lambda x: x[0] != "C", document["graph"].items()) for ep in filter(lambda x: x[0] == "I", row)
+        }
         return bytes((type_list.index(cast(int, ep[2])) for ep in sorted(inputs, key=lambda x: x[1])))
 
     def _normalize_default_setter_set_output_indices(self, document) -> bytes:

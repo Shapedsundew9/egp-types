@@ -27,7 +27,7 @@ GRAPH_RULES_SET: tuple[tuple[str, dict[str, Any]], ...] = (
             "min": MIN_EP_TYPE_VALUE,
             "max": MAX_EP_TYPE_VALUE,
             "check_with": "valid_ep_type",
-        }
+        },
     ),
     (
         "ep_type_not_bool",
@@ -46,11 +46,7 @@ GRAPH_RULES_SET: tuple[tuple[str, dict[str, Any]], ...] = (
     ),
     (
         "ep_type_only_bool",
-        {
-            "type": "integer",
-            "min": ep_type_lookup["n2v"]["bool"],
-            "max": ep_type_lookup["n2v"]["bool"]
-        },
+        {"type": "integer", "min": ep_type_lookup["n2v"]["bool"], "max": ep_type_lookup["n2v"]["bool"]},
     ),
     (
         "ep_idx",
@@ -63,12 +59,8 @@ GRAPH_RULES_SET: tuple[tuple[str, dict[str, Any]], ...] = (
     (
         # This can by any valid python constant or object instanciation expression
         "ep_const_value",
-        {
-            "minlength": 1,
-            "maxlength": 128,
-            "type": "string"
-        }
-    )
+        {"minlength": 1, "maxlength": 128, "type": "string"},
+    ),
 )
 GRAPH_REGISTRY.extend(deepcopy(GRAPH_RULES_SET))
 

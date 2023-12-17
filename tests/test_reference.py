@@ -24,4 +24,3 @@ def test_ref_from_sig_shift() -> None:
         sig: int = ref << shift
         rfs: int = ref_from_sig(sig.to_bytes(32, "big"), shift)
         assert rfs == (ref - _GL_GC), f"{sig:032x} >> {shift} with GL GC bit set != {rfs:08x}"
-
