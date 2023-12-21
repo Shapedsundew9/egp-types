@@ -1166,6 +1166,18 @@ class gc_graph:
             cast(src_end_point, self.i_graph[dst_ep.refs[0].key()]).refs.remove(dst_end_point_ref(dst_ep.row, dst_ep.idx))
             dst_ep.refs = []
 
+    def remove_all_connections(self) -> None:
+        """Remove all connections.
+
+        This is done by selecting all of the connected destination endpoint not in row U.
+        """
+        dst_ep_tuple = tuple(self.i_graph.dst_ref_filter())
+        if _LOG_DEBUG:
+            _logger.debug(f"Selecting connection to remove from destination endpoint tuple: {dst_ep_tuple}")
+        if dst_ep_tuple:
+            self.remove_connection(dst_ep_tuple)
+
+
     def random_add_connection(self) -> None:
         """Randomly choose two endpoints to connect.
 
