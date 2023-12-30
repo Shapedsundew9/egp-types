@@ -870,6 +870,7 @@ class gc_graph:
             4. Check a valid steady state has been achieved
             5. self.app_graph is regenerated
         """
+        # TODO: Need to put in a check for normalizing a graph that has not been modified since last normalization.
         _logger.debug("Normalising...")
 
         # 1. Remove all references to U before starting

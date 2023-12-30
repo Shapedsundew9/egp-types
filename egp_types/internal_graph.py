@@ -1,32 +1,20 @@
 """The internal_graph class."""
 
-from typing import Generator, Iterable, Literal, Any, cast
-from pprint import pformat
 from itertools import count
 from logging import DEBUG, Logger, NullHandler, getLogger
 from pprint import pformat
 from random import choice, randint, seed
-from egp_utils.base_validator import base_validator
-from surebrec.surebrec import generate
+from typing import Any, Generator, Iterable, Literal, cast, Self
 
-from .graph_validators import igraph_validator
 from .common import random_constant_str
-from .ep_type import asint, EP_TYPE_VALUES_TUPLE
-from .egp_typing import (
-    DestinationRow,
-    EndPointClass,
-    Row,
-    SourceRow,
-    DST_EP,
-    SRC_EP,
-    SrcEndPointHash,
-    DstEndPointHash,
-    VALID_ROW_SOURCES,
-    SOURCE_ROWS,
-    DESTINATION_ROWS,
-)
-from .end_point import dst_end_point, dst_end_point_ref, isDstEndPoint, isSrcEndPoint, src_end_point, src_end_point_ref, x_end_point
-
+from .egp_typing import (DESTINATION_ROWS, DST_EP, SOURCE_ROWS, SRC_EP,
+                         VALID_ROW_SOURCES, DestinationRow, DstEndPointHash,
+                         EndPointClass, Row, SourceRow, SrcEndPointHash, EndPointIndex)
+from .end_point import (dst_end_point, dst_end_point_ref, isDstEndPoint,
+                        isSrcEndPoint, src_end_point, src_end_point_ref,
+                        x_end_point)
+from .ep_type import EP_TYPE_VALUES_TUPLE, asint
+from .graph_validators import igraph_validator
 
 # Logging
 _logger: Logger = getLogger(__name__)
@@ -165,6 +153,17 @@ class internal_graph(EndPointDict):
         idx = count(self.next_idx(dst_row, DST_EP))
         return {n.key(): n for n in (dst_end_point(dst_row, next(idx), ep.typ) for ep in self.src_row_filter(src_row))}
 
+    def row_types(self, row: Row, cls: EndPointClass) -> set[int]:
+        """Return the set of types in row."""
+        return {ep.typ for ep in self.row_filter(row) if ep.cls == cls}
+
+    def extend_type_interface(self, row: Row) -> None:
+        """Extend the internal graph with the types of row."""
+        for ep_type in self.row_types(row, DST_EP) - self.row_types("I", SRC_EP):
+            self.add(src_end_point("I", self.next_idx("I", SRC_EP), ep_type))
+        for ep_type in self.row_types(row, SRC_EP) - self.row_types("O", DST_EP):
+            self.add(dst_end_point("O", self.next_idx("O", DST_EP), ep_type))
+
     def redirect_refs(self, row: Row, cls: EndPointClass, old_ref_row: Row, new_ref_row: Row) -> None:
         """Redirects cls end point references on row from old_ref_row to new_ref_row."""
         for ep in self.row_cls_filter(row, cls):
@@ -175,15 +174,20 @@ class internal_graph(EndPointDict):
         io_if: Generator[x_end_point, None, None] = self.rows_filter(("I", "O"))
         return {n.key(): n for n in ((dst_end_point, src_end_point)[not ep.cls](row, ep.idx, ep.typ) for ep in io_if)}
 
-    def interface_from(self, row: Row) -> EndPointDict:
+    def interface_from(self, row: Row, vet: set[int]) -> EndPointDict:
         """Create an interface graph (rows I and O) from row."""
-        io_if: Generator[x_end_point, None, None] = self.row_filter(row)
-        return {n.key(): n for n in ((src_end_point, dst_end_point)[ep.cls]("IO"[ep.cls], ep.idx, ep.typ) for ep in io_if)}  # type: ignore
+        i_if: Generator[x_end_point, None, None] = self.row_cls_filter(row, SRC_EP)
+        o_if: Generator[x_end_point, None, None] = self.row_cls_filter(row, DST_EP)
+        idx = count()
+        new_dict: EndPointDict = {n.key(): n for n in (src_end_point("I", next(idx), ep.typ) for ep in o_if if ep.typ in vet)}
+        new_dict.update({n.key(): n for n in (dst_end_point("O", ep.idx, ep.typ) for ep in i_if)})
+        return new_dict
 
-    def embed(self, f_row: Row, t_row: Row) -> EndPointDict:
+    def embed(self, f_row: Row, t_row: Row, vet: set[int]) -> EndPointDict:
         """Embed f_row as t_row in a graph with direct connections to row I and O"""
         new_dict: EndPointDict = self.move_row(f_row, t_row, True)
-        if_dict: EndPointDict = self.interface_from(f_row)
+        if_dict: EndPointDict = self.interface_from(f_row, vet)
+        indices = count()
         new_dict.update(if_dict)
         for iep in filter((lambda x: x.row == "I"), if_dict.values()):
             cast(src_end_point, iep).refs.append(dst_end_point_ref(cast(DestinationRow, t_row), iep.idx))
