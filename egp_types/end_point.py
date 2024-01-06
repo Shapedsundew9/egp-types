@@ -1,5 +1,6 @@
 """End point and end point reference classes."""
 
+from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, TypeGuard, Self, cast
 from copy import deepcopy
@@ -106,7 +107,7 @@ class end_point(generic_end_point):
         """For hashable operations."""
         return hash(self.key())
 
-    def _del_invalid_refs(self, ep: Self, row: Row, has_f: bool = False) -> None:
+    def _del_invalid_refs(self, ep: end_point, row: Row, has_f: bool = False) -> None:
         """Remove any invalid references"""
         valid_ref_rows: tuple[Row, ...] = VALID_ROW_SOURCES[has_f][row] if ep.cls == DST_EP else VALID_ROW_DESTINATIONS[has_f][row]
         for vidx in reversed([idx for idx, ref in enumerate(ep.refs) if ref.row not in valid_ref_rows]):
@@ -131,7 +132,7 @@ class end_point(generic_end_point):
 
     def copy(self, clean: bool = False) -> Self:
         """Return a copy of the end point with no references."""
-        return end_point(self.row, self.idx, self.typ, self.cls, val=self.val) if clean else deepcopy(self)
+        return self.__class__(self.row, self.idx, self.typ, self.cls, val=self.val) if clean else deepcopy(self)
 
     def move_copy(self, row: Row, clean: bool = False, has_f: bool = False) -> Self:
         """Return a copy of the end point with the row changed.
@@ -144,10 +145,8 @@ class end_point(generic_end_point):
             self._del_invalid_refs(ep, row, has_f)
         return ep
 
-    def move_cls_copy(self, row: Row, cls: EndPointClass, clean: bool = False, has_f: bool = False) -> Self:
+    def move_cls_copy(self, row: Row, cls: EndPointClass) -> x_end_point:
         """Return a copy of the end point with the row & cls changed."""
-        if cls == self.cls:
-            return self.move_copy(row, clean, has_f)
         # If the class of the endpoint has changed then the references must be invalid and are not copied.
         if cls == SRC_EP:
             assert row in SOURCE_ROWS, "Invalid row for source endpoint"
@@ -181,11 +180,11 @@ class dst_end_point(end_point):
         """Return a reference to this end point."""
         return dst_end_point_ref(self.row, self.idx)
 
-    def copy(self, clean: bool = False) -> Self:
+    def copy(self, clean: bool = False) -> dst_end_point:
         """Return a copy of the end point with no references."""
         return dst_end_point(self.row, self.idx, self.typ, self.cls, val=self.val) if clean else deepcopy(self)
 
-    def clean_copy(self) -> Self:
+    def clean_copy(self) -> dst_end_point:
         """Return a copy of the end point with no references."""
         return dst_end_point(self.row, self.idx, self.typ)
 
@@ -218,11 +217,11 @@ class src_end_point(end_point):
         """Return a reference to this end point."""
         return src_end_point_ref(self.row, self.idx)
 
-    def copy(self, clean: bool = False) -> Self:
+    def copy(self, clean: bool = False) -> src_end_point:
         """Return a copy of the end point with no references."""
         return src_end_point(self.row, self.idx, self.typ, self.cls, val=self.val) if clean else deepcopy(self)
 
-    def clean_copy(self) -> Self:
+    def clean_copy(self) -> src_end_point:
         """Return a copy of the end point with no references."""
         return src_end_point(self.row, self.idx, self.typ, val=self.val)
 
@@ -243,3 +242,4 @@ def isSrcEndPoint(ep: end_point) -> TypeGuard[src_end_point]:
 
 
 x_end_point = src_end_point | dst_end_point
+x_end_point_ref = src_end_point_ref | dst_end_point_ref

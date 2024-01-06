@@ -4,7 +4,8 @@ from itertools import count
 from logging import DEBUG, Logger, NullHandler, getLogger
 from pprint import pformat
 from random import choice, randint, seed
-from typing import Any, Generator, Iterable, Literal, cast, Self
+from typing import Any, Generator, Iterable, Literal, cast
+from operator import attrgetter
 
 from .common import random_constant_str
 from .egp_typing import (DESTINATION_ROWS, DST_EP, SOURCE_ROWS, SRC_EP,
@@ -129,21 +130,6 @@ class internal_graph(EndPointDict):
         """Return a copy of the specified f_row endpoints mapped to t_row. Remove references if clean is True."""
         return {n.key(): n for n in (ep.move_copy(t_row, clean, has_f) for ep in self.values() if ep.row == f_row)}
 
-    def move_row_cls(
-        self,
-        f_row: Row,
-        f_cls: EndPointClass,
-        t_row: Row,
-        t_cls: EndPointClass,
-        clean: bool = False,
-        has_f: bool = False,
-    ) -> EndPointDict:
-        """Return a copy of the specified f_row & f_cls endpoints mapped to t_row & t_cls. Remove references if clean is True."""
-        return {
-            n.key(): n
-            for n in (ep.move_cls_copy(t_row, t_cls, clean, has_f) for ep in self.values() if ep.row == f_row and ep.cls == f_cls)
-        }
-
     def direct_connect(self, src_row: SourceRow, dst_row: DestinationRow) -> DstEndPointDict:
         """Create a destination row with the exact endpoints needed by src_row."""
         return {n.key(): n for n in (dst_end_point(dst_row, ep.idx, ep.typ) for ep in self.src_row_filter(src_row))}
@@ -153,6 +139,18 @@ class internal_graph(EndPointDict):
         idx = count(self.next_idx(dst_row, DST_EP))
         return {n.key(): n for n in (dst_end_point(dst_row, next(idx), ep.typ) for ep in self.src_row_filter(src_row))}
 
+    def strip_unconnected_dst_eps(self, dst_row: DestinationRow) -> list[EndPointIndex]:
+        """Remove all unconnected destination endpoints in dst_row & reindex returning the old indices."""
+        for ep in tuple(self.dst_row_filter(dst_row)):
+            if not ep.refs:
+                del self[ep.key()]
+        return self.reindex_dst_row(dst_row)
+
+    def pass_thru(self, dst_row_a: DestinationRow, dst_row_b: DestinationRow, mapping: list[EndPointIndex]) -> SrcEndPointDict:
+        """Pass through the endpoints from dst_row_a in RGC to dst_row_b in FGC using mapping."""
+        i_eps: Generator[src_end_point, None, None] = (src_end_point("I", ep.idx, ep.typ, refs=[dst_end_point_ref(dst_row_b, mapping.pop(0))]) for ep in self.dst_row_filter(dst_row_a))
+        return {ep.key(): ep for ep in i_eps}
+            
     def row_types(self, row: Row, cls: EndPointClass) -> set[int]:
         """Return the set of types in row."""
         return {ep.typ for ep in self.row_filter(row) if ep.cls == cls}
@@ -174,29 +172,6 @@ class internal_graph(EndPointDict):
         io_if: Generator[x_end_point, None, None] = self.rows_filter(("I", "O"))
         return {n.key(): n for n in ((dst_end_point, src_end_point)[not ep.cls](row, ep.idx, ep.typ) for ep in io_if)}
 
-    def interface_from(self, row: Row, vet: set[int]) -> EndPointDict:
-        """Create an interface graph (rows I and O) from row."""
-        i_if: Generator[x_end_point, None, None] = self.row_cls_filter(row, SRC_EP)
-        o_if: Generator[x_end_point, None, None] = self.row_cls_filter(row, DST_EP)
-        idx = count()
-        new_dict: EndPointDict = {n.key(): n for n in (src_end_point("I", next(idx), ep.typ) for ep in o_if if ep.typ in vet)}
-        new_dict.update({n.key(): n for n in (dst_end_point("O", ep.idx, ep.typ) for ep in i_if)})
-        return new_dict
-
-    def embed(self, f_row: Row, t_row: Row, vet: set[int]) -> EndPointDict:
-        """Embed f_row as t_row in a graph with direct connections to row I and O"""
-        new_dict: EndPointDict = self.move_row(f_row, t_row, True)
-        if_dict: EndPointDict = self.interface_from(f_row, vet)
-        indices = count()
-        new_dict.update(if_dict)
-        for iep in filter((lambda x: x.row == "I"), if_dict.values()):
-            cast(src_end_point, iep).refs.append(dst_end_point_ref(cast(DestinationRow, t_row), iep.idx))
-            cast(dst_end_point, new_dict[iep.refs[-1].key()]).refs.append(src_end_point_ref("I", iep.idx))
-        for oep in filter((lambda x: x.row == "O"), if_dict.values()):
-            cast(dst_end_point, oep).refs.append(src_end_point_ref(cast(SourceRow, t_row), oep.idx))
-            cast(src_end_point, new_dict[oep.refs[-1].key()]).refs.append(dst_end_point_ref("O", oep.idx))
-        return new_dict
-
     def complete_references(self) -> None:
         """An incomplete reference is when only one end of the connection references the other."""
         for dst_ep in self.dst_ref_filter():
@@ -216,8 +191,50 @@ class internal_graph(EndPointDict):
             if self[key].row == row:
                 del self[key]
 
-    def reindex(self) -> None:
-        """Reindex all endpoints."""
+    def reindex_dst_row(self, row: DestinationRow, clean: bool = False) -> list[EndPointIndex]:
+        """Reindex the destination endpoints & correct any uncleaned references retuning the old indices."""
+        indices = count()
+        retval: list[EndPointIndex] = []
+        for ep in sorted(self.dst_row_filter(row), key=attrgetter("idx")):
+            old_key: DstEndPointHash = ep.key()
+            old_ep_ref: dst_end_point_ref = ep.as_ref()
+            retval.append(old_ep_ref.idx)
+            ep.idx = next(indices)
+            if ep.refs:
+                if clean:
+                    ep.refs.clear()
+                else:
+                    other_ep: src_end_point = cast(src_end_point, self[ep.refs[0].key()])
+                    # Source endpoints can have multiple references
+                    other_ep.refs[other_ep.refs.index(old_ep_ref)].idx = ep.idx
+            del self[old_key]
+            self[ep.key()] = ep
+        return retval
+
+    def reindex_src_row(self, row: SourceRow, clean: bool = False) -> list[EndPointIndex]:
+        """Reindex the source endpoints & correct any uncleaned references retuning the old indices."""
+        indices = count()
+        retval: list[EndPointIndex] = []
+        for ep in sorted(self.src_row_filter(row), key=attrgetter("idx")):
+            old_key: SrcEndPointHash = ep.key()
+            retval.append(ep.idx)
+            ep.idx = next(indices)
+            if ep.refs:
+                if clean:
+                    ep.refs.clear()
+                else:
+                    for ref in ep.refs:
+                        other_ep: dst_end_point = cast(dst_end_point, self[ref.key()])
+                        # Destination endpoints can only have 1 reference
+                        other_ep.refs[0].idx = ep.idx
+            del self[old_key]
+            self[ep.key()] = ep
+        return retval
+
+    def reindex(self, clean: bool = True) -> None:
+        """Reindex all endpoints deleting all references by default."""
+        if clean:
+            self.remove_all_refs()
         counts: dict[str, int] = {}
         for k, ep in sorted(self.items()):
             key: str = ep.row + ("d", "s")[ep.cls]
@@ -319,7 +336,8 @@ def random_internal_graph(
     for const_ep in igraph.row_filter("C"):
         const_ep.val = random_constant_str(const_ep.typ)
 
-    igraph.reindex()
+    # No references to clean out.
+    igraph.reindex(False)
     if _LOG_DEBUG:
         _logger.debug(f"Random internal graph post-refactor:\n{pformat(igraph, 4, width=180)}")
 

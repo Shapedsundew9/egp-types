@@ -278,18 +278,6 @@ def test_internal_graph_move_row() -> None:
     assert "B000d" not in moved_row
 
 
-def test_internal_graph_move_row_cls() -> None:
-    """Test case for internal_graph.move_row_cls()"""
-    graph = internal_graph()
-    graph.add(src_end_point("A", 0, 2))
-    graph.add(src_end_point("B", 0, 2))
-    moved_row: EndPointDict = graph.move_row_cls("A", SRC_EP, "B", DST_EP)
-    assert isinstance(moved_row, dict)
-    assert len(moved_row) == 1
-    assert "B000d" in moved_row
-    assert "B000s" not in moved_row
-
-
 def test_internal_graph_direct_connect() -> None:
     """Test case for internal_graph.direct_connect()"""
     graph = internal_graph()
@@ -331,36 +319,6 @@ def test_internal_graph_as_row() -> None:
     assert len(row) == 2
     assert "A000d" in row
     assert "A000s" in row
-
-
-def test_internal_graph_interface_from() -> None:
-    """Test case for internal_graph.interface_from()"""
-    graph = internal_graph()
-    graph.add(src_end_point("A", 0, 2))
-    graph.add(dst_end_point("A", 0, 2))
-    interface: EndPointDict = graph.interface_from("A")
-    assert isinstance(interface, dict)
-    assert len(interface) == 2
-    assert "O000d" in interface
-    assert "I000s" in interface
-
-
-def test_internal_graph_embed() -> None:
-    """Test case for internal_graph.embed()"""
-    graph = internal_graph()
-    graph.add(src_end_point("A", 0, 2))
-    graph.add(dst_end_point("A", 0, 2))
-    embedded_graph: EndPointDict = graph.embed("A", "B")
-    assert isinstance(embedded_graph, dict)
-    assert len(embedded_graph) == 4
-    assert "O000d" in embedded_graph
-    assert "I000s" in embedded_graph
-    assert "B000d" in embedded_graph
-    assert "B000s" in embedded_graph
-    assert embedded_graph["B000d"].refs[0].row == "I" and embedded_graph["B000d"].refs[0].idx == 0
-    assert embedded_graph["B000s"].refs[0].row == "O" and embedded_graph["B000s"].refs[0].idx == 0
-    assert embedded_graph["O000d"].refs[0].row == "B" and embedded_graph["O000d"].refs[0].idx == 0
-    assert embedded_graph["I000s"].refs[0].row == "B" and embedded_graph["I000s"].refs[0].idx == 0
 
 
 def test_internal_graph_complete_references() -> None:
