@@ -1,5 +1,6 @@
 """The internal_graph class."""
 
+from __future__ import annotations
 from itertools import count
 from logging import DEBUG, Logger, NullHandler, getLogger
 from pprint import pformat
@@ -33,8 +34,69 @@ class internal_graph(EndPointDict):
     """Convinient structure for GC graph manipulation."""
 
     def __repr__(self) -> str:
-        """Return a string representation of the internal graph."""
-        return pformat(dict(self), sort_dicts=True, width=180)
+        """Return a mermaid chart flowchart representation of the internal graph.
+            flowchart TB
+                subgraph R
+                    direction TB
+                    subgraph Rs
+                        direction TB
+                        R000s["R000s: ep.typ"]
+                        R001s["R000s: ep.typ"]
+                        ...
+                        Rxxxs["Rxxxs: ep.typ"]
+                    end
+                    subgraph Rd
+                        direction TB
+                        R000d["R000d: ep.typ"]
+                        R001d["R000d: ep.typ"]
+                        ...
+                        Rxxxd["Rxxxd: ep.typ"]
+                    end
+                end
+                ...
+
+                x000s --> y004d
+                y000s --> z002d
+                ...     
+        """
+        if not self:
+            return "Empty internal graph"
+        ret_str = "flowchart TB\n"
+        for row in sorted(set(ep.row for ep in self.values() if ep.row != "U")):
+            ret_str += f"\tsubgraph {row}\n"
+            ret_str += "\t\tdirection TB\n"
+            if self.num_eps(row, SRC_EP):
+                ret_str += f"\t\tsubgraph {row}s\n"
+                for ep in self.src_row_filter(row):
+                    ret_str += f"\t\t\t{ep.key()}[\"{ep.key()}: {ep.typ}\"]\n"
+                ret_str += "\t\tend\n"
+            if self.num_eps(row, DST_EP):
+                ret_str += f"\t\tsubgraph {row}d\n"
+                for ep in self.dst_row_filter(row):
+                    ret_str += f"\t\t\t{ep.key()}[\"{ep.key()}: {ep.typ}\"]\n"
+                ret_str += "\t\tend\n"
+            ret_str += "\tend\n"
+        for ep in self.src_filter():
+            for ref in ep.refs:
+                ret_str += f"\t{ep.key()} --> {ref.key()}\n"
+        ret_str += "\n"
+        ret_str += "classDef Iclass fill:#999,stroke:#333,stroke-width:4px\n"
+        ret_str += "classDef Cclass fill:#444,stroke:#333,stroke-width:4px\n"
+        ret_str += "classDef Fclass fill:#0FF,stroke:#333,stroke-width:4px\n"
+        ret_str += "classDef Aclass fill:#900,stroke:#333,stroke-width:4px\n"
+        ret_str += "classDef Bclass fill:#009,stroke:#333,stroke-width:4px\n"
+        ret_str += "classDef Oclass fill:#000,stroke:#333,stroke-width:4px\n"
+        ret_str += "classDef Pclass fill:#090,stroke:#333,stroke-width:4px\n"
+        ret_str += "\n"
+        ret_str += "class I Iclass\n"
+        ret_str += "class C Cclass\n"
+        ret_str += "class F Fclass\n"
+        ret_str += "class A Aclass\n"
+        ret_str += "class B Bclass\n"
+        ret_str += "class O Oclass\n"
+        ret_str += "class P Pclass\n"
+        return ret_str
+        # return pformat(dict(self), sort_dicts=True, width=180)
 
     def add(self, ep: x_end_point) -> None:
         """Add an end point to the internal graph."""
@@ -139,6 +201,12 @@ class internal_graph(EndPointDict):
         idx = count(self.next_idx(dst_row, DST_EP))
         return {n.key(): n for n in (dst_end_point(dst_row, next(idx), ep.typ) for ep in self.src_row_filter(src_row))}
 
+    def extend_src(self, src_row: SourceRow, iig: internal_graph) -> None:
+        """Extend the source endpoints in src_row by igc row O"""
+        idx = count(self.next_idx(src_row, SRC_EP))
+        for ep in iig.dst_row_filter("O"):
+            self.add(src_end_point(src_row, next(idx), ep.typ))
+
     def strip_unconnected_dst_eps(self, dst_row: DestinationRow) -> list[EndPointIndex]:
         """Remove all unconnected destination endpoints in dst_row & reindex returning the old indices."""
         for ep in tuple(self.dst_row_filter(dst_row)):
@@ -148,9 +216,9 @@ class internal_graph(EndPointDict):
 
     def pass_thru(self, dst_row_a: DestinationRow, dst_row_b: DestinationRow, mapping: list[EndPointIndex]) -> SrcEndPointDict:
         """Pass through the endpoints from dst_row_a in RGC to dst_row_b in FGC using mapping."""
-        i_eps: Generator[src_end_point, None, None] = (src_end_point("I", ep.idx, ep.typ, refs=[dst_end_point_ref(dst_row_b, mapping.pop(0))]) for ep in self.dst_row_filter(dst_row_a))
+        i_eps: Generator[src_end_point, None, None] = (src_end_point("I", ep.idx, ep.typ, refs=[dst_end_point_ref(dst_row_b, mapping.pop(0))]) for ep in self.dst_row_filter(dst_row_a) if ep.refs)
         return {ep.key(): ep for ep in i_eps}
-            
+
     def row_types(self, row: Row, cls: EndPointClass) -> set[int]:
         """Return the set of types in row."""
         return {ep.typ for ep in self.row_filter(row) if ep.cls == cls}

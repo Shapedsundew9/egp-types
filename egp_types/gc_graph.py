@@ -312,8 +312,14 @@ class gc_graph:
         )
 
     def __repr__(self) -> str:
+        """Return a string representation of the graph."""
+        return self.i_graph.__repr__()
+
+    def unique_str(self) -> str:
         """Print the graph in row order sources then destinations in index order."""
         # NOTE: This function is used in determining the signature of a GC.
+        # FIXME: If it is where is
+        assert False, "This function should not be used anywhere."
         str_list: list[str] = [f"Rows: {self.rows}"]
         for row in ROWS:
             for ep_class in (False, True):
