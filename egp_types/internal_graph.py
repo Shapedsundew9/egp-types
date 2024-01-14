@@ -9,7 +9,7 @@ from typing import Any, Generator, Iterable, Literal, cast
 from operator import attrgetter
 
 from .common import random_constant_str
-from .egp_typing import (DESTINATION_ROWS, DST_EP, SOURCE_ROWS, SRC_EP,
+from .egp_typing import (DESTINATION_ROWS, DST_EP, SOURCE_ROWS, SRC_EP, ROWS,
                          VALID_ROW_SOURCES, DestinationRow, DstEndPointHash,
                          EndPointClass, Row, SourceRow, SrcEndPointHash, EndPointIndex)
 from .end_point import (dst_end_point, dst_end_point_ref, isDstEndPoint,
@@ -17,6 +17,8 @@ from .end_point import (dst_end_point, dst_end_point_ref, isDstEndPoint,
                         x_end_point)
 from .ep_type import EP_TYPE_VALUES_TUPLE, asint
 from .graph_validators import igraph_validator
+from .mermaid_charts import MERMAID_IGRAPH_CLASS_DEF_STR, MERMAID_IGRAPH_COLORS
+
 
 # Logging
 _logger: Logger = getLogger(__name__)
@@ -28,6 +30,22 @@ _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 EndPointDict = dict[SrcEndPointHash | DstEndPointHash, x_end_point]
 SrcEndPointDict = dict[SrcEndPointHash, src_end_point]
 DstEndPointDict = dict[DstEndPointHash, dst_end_point]
+
+
+# Mermaid chart formatting.
+# Can be pasted after the flowchart definition of the internal chart to add colouring/formatting etc.
+MERMAID_IGRAPH_CLASS_STR = ( 
+    "\n"
+    "class I0000 Iclass\n"
+    "class C0000 Cclass\n"
+    "class F0000 Fclass\n"
+    "class A0000 Aclass\n"
+    "class B0000 Bclass\n"
+    "class O0000 Oclass\n"
+    "class P0000 Pclass\n"
+)
+MERMAID_IGRAPH_FORMAT_STR: str = MERMAID_IGRAPH_CLASS_DEF_STR + MERMAID_IGRAPH_CLASS_STR
+_logger.debug(f"Mermaid chart formatting for internal graph representation:\n{MERMAID_IGRAPH_FORMAT_STR}\n")
 
 
 class internal_graph(EndPointDict):
@@ -60,43 +78,57 @@ class internal_graph(EndPointDict):
                 ...     
         """
         if not self:
-            return "Empty internal graph"
-        ret_str = "flowchart TB\n"
+            return "\n%% Instance ID: {id(self)}\nEmpty internal graph\n"
+        ret_list_str: list[str] = [f"\n%% Instance ID: {id(self)}\nflowchart TB\n"]
+        ret_list_str.extend(self.mermaid_subgraph_str())
+        ret_list_str.append("\n")
+        ret_list_str.extend(self.mermaid_link_str())
+        return "\n".join(ret_list_str)
+    
+    def mermaid_embedded_str(self, uid: int = 0) -> tuple[list[str], list[str]]:
+        """Return the mermaid chart representation of the internal graph."""
+        ret_list_str: list[str] = self.mermaid_subgraph_str(uid)
+        link_list_str: list[str] = self.mermaid_link_str(uid)
+        return ret_list_str, link_list_str
+
+    def mermaid_subgraph_str(self, uid: int = 0) -> list[str]:
+        """Return the mermaid chart subgraph representation of the internal graph."""
+        # Add the relevant row subgraphs
+        ret_list_str: list[str] = []
         for row in sorted(set(ep.row for ep in self.values() if ep.row != "U")):
-            ret_str += f"\tsubgraph {row}\n"
-            ret_str += "\t\tdirection TB\n"
+            ret_list_str.append(f"\tsubgraph {row}{uid:04x}[\"{row}\"]")
+            ret_list_str.append("\t\tdirection TB")
             if self.num_eps(row, SRC_EP):
-                ret_str += f"\t\tsubgraph {row}s\n"
+                ret_list_str.append(f"\t\tsubgraph {row}s{uid:04x}[\"{row}s\"]")
                 for ep in self.src_row_filter(row):
-                    ret_str += f"\t\t\t{ep.key()}[\"{ep.key()}: {ep.typ}\"]\n"
-                ret_str += "\t\tend\n"
+                    ret_list_str.append(f"\t\t\t{ep.key()}{uid:04x}[\"{ep.key()}: {ep.typ}\"]")
+                ret_list_str.append("\t\tend")
             if self.num_eps(row, DST_EP):
-                ret_str += f"\t\tsubgraph {row}d\n"
+                ret_list_str.append(f"\t\tsubgraph {row}d{uid:04x}[\"{row}d\"]")
                 for ep in self.dst_row_filter(row):
-                    ret_str += f"\t\t\t{ep.key()}[\"{ep.key()}: {ep.typ}\"]\n"
-                ret_str += "\t\tend\n"
-            ret_str += "\tend\n"
+                    ret_list_str.append(f"\t\t\t{ep.key()}{uid:04x}[\"{ep.key()}: {ep.typ}\"]")
+                ret_list_str.append("\t\tend")
+            ret_list_str.append("\tend")
+        return ret_list_str
+
+    def mermaid_link_str(self, uid: int = 0) -> list[str]:
+        """Return the mermaid chart link representation of the internal graph."""
+        ret_list_str: list[str] = []
         for ep in self.src_filter():
             for ref in ep.refs:
-                ret_str += f"\t{ep.key()} --> {ref.key()}\n"
-        ret_str += "\n"
-        ret_str += "classDef Iclass fill:#999,stroke:#333,stroke-width:4px\n"
-        ret_str += "classDef Cclass fill:#444,stroke:#333,stroke-width:4px\n"
-        ret_str += "classDef Fclass fill:#0FF,stroke:#333,stroke-width:4px\n"
-        ret_str += "classDef Aclass fill:#900,stroke:#333,stroke-width:4px\n"
-        ret_str += "classDef Bclass fill:#009,stroke:#333,stroke-width:4px\n"
-        ret_str += "classDef Oclass fill:#000,stroke:#333,stroke-width:4px\n"
-        ret_str += "classDef Pclass fill:#090,stroke:#333,stroke-width:4px\n"
-        ret_str += "\n"
-        ret_str += "class I Iclass\n"
-        ret_str += "class C Cclass\n"
-        ret_str += "class F Fclass\n"
-        ret_str += "class A Aclass\n"
-        ret_str += "class B Bclass\n"
-        ret_str += "class O Oclass\n"
-        ret_str += "class P Pclass\n"
-        return ret_str
-        # return pformat(dict(self), sort_dicts=True, width=180)
+                ret_list_str.append(f"\t{ep.key()}{uid:04x} --> {ref.key()}{uid:04x}")
+        return ret_list_str
+
+    def mermaid_style_str(self, link_list_str:list[str]) -> list[str]:
+        """Return the mermaid link style lists."""
+        row_link_counts: dict[Row, list[str]] = {r: [] for r in ROWS}
+        for i, link_str in enumerate(link_list_str):
+            row_link_counts[cast(Row, link_str[1])].append(str(i))
+        return [f"linkStyle {','.join(link_counts)} stroke:{MERMAID_IGRAPH_COLORS[row]['link']}" for row, link_counts in row_link_counts.items() if link_counts]
+
+    def mermaid_class_str(self, uid: int = 0) -> list[str]:
+        """Return the mermaid class style lists."""
+        return [f"class {r}{uid:04x} {r}class" for r in ROWS]
 
     def add(self, ep: x_end_point) -> None:
         """Add an end point to the internal graph."""
@@ -194,7 +226,7 @@ class internal_graph(EndPointDict):
 
     def direct_connect(self, src_row: SourceRow, dst_row: DestinationRow) -> DstEndPointDict:
         """Create a destination row with the exact endpoints needed by src_row."""
-        return {n.key(): n for n in (dst_end_point(dst_row, ep.idx, ep.typ) for ep in self.src_row_filter(src_row))}
+        return {n.key(): n for n in (dst_end_point(dst_row, ep.idx, ep.typ, refs=[ep.as_ref()]) for ep in self.src_row_filter(src_row))}
 
     def append_connect(self, src_row: SourceRow, dst_row: DestinationRow) -> DstEndPointDict:
         """Create endpoints as they would append to a destination row with the exact endpoints needed by src_row."""
@@ -231,7 +263,9 @@ class internal_graph(EndPointDict):
             self.add(dst_end_point("O", self.next_idx("O", DST_EP), ep_type))
 
     def redirect_refs(self, row: Row, cls: EndPointClass, old_ref_row: Row, new_ref_row: Row) -> None:
-        """Redirects cls end point references on row from old_ref_row to new_ref_row."""
+        """Redirects cls end point references on row from old_ref_row to new_ref_row.
+        Does not modifiy old_ref or new_ref endpoints. These endpoints must be change separately to maintain consistency.
+        """
         for ep in self.row_cls_filter(row, cls):
             ep.redirect_refs(old_ref_row, new_ref_row)
 
@@ -240,13 +274,16 @@ class internal_graph(EndPointDict):
         io_if: Generator[x_end_point, None, None] = self.rows_filter(("I", "O"))
         return {n.key(): n for n in ((dst_end_point, src_end_point)[not ep.cls](row, ep.idx, ep.typ) for ep in io_if)}
 
-    def complete_references(self) -> None:
+    def complete_dst_references(self, row: DestinationRow) -> None:
         """An incomplete reference is when only one end of the connection references the other."""
-        for dst_ep in self.dst_ref_filter():
-            cast(src_end_point, self[dst_ep.refs[0].key()]).safe_add_ref(dst_ep.as_ref())
-        for src_ep in self.src_ref_filter():
+        for dst_ep in self.dst_row_filter(row):
+            cast(src_end_point, self[dst_ep.refs[0].key()]).refs.append(dst_ep.as_ref())
+
+    def complete_src_references(self, row: SourceRow) -> None:
+        """An incomplete reference is when only one end of the connection references the other."""
+        for src_ep in self.src_row_filter(row):
             for src_ref in src_ep.refs:
-                cast(dst_end_point, self[src_ref.key()]).safe_add_ref(src_ep.as_ref())
+                cast(dst_end_point, self[src_ref.key()]).refs.append(src_ep.as_ref())
 
     def remove_all_refs(self) -> None:
         """Remove all references from all endpoints."""
@@ -374,7 +411,7 @@ def random_internal_graph(
     # Set defaults
     if not ep_types:
         ep_types = EP_TYPE_VALUES_TUPLE[2:]
-    if seed is not None:
+    if rseed is not None:
         seed(rseed)
 
     if _LOG_DEBUG:

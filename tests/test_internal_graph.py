@@ -321,15 +321,6 @@ def test_internal_graph_as_row() -> None:
     assert "A000s" in row
 
 
-def test_internal_graph_complete_references() -> None:
-    """Test case for internal_graph.complete_references()"""
-    graph = internal_graph()
-    graph.add(src_end_point("A", 0, 2))
-    graph.add(dst_end_point("B", 0, 2))
-    graph.complete_references()
-    assert len(graph) == 2
-
-
 def test_internal_graph_remove_all_refs() -> None:
     """Test case for internal_graph.remove_all_refs()"""
     graph = internal_graph()

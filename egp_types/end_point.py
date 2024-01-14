@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, TypeGuard, Self, cast
 from copy import deepcopy
+from logging import DEBUG, Logger, NullHandler, getLogger
 
 from .egp_typing import (
     DST_EP,
@@ -22,6 +23,12 @@ from .egp_typing import (
     SOURCE_ROWS,
     DESTINATION_ROWS,
 )
+
+
+# Logging
+_logger: Logger = getLogger(__name__)
+_logger.addHandler(NullHandler())
+_LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
 
 @dataclass(slots=True)
@@ -228,6 +235,7 @@ class src_end_point(end_point):
     def safe_add_ref(self, ref: dst_end_point_ref) -> None:
         """Check if a reference exists before adding it."""
         if ref not in self.refs:
+            _logger.warning(f"Adding reference {ref} to {self}: This is inefficient.")
             self.refs.append(ref)
 
 

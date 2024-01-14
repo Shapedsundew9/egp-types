@@ -264,6 +264,10 @@ register_token_code(
     "E01028",
     "Internal graph failed validation.",
 )
+register_token_code(
+    "E01029",
+    "Endpoint {ep} contains duplicate references.",
+)
 
 register_token_code("I01000", '"I" row endpoint appended of UNKNOWN_EP_TYPE_VALUE.')
 register_token_code("I01001", '"I" row endpoint removed.')
@@ -354,7 +358,7 @@ class gc_graph:
                     i_graph[dst_ep.key()] = dst_ep
                     src_ep_hash: SrcEndPointHash = dst_ep.refs[0].key()
                     if src_ep_hash in i_graph and row != "U":
-                        i_graph[src_ep_hash].refs.append(dst_end_point_ref(row, index))
+                        cast(src_end_point, i_graph[src_ep_hash]).refs.append(dst_end_point_ref(row, index))
                     elif cp_row != "C":
                         refs: list[dst_end_point_ref] = [dst_end_point_ref(row, index)] if row != "U" else []
                         i_graph[src_ep_hash] = src_end_point(cp_row, cp_idx, cp_typ, refs=refs)
@@ -956,6 +960,7 @@ class gc_graph:
                 a. Row 'U' must have at least 1 destination endpoint
                 b. Row 'U' must have no source endpoints
             16. Internal graph validates
+            17. No endpoints have duplicate references
 
         Args
         ----
@@ -1131,6 +1136,11 @@ class gc_graph:
         if validate_igraph and not self.i_graph.validate():
             self.status.append(text_token({"E01028": {}}))
 
+        # 17
+        for ep in self.i_graph.values():
+            if len(ep.refs) != len(set(ep.refs)):
+                self.status.append(text_token({"E01029": {"ep": ep}}))
+
         if _LOG_DEBUG:
             if self.status:
                 _logger.debug(f"Graph internal format:\n{self}")
@@ -1263,6 +1273,19 @@ class gc_graph:
             [ep.typ for ep in sorted(self.i_graph.src_row_filter(row), key=lambda x: x.idx)],
             [ep.typ for ep in sorted(self.i_graph.dst_row_filter(row), key=lambda x: x.idx)],
         )
+
+    def connected_row_if(self, row: DestinationRow) -> list[int]:
+        """Return the connected input row interface definition.
+
+        Args
+        ----
+        row: One of gc_graph.rows destination rows.
+
+        Returns
+        -------
+        List of integers which are ep_type_ints of connected endpoints in the order defined in the graph.
+        """
+        return [ep.typ for ep in sorted(self.i_graph.dst_row_filter(row), key=lambda x: x.idx) if ep.refs]
 
     def input_if(self) -> list[int]:
         """Return the input interface definition.
