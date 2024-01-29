@@ -23,8 +23,12 @@ GCGraphRows = tuple[dict[Row, int], dict[Row, int]]
 SRC_EP: Literal[True] = True
 DST_EP: Literal[False] = False
 DESTINATION_ROWS: tuple[DestinationRow, ...] = ("A", "B", "F", "O", "P", "U")
+DESTINATION_ROW_INDEXES: dict[DestinationRow, int] = {row: i for i, row in enumerate(DESTINATION_ROWS)}
 SOURCE_ROWS: tuple[SourceRow, ...] = ("I", "C", "A", "B")
+SOURCE_ROW_INDEXES: dict[SourceRow, int] = {row: i for i, row in enumerate(SOURCE_ROWS)}
 ROWS: tuple[Row, ...] = tuple(sorted({*SOURCE_ROWS, *DESTINATION_ROWS}))
+ROW_INDEXES: dict[Row, int] = {row: i for i, row in enumerate(ROWS)}
+
 
 # Valid source rows for a given row.
 # The valid source rows depends on whether there is a row F
@@ -159,7 +163,7 @@ ConnectionGraphPair = tuple[DestinationRow | Literal["C"], ConnectionRow | Const
 ConnectionPair = tuple[DestinationRow, ConnectionRow]
 ConstantPair = tuple[Literal["C"], ConstantRow]
 JSONGraph = dict[
-    DestinationRow,
+    Row,
     list[list[SourceRow | EndPointIndex | EndPointType]] | list[list[ConstantExecStr | EndPointType]],
 ]
 

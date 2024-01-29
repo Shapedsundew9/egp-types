@@ -79,7 +79,7 @@ class internal_graph(EndPointDict):
         """
         if not self:
             return "\n%% Instance ID: {id(self)}\nEmpty internal graph\n"
-        ret_list_str: list[str] = [f"\n%% Instance ID: {id(self)}\nflowchart TB\n"]
+        ret_list_str: list[str] = [f"\n%% Paste into https://mermaid.live/\n%% Instance ID: {id(self)}\nflowchart TB\n"]
         ret_list_str.extend(self.mermaid_subgraph_str())
         ret_list_str.append("\n")
         ret_list_str.extend(self.mermaid_link_str())
