@@ -71,24 +71,28 @@ from __future__ import annotations
 from gc import collect
 from itertools import count
 from logging import DEBUG, Logger, NullHandler, getLogger
-from typing import Any, Generator, cast
+from typing import Any, Generator, SupportsIndex, cast
 
 from egp_stores.genomic_library import genomic_library
-from numpy import argsort, empty, int64, intp
+from numpy import argsort, empty, int64, intp, array, uint8, ndarray
 from numpy.typing import NDArray
+from enum import IntEnum
+
 
 from .egp_typing import (
     CPI,
     CVI,
-    DESTINATION_ROW_INDEXES,
     DESTINATION_ROWS,
-    SOURCE_ROW_INDEXES,
     SOURCE_ROWS,
+    DESTINATION_ROW_INDEXES,
+    SOURCE_ROW_INDEXES,
+    SrcRowIndex,
+    DstRowIndex,
     ConstantExecStr,
     EndPointType,
     JSONGraph,
-    SourceRow,
-    DestinationRow,
+    EndPointIndex,
+    SourceRow
 )
 from .ep_type import ep_type_lookup
 from .interface import EMPTY_INTERFACE, dst_interface, interface, src_interface
@@ -279,12 +283,16 @@ class _genetic_code(node_base):
     def __init__(self) -> None:
         self.gca: _genetic_code
         self.gcb: _genetic_code
-        self._src_ifs: list[interface]
-        self._dst_ifs: list[interface]
+        self.graph: graph
         self.ancestor_a: _genetic_code
         self.ancestor_b: _genetic_code
+        self.decendants: NDArray
         self.idx: int
         super().__init__()
+
+    def touch(self) -> None:
+        """Update the access sequence for the genetic code."""
+        _genetic_code.data_store.access_sequence[self.idx] = next(_genetic_code.access_number)
 
     def purge(self, purged_gcs: set[_genetic_code]) -> None:
         """Remove any references to the purged genetic codes."""
@@ -306,55 +314,6 @@ class _genetic_code(node_base):
         # TODO: This is just a placeholder
         return self.idx.to_bytes(32, "big")
 
-    def src_ifs(self, row: SourceRow) -> interface:
-        """Return the source interface for the specified row."""
-        if isinstance(self, genetic_code):
-            _genetic_code.data_store.access_sequence[self.idx] = next(_genetic_code.access_number)
-            return self._src_ifs[SOURCE_ROW_INDEXES[row]]
-        return EMPTY_INTERFACE
-
-    def dst_ifs(self, row: DestinationRow) -> interface:
-        """Return the destination interface for the specified row."""
-        if isinstance(self, genetic_code):
-            _genetic_code.data_store.access_sequence[self.idx] = next(_genetic_code.access_number)
-            return self._dst_ifs[DESTINATION_ROW_INDEXES[row]]
-        return EMPTY_INTERFACE
-
-    def src_ifs_from_graph(self, graph: JSONGraph) -> list[interface]:
-        """Return the source interfaces for a genetic code application graph."""
-        # Make no assumption about the number of source interfaces or their indices
-        src_ifs: list[interface] = list(EMPTY_INTERFACE for _ in SOURCE_ROWS)
-        src_ifs[SOURCE_ROW_INDEXES["I"]] = self.i_if_from_graph(graph)
-        src_ifs[SOURCE_ROW_INDEXES["C"]] = self.row_c_from_graph(graph)
-        src_ifs[SOURCE_ROW_INDEXES["A"]] = self.gca.src_ifs("I")
-        src_ifs[SOURCE_ROW_INDEXES["B"]] = self.gcb.src_ifs("I")
-        return src_ifs
-
-    def i_if_from_graph(self, graph: JSONGraph) -> interface:
-        """Return the I interface for a genetic code application graph."""
-        i_srcs: Generator = (dst_ep for dst_eps in graph.values() for dst_ep in dst_eps if dst_ep[CPI.ROW] == "I")
-        sorted_i_srcs: list[list[EndPointType]] = sorted(i_srcs, key=lambda ep: ep[CPI.IDX])
-        if not sorted_i_srcs:
-            return EMPTY_INTERFACE
-        return interface(cast(EndPointType, ep[CPI.TYP]) for ep in sorted_i_srcs)
-
-    def row_c_from_graph(self, graph: JSONGraph) -> row_c:
-        """Return the C source interface for a genetic code application graph."""
-        return row_c(cast(list[list[ConstantExecStr | EndPointType]], graph["C"])) if "C" in graph and graph["C"] else EMPTY_ROW_C
-
-    def dst_ifs_from_graph(self, graph: JSONGraph) -> list[interface]:
-        """Return the destination interfaces for a genetic code application graph."""
-        # Make no assumption about the number of destination interfaces or their indices
-        dst_ifs: list[interface] = list(EMPTY_INTERFACE for _ in DESTINATION_ROWS)
-        dst_ifs[DESTINATION_ROW_INDEXES["F"]] = ROW_F if "F" in graph else EMPTY_INTERFACE
-        dst_ifs[DESTINATION_ROW_INDEXES["A"]] = self.gca.dst_ifs("A")
-        dst_ifs[DESTINATION_ROW_INDEXES["B"]] = self.gcb.dst_ifs("B")
-        dst_ifs[DESTINATION_ROW_INDEXES["O"]] = (
-            interface(cast(EndPointType, src_ep[CPI.TYP]) for src_ep in graph["O"]) if "O" in graph and graph["O"] else EMPTY_INTERFACE
-        )
-        dst_ifs[DESTINATION_ROW_INDEXES["P"]] = dst_ifs[DESTINATION_ROW_INDEXES["O"]]
-        return dst_ifs
-
     @classmethod
     def cls_assertions(cls) -> None:
         """Validate assertions for the _genetic_code."""
@@ -367,22 +326,23 @@ EMPTY_ROW_C = row_c([])
 ROW_F = row_f()
 EMPTY_GENETIC_CODE = _genetic_code()
 PURGED_GENETIC_CODE = _genetic_code()
+NO_DESCENDANTS: NDArray = array([], dtype=object)
 
 
 class genetic_code(_genetic_code):
     """A genetic code is a codon with a source interface and a destination interface."""
 
-    __slots__: list[str] = ["gca", "gcb", "_src_ifs", "_dst_ifs", "ancestor_a", "ancestor_b", "idx"]
+    __slots__: list[str] = ["gca", "gcb", "_src_ifs", "_dst_ifs", "ancestor_a", "ancestor_b", "decendants", "idx"]
 
     def __init__(self, gc_dict: dict[str, Any] = {}) -> None:  # pylint: disable=dangerous-default-value
         self.gca: _genetic_code = gc_dict.get("gca", EMPTY_GENETIC_CODE)
         self.gcb: _genetic_code = gc_dict.get("gcb", EMPTY_GENETIC_CODE)
-        self._src_ifs: list[interface] = self.src_ifs_from_graph(gc_dict.get("graph", {}))
-        self._dst_ifs: list[interface] = self.dst_ifs_from_graph(gc_dict.get("graph", {}))
+        self.graph: graph = graph(gc_dict.get("graph", {}), self.gca, self.gcb)
         self.ancestor_a: _genetic_code = gc_dict.get("ancestor_a", EMPTY_GENETIC_CODE)
         self.ancestor_b: _genetic_code = gc_dict.get("ancestor_b", EMPTY_GENETIC_CODE)
+        self.decendants: NDArray = array(gc_dict["decendants"], dtype=object) if "descendants" in gc_dict else NO_DESCENDANTS
         self.idx: int = _genetic_code.data_store.assign_index(self)
-        _genetic_code.data_store.access_sequence[self.idx] = next(_genetic_code.access_number)
+        self.touch()
         _genetic_code.num_nodes += 1
         super().__init__()
 
@@ -405,3 +365,69 @@ class genetic_code(_genetic_code):
         _genetic_code.data_store.assertions()
         assert len(_genetic_code.data_store) == _genetic_code.num_nodes
         super().cls_assertions()
+
+
+class ConnIdx(IntEnum):
+    """Indices for connection definitions."""
+    SRC_ROW = 0
+    DST_ROW = 1
+    SRC_IDX = 2
+    DST_IDX = 3
+
+
+class connections(ndarray):
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        json_graph: JSONGraph = cast(JSONGraph, kwargs["json_graph"])
+        self[ConnIdx.SRC_ROW] = [SOURCE_ROW_INDEXES[cast(SourceRow, ep[CPI.ROW])] for row in json_graph for ep in json_graph[row] if row in DESTINATION_ROWS]
+        self[ConnIdx.DST_ROW] = [DESTINATION_ROW_INDEXES[row] for row in json_graph for ep in json_graph[row] if row in DESTINATION_ROWS]
+        self[ConnIdx.SRC_IDX] = [cast(int, ep[CPI.IDX]) for row in json_graph for ep in json_graph[row] if row in DESTINATION_ROWS]
+        self[ConnIdx.DST_IDX] = [cast(int, ep[CPI.IDX]) for row in json_graph for ep in json_graph[row] if row in DESTINATION_ROWS]
+
+    def __new__(cls, *_, **kwargs):
+        """Create a byte array for the connection data """
+        return super().__new__(cls, (4, sum(len(val) for row, val in kwargs["json_graph"].items() if row in DESTINATION_ROWS)), dtype=uint8)
+
+
+class rows(ndarray):
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        json_graph: JSONGraph = cast(JSONGraph, kwargs["json_graph"])
+        gca: _genetic_code = cast(_genetic_code, kwargs["gca"])
+        gcb: _genetic_code = cast(_genetic_code, kwargs["gcb"])
+        self[SrcRowIndex.I] = self.i_if_from_graph(json_graph)
+        self[SrcRowIndex.C] = self.row_c_from_graph(json_graph)
+        self[SrcRowIndex.A] = gca.graph.interface[SrcRowIndex.I] if gca is not EMPTY_GENETIC_CODE else EMPTY_INTERFACE
+        self[SrcRowIndex.B] = gcb.graph.interface[SrcRowIndex.I] if gcb is not EMPTY_GENETIC_CODE else EMPTY_INTERFACE
+        self[DstRowIndex.F] = ROW_F if "F" in json_graph else EMPTY_INTERFACE
+        self[DstRowIndex.A] = gca.graph.interface[DstRowIndex.A] if gca is not EMPTY_GENETIC_CODE else EMPTY_INTERFACE
+        self[DstRowIndex.B] = gcb.graph.interface[DstRowIndex.B] if gcb is not EMPTY_GENETIC_CODE else EMPTY_INTERFACE
+        self[DstRowIndex.O] = (
+            interface(cast(EndPointType, src_ep[CPI.TYP]) for src_ep in json_graph["O"]) if "O" in json_graph and json_graph["O"] else EMPTY_INTERFACE
+        )
+
+    def __new__(cls, *_, **__):
+        return super().__new__(cls, (len(SOURCE_ROWS) + len(DESTINATION_ROWS),), dtype=object)
+    
+    def i_if_from_graph(self, json_graph: JSONGraph) -> interface:
+        """Return the I interface for a genetic code application graph."""
+        i_srcs: Generator = (dst_ep for dst_eps in json_graph.values() for dst_ep in dst_eps if dst_ep[CPI.ROW] == "I")
+        sorted_i_srcs: list[list[EndPointType]] = sorted(i_srcs, key=lambda ep: ep[CPI.IDX])
+        if not sorted_i_srcs:
+            return EMPTY_INTERFACE
+        return interface(cast(EndPointType, ep[CPI.TYP]) for ep in sorted_i_srcs)
+
+    def row_c_from_graph(self, json_graph: JSONGraph) -> row_c:
+        """Return the C source interface for a genetic code application graph."""
+        return row_c(cast(list[list[ConstantExecStr | EndPointType]], json_graph["C"])) if "C" in json_graph and json_graph["C"] else EMPTY_ROW_C
+
+
+class graph():
+
+    def __init__(self, json_graph: JSONGraph, gca: _genetic_code, gcb: _genetic_code) -> None:
+        self.interface: NDArray = empty((len(SOURCE_ROWS) + len(DESTINATION_ROWS),), dtype=object)
+        self.connection: connections = connections(json_graph=json_graph)
+
+

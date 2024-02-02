@@ -11,6 +11,7 @@ from tqdm import trange
 from egp_types.egp_typing import (DESTINATION_ROWS, SOURCE_ROWS,
                                   ConnectionGraph, JSONGraph,
                                   connection_graph_to_json,
+                                  SrcRowIndex, DstRowIndex,
                                   json_to_connection_graph)
 from egp_types.gc_graph import gc_graph, random_gc_graph
 from egp_types.genetic_code import (DEFAULT_STORE_SIZE, EMPTY_GENETIC_CODE,
@@ -65,13 +66,16 @@ def test_genetic_code() -> None:
         assert gc.gcb is EMPTY_GENETIC_CODE
         assert gc.ancestor_a is EMPTY_GENETIC_CODE
         assert gc.ancestor_b is EMPTY_GENETIC_CODE
-        for row in SOURCE_ROWS:
-            if row == "C":
-                assert gc.src_ifs(row) is EMPTY_ROW_C
-            else:
-                assert gc.src_ifs(row) is EMPTY_INTERFACE
-        for row in DESTINATION_ROWS:
-            assert gc.dst_ifs(row) is EMPTY_INTERFACE
+        assert gc.graph.interface[SrcRowIndex.I] is EMPTY_INTERFACE
+        assert gc.graph.interface[SrcRowIndex.C] is EMPTY_ROW_C
+        assert gc.graph.interface[DstRowIndex.F] is EMPTY_INTERFACE
+        assert gc.graph.interface[SrcRowIndex.A] is EMPTY_INTERFACE
+        assert gc.graph.interface[DstRowIndex.A] is EMPTY_INTERFACE
+        assert gc.graph.interface[SrcRowIndex.B] is EMPTY_INTERFACE
+        assert gc.graph.interface[DstRowIndex.B] is EMPTY_INTERFACE
+        assert gc.graph.interface[DstRowIndex.O] is EMPTY_INTERFACE
+        assert gc.graph.interface[DstRowIndex.P] is EMPTY_INTERFACE
+
     _logger.debug("Gene pool validation completed.")
 
 
@@ -118,7 +122,7 @@ def test_purge_complex() -> None:
     # Randomly access genetic codes
     _logger.debug("Random access started.")
     for _ in range(DEFAULT_STORE_SIZE * 10):
-        genetic_code.data_store[randint(0, DEFAULT_STORE_SIZE - 1)].src_ifs("I")
+        genetic_code.data_store[randint(0, DEFAULT_STORE_SIZE - 1)].touch()
 
     # Add a genetic code causing a purge
     _logger.debug("Trigger purge.")

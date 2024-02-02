@@ -23,12 +23,42 @@ GCGraphRows = tuple[dict[Row, int], dict[Row, int]]
 SRC_EP: Literal[True] = True
 DST_EP: Literal[False] = False
 DESTINATION_ROWS: tuple[DestinationRow, ...] = ("A", "B", "F", "O", "P", "U")
-DESTINATION_ROW_INDEXES: dict[DestinationRow, int] = {row: i for i, row in enumerate(DESTINATION_ROWS)}
 SOURCE_ROWS: tuple[SourceRow, ...] = ("I", "C", "A", "B")
-SOURCE_ROW_INDEXES: dict[SourceRow, int] = {row: i for i, row in enumerate(SOURCE_ROWS)}
 ROWS: tuple[Row, ...] = tuple(sorted({*SOURCE_ROWS, *DESTINATION_ROWS}))
-ROW_INDEXES: dict[Row, int] = {row: i for i, row in enumerate(ROWS)}
 
+
+class SrcRowIndex(IntEnum):
+    """Indices for source rows."""
+    I = 0
+    C = 1
+    A = 2
+    B = 3
+
+
+class DstRowIndex(IntEnum):
+    """Indices for destination rows."""
+    A = 4
+    B = 5
+    F = 6
+    O = 7
+    P = 7  # O & P have the same definition
+    U = 8
+
+
+SOURCE_ROW_INDEXES: dict[SourceRow, SrcRowIndex] = {
+    "I": SrcRowIndex.I,
+    "C": SrcRowIndex.C,
+    "A": SrcRowIndex.A,
+    "B": SrcRowIndex.B,
+}
+DESTINATION_ROW_INDEXES: dict[DestinationRow, DstRowIndex] = {
+    "A": DstRowIndex.A,
+    "B": DstRowIndex.B,
+    "F": DstRowIndex.F,
+    "O": DstRowIndex.O,
+    "P": DstRowIndex.P,
+    "U": DstRowIndex.U,
+}
 
 # Valid source rows for a given row.
 # The valid source rows depends on whether there is a row F
