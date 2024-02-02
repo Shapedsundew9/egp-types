@@ -71,7 +71,7 @@ from __future__ import annotations
 from gc import collect
 from itertools import count
 from logging import DEBUG, Logger, NullHandler, getLogger
-from typing import Any, Generator, SupportsIndex, cast
+from typing import Any, Generator, SupportsIndex, cast, Self
 
 from egp_stores.genomic_library import genomic_library
 from numpy import argsort, empty, int64, intp, array, uint8, ndarray
@@ -385,9 +385,10 @@ class connections(ndarray):
         self[ConnIdx.SRC_IDX] = [cast(int, ep[CPI.IDX]) for row in json_graph for ep in json_graph[row] if row in DESTINATION_ROWS]
         self[ConnIdx.DST_IDX] = [cast(int, ep[CPI.IDX]) for row in json_graph for ep in json_graph[row] if row in DESTINATION_ROWS]
 
-    def __new__(cls, *_, **kwargs):
+    def __new__(cls, *_, **kwargs) -> connections:
         """Create a byte array for the connection data """
-        return super().__new__(cls, (4, sum(len(val) for row, val in kwargs["json_graph"].items() if row in DESTINATION_ROWS)), dtype=uint8)
+        shape: tuple[int, int] = (4, sum(len(val) for row, val in kwargs["json_graph"].items() if row in DESTINATION_ROWS))
+        return super().__new__(cls, shape, dtype=uint8)  # pylint: disable=unexpected-keyword-arg
 
 
 class rows(ndarray):
@@ -408,8 +409,9 @@ class rows(ndarray):
             interface(cast(EndPointType, src_ep[CPI.TYP]) for src_ep in json_graph["O"]) if "O" in json_graph and json_graph["O"] else EMPTY_INTERFACE
         )
 
-    def __new__(cls, *_, **__):
-        return super().__new__(cls, (len(SOURCE_ROWS) + len(DESTINATION_ROWS),), dtype=object)
+    def __new__(cls, *_, **__) -> rows:
+        shape: tuple[int] = (len(SOURCE_ROWS) + len(DESTINATION_ROWS),)
+        return super().__new__(cls, shape, dtype=object)  # pylint: disable=unexpected-keyword-arg
     
     def i_if_from_graph(self, json_graph: JSONGraph) -> interface:
         """Return the I interface for a genetic code application graph."""
