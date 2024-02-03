@@ -9,6 +9,7 @@ DestinationRow = Literal["A", "B", "F", "O", "P", "U"]
 SourceRow = Literal["I", "C", "A", "B"]
 Row = Literal["A", "B", "F", "O", "P", "I", "C", "U"]
 EndPointClass = bool
+EndPointClassStr = Literal["s", "d"]
 EndPointIndex = int
 EndPointType = int
 SrcEndPointHash = str
@@ -22,9 +23,15 @@ GCGraphRows = tuple[dict[Row, int], dict[Row, int]]
 # Constants
 SRC_EP: Literal[True] = True
 DST_EP: Literal[False] = False
+SRC_EP_CLS_STR: Literal["s"] = "s"
+DST_EP_CLS_STR: Literal["d"] = "d"
+EP_CLS_STR_TUPLE: tuple[Literal["d"], Literal["s"]] = (DST_EP_CLS_STR, SRC_EP_CLS_STR)
 DESTINATION_ROWS: tuple[DestinationRow, ...] = ("A", "B", "F", "O", "P", "U")
 SOURCE_ROWS: tuple[SourceRow, ...] = ("I", "C", "A", "B")
 ROWS: tuple[Row, ...] = tuple(sorted({*SOURCE_ROWS, *DESTINATION_ROWS}))
+
+# Indices for source and destination rows must match the order of the rows in the tuple.
+ROWS_INDEXED: tuple[Row, ...] = ("I", "C", "A", "B", "A", "B", "F", "O", "P", "U")
 
 
 class SrcRowIndex(IntEnum):

@@ -84,7 +84,7 @@ class internal_graph(EndPointDict):
         ret_list_str.append("\n")
         ret_list_str.extend(self.mermaid_link_str())
         return "\n".join(ret_list_str)
-    
+
     def mermaid_embedded_str(self, uid: int = 0) -> tuple[list[str], list[str]]:
         """Return the mermaid chart representation of the internal graph."""
         ret_list_str: list[str] = self.mermaid_subgraph_str(uid)
@@ -360,9 +360,11 @@ class internal_graph(EndPointDict):
 
         # Valid structure and hash keys
         valid: bool = igraph_validator.validate(validation_structure) and all(k == v.key() for k, v in self.items())
+        if not valid: 
+            _logger.debug("igraph_validator returned False.")
 
         # Valid reference types
-        valid = valid and all(isinstance(ep_ref, (src_end_point, dst_end_point)[ep.cls]) for ep in self.values() for ep_ref in ep.refs)
+        valid = valid and all(isinstance(ep_ref, (src_end_point_ref, dst_end_point_ref)[ep.cls]) for ep in self.values() for ep_ref in ep.refs)
 
         if not valid and _LOG_DEBUG:
             _logger.debug(f"Validation JSON:\n{pformat(validation_structure, 4)}")

@@ -88,35 +88,13 @@ _logger.addHandler(NullHandler())
 _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
 
-class node_base:
-    """Base class for all nodes in the genomic library."""
-
-    num_nodes: int = 0
-
-    def reference(self) -> bytes:
-        """Return a globally unique reference for the node."""
-        raise NotImplementedError
-
-    @classmethod
-    def cls_assertions(cls) -> None:
-        """Validate assertions for the node."""
-
-    def assertions(self) -> None:
-        """Validate assertions for the node."""
-        if len(self.reference()) != 32:
-            raise ValueError("reference is not 32 bytes")
-
-    def get_num_nodes(self) -> int:
-        """Return the number of nodes in the genomic library."""
-        return node_base.num_nodes
-
-
-class _genetic_code(node_base):
+class _genetic_code():
     """A genetic code is a codon with a source interface and a destination interface."""
 
+    num_nodes: int = 0
     data_store: store = store()
     access_number: count = count(FIRST_ACCESS_NUMBER)
-    __slots__: list[str] = ["gca", "gcb", "_src_ifs", "_dst_ifs", "ancestor_a", "ancestor_b", "idx"]
+    __slots__: list[str] = ["gca", "gcb", "graph", "_src_ifs", "_dst_ifs", "ancestor_a", "ancestor_b", "decendants", "idx"]
 
     def __init__(self) -> None:
         self.gca: _genetic_code
@@ -131,6 +109,11 @@ class _genetic_code(node_base):
     def touch(self) -> None:
         """Update the access sequence for the genetic code."""
         _genetic_code.data_store.access_sequence[self.idx] = next(_genetic_code.access_number)
+
+    @classmethod
+    def get_num_nodes(cls) -> int:
+        """Return the number of nodes in the genomic library."""
+        return cls.num_nodes
 
     def purge(self, purged_gcs: set[_genetic_code]) -> None:
         """Remove any references to the purged genetic codes."""
@@ -155,7 +138,6 @@ class _genetic_code(node_base):
     @classmethod
     def cls_assertions(cls) -> None:
         """Validate assertions for the _genetic_code."""
-        super().cls_assertions()
 
 
 # Constants

@@ -60,15 +60,15 @@ def test_genetic_code() -> None:
         assert gc.gcb is EMPTY_GENETIC_CODE
         assert gc.ancestor_a is EMPTY_GENETIC_CODE
         assert gc.ancestor_b is EMPTY_GENETIC_CODE
-        assert gc.graph.row[SrcRowIndex.I] is EMPTY_INTERFACE
-        assert gc.graph.row[SrcRowIndex.C] is EMPTY_INTERFACE_C
-        assert gc.graph.row[DstRowIndex.F] is EMPTY_INTERFACE
-        assert gc.graph.row[SrcRowIndex.A] is EMPTY_INTERFACE
-        assert gc.graph.row[DstRowIndex.A] is EMPTY_INTERFACE
-        assert gc.graph.row[SrcRowIndex.B] is EMPTY_INTERFACE
-        assert gc.graph.row[DstRowIndex.B] is EMPTY_INTERFACE
-        assert gc.graph.row[DstRowIndex.O] is EMPTY_INTERFACE
-        assert gc.graph.row[DstRowIndex.P] is EMPTY_INTERFACE
+        assert gc.graph.rows[SrcRowIndex.I] is EMPTY_INTERFACE
+        assert gc.graph.rows[SrcRowIndex.C] is EMPTY_INTERFACE_C
+        assert gc.graph.rows[DstRowIndex.F] is EMPTY_INTERFACE
+        assert gc.graph.rows[SrcRowIndex.A] is EMPTY_INTERFACE
+        assert gc.graph.rows[DstRowIndex.A] is EMPTY_INTERFACE
+        assert gc.graph.rows[SrcRowIndex.B] is EMPTY_INTERFACE
+        assert gc.graph.rows[DstRowIndex.B] is EMPTY_INTERFACE
+        assert gc.graph.rows[DstRowIndex.O] is EMPTY_INTERFACE
+        assert gc.graph.rows[DstRowIndex.P] is EMPTY_INTERFACE
 
     _logger.debug("Gene pool validation completed.")
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from gc import collect
 from logging import DEBUG, Logger, NullHandler, getLogger
-from typing import Any, cast, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from egp_stores.genomic_library import genomic_library
 from numpy import argsort, empty, int64, intp

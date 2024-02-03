@@ -2,27 +2,31 @@
 
 # Interfaces
 
-An interface is defined by the interface class which is derived from the python array class.
-An interface has a list of endpoints with 0 to 256 elements.
-Endpoints in the interface may be connected as source or destination endpoints.
+An interface is defined by the interface class which is derived from the numpy ndarray class.
+An interface has an array of endpoints with 0 to 256 elements.
+Endpoints in the interface may be connected as source and/or destination endpoints.
+See connections class for more details.
 There are two specialisations of the interface class: source_interface and destination_interface.
 
 # Source Interfaces
 
-A source interface is defined by the source_interface class which is derived from the interface class.
+A source interface is defined by the src_interface class which is derived from the interface class.
 Source interfaces can only have connections to destination interfaces.
 
 # Destination Interfaces
 
-A destination interface is defined by the destination_interface class which is derived from the interface class.
+A destination interface is defined by the dst_interface class which is derived from the interface class.
 Destination interfaces can only have connections from source interfaces.
 """
 from __future__ import annotations
-from numpy import ndarray, int16
-from typing import Iterable, cast
-from logging import getLogger, Logger, NullHandler
-from .ep_type import validate, ep_type_lookup
-from .egp_typing import EndPointType, ConstantExecStr, CVI
+
+from logging import Logger, NullHandler, getLogger
+from typing import cast, Literal
+
+from numpy import int16, ndarray
+
+from .egp_typing import ConstantExecStr, EndPointType, Row, EndPointClassStr
+from .ep_type import ep_type_lookup, validate
 
 
 # Logging
@@ -37,7 +41,13 @@ class interface(ndarray):
         self[:] = val
 
     def __new__(cls, val: list[EndPointType]) -> interface:
-        return super().__new__(cls, len(val), dtype=int16)
+        return super().__new__(cls, len(val), dtype=int16)  # pylint: disable=unexpected-keyword-arg
+
+    def mermaid(self, row:Row, cls:EndPointClassStr) -> list[str]:
+        """Return the mermaid charts string for the source interface.
+        e.g. uidA001d["A001d: 1"]"""
+        endpoints: list[str] = [f'\tuid{row}{idx:03}{cls}["{row}{idx:03}{cls}: {ept}"]' for idx, ept in enumerate(self)]
+        return[f"subgraph uid{row}{cls}", "\tdirection TB"] + endpoints + ["end"]
 
     def assertions(self) -> None:
         """Validate assertions for the interface."""
@@ -52,13 +62,17 @@ class empty_interface(interface):
     """An empty interface is an interface with no endpoints."""
 
     def __init__(self) -> None:
-        pass
+        super().__init__([])
 
-    def __new__(cls) -> interface:
-        return super().__new__(cls, [])
+    def __new__(cls) -> empty_interface:
+        return cast(empty_interface, super().__new__(cls, []))
 
-    def __setitem__(self, _, __) -> None:
-        assert False, "empty_interface cannot be modified"
+    def __setitem__(self, _, value) -> None:
+        assert not value, "empty_interface cannot be modified"
+
+    def mermaid(self, _: Row, __: Literal["s", "d"] = "s") -> list[str]:
+        """Mermaid charts string is empty for an empty interface."""
+        return []
 
     def append(self, _) -> None:
         """Cannot append to an empty interface."""
@@ -76,11 +90,21 @@ class empty_interface(interface):
 class src_interface(interface):
     """A source interface is an interface that can only have connections to destination interfaces."""
 
+    def mermaid(self, row:Row, cls: Literal["s"] = "s") -> list[str]:
+        """Return the mermaid charts string for the source interface.
+        e.g. A001s["A001s: 1"]"""
+        return super().mermaid(row, cls)
 
 class dst_interface(interface):
     """A destination interface is an interface that can only have connections from source interfaces."""
 
+    def mermaid(self, row:Row, cls: Literal["d"] = "d") -> list[str]:
+        """Return the mermaid charts string for the source interface.
+        e.g. A001d["A001d: 1"]"""
+        return super().mermaid(row, cls)
 
+
+# Used as a default value: Referencing the same object saves space and time.
 EMPTY_INTERFACE = empty_interface()
 
 
@@ -89,25 +113,28 @@ class interface_c(src_interface):
 
     __slots__: list[str] = ["value"]
 
-    def __init__(self, constants: list[list[ConstantExecStr | EndPointType]]) -> None:
-        """Construct a constants row from a list of values and a list of egp_types."""
-        self.value: list[str] = [cast(ConstantExecStr, ep[CVI.VAL]) for ep in constants]
+    def __init__(self, values: list[ConstantExecStr], types: list[EndPointType]) -> None:
+        """Initialize a constants row from a list of values and a list of endpoint types."""
+        super().__init__(types)
+        self.value: list[str] = values
 
-    def __new__(cls, constants: list[list[ConstantExecStr | EndPointType]]) -> interface_c:
-        """Construct a constants row from a list of values and a list of egp_types."""
-        return cast(interface_c, super().__new__(cls, [ep[CVI.TYP] for ep in constants]))  #
+    def __new__(cls, _: list[ConstantExecStr], types: list[EndPointType]) -> interface_c:
+        """Create a constants row from a list of values and a list of endpoint types."""
+        return cast(interface_c, super().__new__(cls, types))
 
 
 class interface_f(dst_interface):
-    """Row F is a specialization of the dst_interface."""
+    """Row F is a specialization of the dst_interface. Row F can only have a single endpoint of type bool."""
 
     def __init__(self) -> None:
         """No initialization required."""
+        super().__init__([ep_type_lookup["n2v"]["bool"]])
 
     def __new__(cls) -> interface_f:
         """Construct a row F."""
         return cast(interface_f, super().__new__(cls, [ep_type_lookup["n2v"]["bool"]]))
 
 
-EMPTY_INTERFACE_C = interface_c([])
+# Used as a default values: Referencing the same object saves space and time.
+EMPTY_INTERFACE_C = interface_c([], [])
 INTERFACE_F = interface_f()

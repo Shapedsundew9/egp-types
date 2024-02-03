@@ -403,6 +403,7 @@ class gc_graph:
         graph: ConnectionGraph = {}
         for ep in sorted(self.i_graph.dst_filter(), key=lambda x: x.idx):
             row: DestinationRow = ep.row
+            print(ep)
             graph.setdefault(row, []).append((ep.refs[0].row, ep.refs[0].idx, ep.typ))
         for ep in sorted(self.i_graph.row_filter("C"), key=lambda x: x.idx):
             if "C" not in graph:
@@ -1317,7 +1318,7 @@ def random_gc_graph(validator: base_validator, verify: bool = False, seed: int |
 
     The validator must be a subset of the rules defined for a valid gc_graph.
     """
-    rc_graph: ConnectionGraph = json_to_connection_graph(generate(validator, 1, seed, verify)[0]["graph"])  # type: ignore
+    rc_graph: ConnectionGraph = json_to_connection_graph(generate(validator, 1, seed, seed, verify)[0]["graph"])  # type: ignore
 
     # Uniquify source reference indexes to prevent random collisions
     # and find the set of constant types required by the rows below.
@@ -1355,5 +1356,5 @@ def random_gc_graph(validator: base_validator, verify: bool = False, seed: int |
     gcg.normalize()
     if verify:
         _logger.debug(f"Post-normalized randomly generated internal graph:\n{gcg}")
-        assert gcg.validate(True), gcg.status
+        assert gcg.validate(True), [str(x) for x in gcg.status]
     return gcg
