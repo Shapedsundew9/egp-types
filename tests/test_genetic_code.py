@@ -8,17 +8,11 @@ from numpy import int64
 from numpy.typing import NDArray
 from tqdm import trange
 
-from egp_types.egp_typing import (DESTINATION_ROWS, SOURCE_ROWS,
-                                  ConnectionGraph, JSONGraph,
-                                  connection_graph_to_json,
-                                  SrcRowIndex, DstRowIndex,
-                                  json_to_connection_graph)
+from egp_types.egp_typing import ConnectionGraph, DstRowIndex, JSONGraph, SrcRowIndex, connection_graph_to_json, json_to_connection_graph
 from egp_types.gc_graph import gc_graph, random_gc_graph
-from egp_types.genetic_code import (DEFAULT_STORE_SIZE, EMPTY_GENETIC_CODE,
-                                    EMPTY_ROW_C, FIRST_ACCESS_NUMBER,
-                                    genetic_code)
+from egp_types.genetic_code import DEFAULT_STORE_SIZE, EMPTY_GENETIC_CODE, FIRST_ACCESS_NUMBER, genetic_code
 from egp_types.graph_validators import graph_validator
-from egp_types.interface import EMPTY_INTERFACE
+from egp_types.interface import EMPTY_INTERFACE, EMPTY_INTERFACE_C
 
 # Logging
 _logger: Logger = getLogger(__name__)
@@ -66,15 +60,15 @@ def test_genetic_code() -> None:
         assert gc.gcb is EMPTY_GENETIC_CODE
         assert gc.ancestor_a is EMPTY_GENETIC_CODE
         assert gc.ancestor_b is EMPTY_GENETIC_CODE
-        assert gc.graph.interface[SrcRowIndex.I] is EMPTY_INTERFACE
-        assert gc.graph.interface[SrcRowIndex.C] is EMPTY_ROW_C
-        assert gc.graph.interface[DstRowIndex.F] is EMPTY_INTERFACE
-        assert gc.graph.interface[SrcRowIndex.A] is EMPTY_INTERFACE
-        assert gc.graph.interface[DstRowIndex.A] is EMPTY_INTERFACE
-        assert gc.graph.interface[SrcRowIndex.B] is EMPTY_INTERFACE
-        assert gc.graph.interface[DstRowIndex.B] is EMPTY_INTERFACE
-        assert gc.graph.interface[DstRowIndex.O] is EMPTY_INTERFACE
-        assert gc.graph.interface[DstRowIndex.P] is EMPTY_INTERFACE
+        assert gc.graph.row[SrcRowIndex.I] is EMPTY_INTERFACE
+        assert gc.graph.row[SrcRowIndex.C] is EMPTY_INTERFACE_C
+        assert gc.graph.row[DstRowIndex.F] is EMPTY_INTERFACE
+        assert gc.graph.row[SrcRowIndex.A] is EMPTY_INTERFACE
+        assert gc.graph.row[DstRowIndex.A] is EMPTY_INTERFACE
+        assert gc.graph.row[SrcRowIndex.B] is EMPTY_INTERFACE
+        assert gc.graph.row[DstRowIndex.B] is EMPTY_INTERFACE
+        assert gc.graph.row[DstRowIndex.O] is EMPTY_INTERFACE
+        assert gc.graph.row[DstRowIndex.P] is EMPTY_INTERFACE
 
     _logger.debug("Gene pool validation completed.")
 

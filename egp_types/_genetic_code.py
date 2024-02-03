@@ -69,15 +69,17 @@ A genetic code is defined by the genetic_code class derived from the codon class
 from __future__ import annotations
 
 from itertools import count
-from typing import Any
+from typing import TYPE_CHECKING
 from logging import DEBUG, Logger, NullHandler, getLogger
 
 from numpy import array
 from numpy.typing import NDArray
 
-from ._genetic_code import _genetic_code, EMPTY_GENETIC_CODE, NO_DESCENDANTS
-from .store import DEFAULT_STORE_SIZE, FIRST_ACCESS_NUMBER
-from .graph import graph
+from .store import FIRST_ACCESS_NUMBER, store
+
+
+if TYPE_CHECKING:
+    from .graph import graph
 
 
 # Logging
@@ -86,38 +88,81 @@ _logger.addHandler(NullHandler())
 _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
 
-class genetic_code(_genetic_code):
-    """A genetic code is a codon with a source interface and a destination interface."""
+class node_base:
+    """Base class for all nodes in the genomic library."""
 
-    __slots__: list[str] = ["gca", "gcb", "_src_ifs", "_dst_ifs", "ancestor_a", "ancestor_b", "decendants", "idx"]
+    num_nodes: int = 0
 
-    def __init__(self, gc_dict: dict[str, Any] = {}) -> None:  # pylint: disable=dangerous-default-value
-        self.gca: _genetic_code = gc_dict.get("gca", EMPTY_GENETIC_CODE)
-        self.gcb: _genetic_code = gc_dict.get("gcb", EMPTY_GENETIC_CODE)
-        self.graph: graph = graph(gc_dict.get("graph", {}), self.gca, self.gcb, EMPTY_GENETIC_CODE)
-        self.ancestor_a: _genetic_code = gc_dict.get("ancestor_a", EMPTY_GENETIC_CODE)
-        self.ancestor_b: _genetic_code = gc_dict.get("ancestor_b", EMPTY_GENETIC_CODE)
-        self.decendants: NDArray = array(gc_dict["decendants"], dtype=object) if "descendants" in gc_dict else NO_DESCENDANTS
-        self.idx: int = _genetic_code.data_store.assign_index(self)
-        self.touch()
-        _genetic_code.num_nodes += 1
-        super().__init__()
-
-    def __del__(self) -> None:
-        """Track the number of genetic codes deleted."""
-        _genetic_code.num_nodes -= 1
-
-    @classmethod
-    def reset(cls, size: int = DEFAULT_STORE_SIZE) -> None:
-        """A full reset of the store allows the size to be changed. All genetic codes
-        are deleted which pushes the genetic codes to the genomic library as required."""
-        _genetic_code.data_store.reset(size)
-        _genetic_code.access_number = count(FIRST_ACCESS_NUMBER)
-        _genetic_code.num_nodes = 0
+    def reference(self) -> bytes:
+        """Return a globally unique reference for the node."""
+        raise NotImplementedError
 
     @classmethod
     def cls_assertions(cls) -> None:
-        """Validate assertions for the genetic code."""
-        _genetic_code.data_store.assertions()
-        assert len(_genetic_code.data_store) == _genetic_code.num_nodes
+        """Validate assertions for the node."""
+
+    def assertions(self) -> None:
+        """Validate assertions for the node."""
+        if len(self.reference()) != 32:
+            raise ValueError("reference is not 32 bytes")
+
+    def get_num_nodes(self) -> int:
+        """Return the number of nodes in the genomic library."""
+        return node_base.num_nodes
+
+
+class _genetic_code(node_base):
+    """A genetic code is a codon with a source interface and a destination interface."""
+
+    data_store: store = store()
+    access_number: count = count(FIRST_ACCESS_NUMBER)
+    __slots__: list[str] = ["gca", "gcb", "_src_ifs", "_dst_ifs", "ancestor_a", "ancestor_b", "idx"]
+
+    def __init__(self) -> None:
+        self.gca: _genetic_code
+        self.gcb: _genetic_code
+        self.graph: graph
+        self.ancestor_a: _genetic_code
+        self.ancestor_b: _genetic_code
+        self.decendants: NDArray
+        self.idx: int
+        super().__init__()
+
+    def touch(self) -> None:
+        """Update the access sequence for the genetic code."""
+        _genetic_code.data_store.access_sequence[self.idx] = next(_genetic_code.access_number)
+
+    def purge(self, purged_gcs: set[_genetic_code]) -> None:
+        """Remove any references to the purged genetic codes."""
+        # So that we can tell the difference between a genuinely null genetic code reference
+        # and a purged genetic code reference, we set the genetic code reference to the
+        # purged genetic code if it is to be purged from the data store (and memory).
+        if self is not EMPTY_GENETIC_CODE and self is not PURGED_GENETIC_CODE:
+            if self.gca in purged_gcs:
+                self.gca = PURGED_GENETIC_CODE
+            if self.gcb in purged_gcs:
+                self.gcb = PURGED_GENETIC_CODE
+            if self.ancestor_a in purged_gcs:
+                self.ancestor_a = PURGED_GENETIC_CODE
+            if self.ancestor_b in purged_gcs:
+                self.ancestor_b = PURGED_GENETIC_CODE
+
+    def reference(self) -> bytes:
+        """Return a globally unique reference for the genetic code."""
+        # TODO: This is just a placeholder
+        return self.idx.to_bytes(32, "big")
+
+    @classmethod
+    def cls_assertions(cls) -> None:
+        """Validate assertions for the _genetic_code."""
         super().cls_assertions()
+
+
+# Constants
+EMPTY_TUPLE = tuple()
+EMPTY_GENETIC_CODE = _genetic_code()
+PURGED_GENETIC_CODE = _genetic_code()
+NO_DESCENDANTS: NDArray = array([], dtype=object)
+
+# This is an unpleasant hack to get around the circular dependencies
+_genetic_code.data_store.purged_object = PURGED_GENETIC_CODE
