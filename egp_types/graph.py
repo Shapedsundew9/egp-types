@@ -4,8 +4,8 @@
 
 The graph class is a collection of rows and connections between the rows.
 """
-from .connections import connections
-from .egp_typing import JSONGraph
+from .connections import connections, ConnIdx
+from .egp_typing import JSONGraph, Row, EndPointClassStr, EndPointType, SrcRowIndex, DstRowIndex, ROWS_INDEXED
 from .rows import rows
 from .genetic_code import _genetic_code
 
@@ -31,8 +31,19 @@ class graph:
         flowchart. ([flowchart], []) is returned.
         """
         if uid:
-            rows_str_list: list[str] = [f"subgraph uid{uid:x04}", "\tdirection TB"] + ["\t" + s.replace("uid", f"uid{uid:x04}") for s in self.rows.mermaid()] + ["end"]
-            return rows_str_list, [s.replace("uid", f"uid{uid:x04}") for s in self.connections.mermaid()]
+            rows_str_list: list[str] = [f"subgraph uid{uid:04x}", "\tdirection TB"] + ["\t" + s.replace("uid", f"uid{uid:x04}") for s in self.rows.mermaid()] + ["end"]
+            return rows_str_list, [s.replace("uid", f"uid{uid:04x}") for s in self.connections.mermaid()]
         rows_str_list = ["\t" + s.replace("uid", "") for s in self.rows.mermaid()]
         connections_str_list: list[str] = ["\t" + s.replace("uid", "") for s in self.connections.mermaid()]
         return ["flowchart TB"] + rows_str_list + connections_str_list + [""], []
+
+    def assertions(self) -> None:
+        """Run the assertions for the graph."""
+        self.rows.assertions()
+        self.connections.assertions()
+
+        # Ensure connection indicies and types are correct
+        for sr, dr, si, di in self.connections.T:
+            assert si < len(self.rows[sr]), f"Connection {ROWS_INDEXED[sr]}{si} source index out of range"
+            assert di < len(self.rows[dr]), f"Connection {ROWS_INDEXED[dr]}{di} destination index out of range"
+            assert self.rows[sr][si] == self.rows[dr][di], f"Connection {ROWS_INDEXED[sr]}{si}->{ROWS_INDEXED[dr]}{di} types do not match"

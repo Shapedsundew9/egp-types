@@ -98,3 +98,11 @@ class rows(ndarray):
             dst_iface: interface = EMPTY_INTERFACE if not row in json_graph else interface([cast(EndPointType, ep[CPI.TYP]) for ep in json_graph[row]])
             return src_iface, dst_iface
         return gcx.graph.rows[SrcRowIndex.I], gcx.graph.rows[DstRowIndex.O]
+
+    def assertions(self) -> None:
+        """Assertions for the rows."""
+        if self[DstRowIndex.F] is EMPTY_INTERFACE:
+            assert self[DstRowIndex.P] is EMPTY_INTERFACE, "Row P is not empty when F is empty"
+        else:
+O            assert self[DstRowIndex.P] is self[DstRowIndex.O], "P is not O when F is defined"
+        
