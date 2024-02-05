@@ -101,6 +101,7 @@ class genetic_code(_genetic_code):
         data.ancestor_a[idx] = gc_dict.get("ancestor_a", EMPTY_GENETIC_CODE)
         data.ancestor_b[idx] = gc_dict.get("ancestor_b", EMPTY_GENETIC_CODE)
         data.descendants[idx] = array(gc_dict["decendants"], dtype=object) if "descendants" in gc_dict else NO_DESCENDANTS
+        data.state[idx] = gc_dict.get("state", 0)
         self.idx: int = idx
         self.touch()
         _genetic_code.num_nodes += 1
