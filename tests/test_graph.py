@@ -9,7 +9,7 @@ import pytest
 
 from egp_types.eGC import set_reference_generator
 from egp_types.egp_typing import VALID_GRAPH_ROW_COMBINATIONS, JSONGraph
-from egp_types.genetic_code import EGC_TRIPLE, graph
+from egp_types.genetic_code import graph
 from egp_types.reference import reference
 from egp_types.graph_validators import graph_validator
 
@@ -50,7 +50,7 @@ TEST_GRAPH: JSONGraph = {
 
 def test_graph_mermaid() -> None:
     """Test the mermaid function."""
-    grph: graph = graph(TEST_GRAPH, *EGC_TRIPLE)
+    grph: graph = graph(TEST_GRAPH)
     grph.assertions()
     _logger.debug(f"Graph data:\n{repr(grph)}")
     _logger.debug(f"Graph Mermaid Chart:\n{grph}")
@@ -60,7 +60,7 @@ def test_graph_mermaid() -> None:
 def test_random_graph(_) -> None:
     """Test the random graph function generates a valid graph that can be converted to JSON
     and back again to a graph. The two graphs should be equal."""
-    g1 = graph({}, *EGC_TRIPLE, rows=choice(VALID_COMBOS), rndm=True, rseed=None, verify=True)
+    g1 = graph({}, rows=choice(VALID_COMBOS), rndm=True, verify=True)
     #_logger.debug(f"Random graph:\n{repr(g1)}")
     json_graph: JSONGraph = g1.json_graph()
     #_logger.debug(f"Random JSON graph:\n{pformat(json_graph)}")
@@ -68,7 +68,7 @@ def test_random_graph(_) -> None:
     if not valid:
         _logger.error(f"Invalid JSON graph:\n{graph_validator.error_str()}\n{pformat(json_graph)}")
         assert valid, "Invalid JSON graph. See logs."
-    g2 = graph(json_graph, *EGC_TRIPLE)
+    g2 = graph(json_graph)
     equal: bool = g1 == g2
     if not equal:
         _logger.error(f"Graphs are not equal:\n{repr(g1)}\n{repr(g2)}")

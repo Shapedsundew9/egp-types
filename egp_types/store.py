@@ -6,7 +6,7 @@ from logging import DEBUG, Logger, NullHandler, getLogger
 from typing import Any, TYPE_CHECKING
 
 from egp_stores.genomic_library import genomic_library
-from numpy import argsort, empty, int64, intp
+from numpy import argsort, empty, int64, intp, int8
 from numpy.typing import NDArray
 
 if TYPE_CHECKING:
@@ -39,17 +39,41 @@ class store:
     gl: genomic_library = genomic_library()
 
     def __init__(self, size: int = DEFAULT_STORE_SIZE) -> None:
-        """Initialize the store."""
+        """Initialize the store.
+        
+        empty_indices: Is a list of empty indices in the store when _remaining is False
+        size: The size of the store.
+        _remaining: Is True if the store has not yet been filled once. In this case
+            empty_indices[0] is the number of empty indices until full.
+        purged_object: An object to use to replace purged objects.
+        genetic_codes: The genetic codes in the store.
+        access_sequence: When a genetic code is 'touched' the access number is
+            updated to the next access number. This is used to implement an LRU policy.
+        state: The storage state of the genetic code. Different states have different
+            storage requirements.
+                    0: The genetic code was created in the current runtime.
+                    1: The genetic code was loaded from the genomic library.
+                    2: The genetic code is terminal i.e. edges connect to purged genetic codes.
+        """
         self.empty_indices: list[int] = [0]
         self.size: int = size
         self._remaining: bool = True
         self.purged_object: object = object()
-        self.objects: NDArray[Any] = empty(self.size, dtype=object)
+        self.genetic_codes: NDArray[Any] = empty(self.size, dtype=object)
         self.access_sequence: NDArray[int64] = empty(self.size, dtype=int64)
+        self.state: NDArray[Any] = empty(self.size, dtype=int8)
+
+        # Genetic code data
+        self.gca: NDArray[Any] = empty(self.size, dtype=object)
+        self.gcb: NDArray[Any] = empty(self.size, dtype=object)
+        self.graph: NDArray[Any] = empty(self.size, dtype=object)
+        self.ancestor_a: NDArray[Any] = empty(self.size, dtype=object)
+        self.ancestor_b: NDArray[Any] = empty(self.size, dtype=object)
+        self.descendants: NDArray[Any] = empty(self.size, dtype=object)
 
     def __getitem__(self, idx: int) -> genetic_code:
         """Return the object at the specified index."""
-        return self.objects[idx]
+        return self.genetic_codes[idx]
 
     def __len__(self) -> int:
         """Return the number of nodes in the genomic library."""
@@ -66,7 +90,7 @@ class store:
 
         # Stored data
         # 8 bytes per element
-        self.objects: NDArray[Any] = empty(self.size, dtype=object)
+        self.genetic_codes: NDArray[Any] = empty(self.size, dtype=object)
         # 8 bytes per element
         self.access_sequence: NDArray[int64] = empty(self.size, dtype=int64)
         # Total bytes = 16 * size
@@ -80,17 +104,17 @@ class store:
         num_to_purge: int = self.size // 4
         _logger.info(f"Purging 25% ({num_to_purge} of {self.size}) of the store")
         purged: NDArray[intp] = argsort(self.access_sequence)[:num_to_purge]
-        doomed_objects: set[Any] = {self.objects[int(idx)] for idx in purged}
+        doomed_objects: set[Any] = {self.genetic_codes[int(idx)] for idx in purged}
 
         # Push doomed objects to the global genomic library if they have value
         # TODO
 
         # Remove any references to the purged objects
-        for idx, obj in enumerate(self.objects):
+        for idx, obj in enumerate(self.genetic_codes):
             # Objects must be _genetic_code instances
             obj.purge(doomed_objects)
             if obj in doomed_objects:
-                self.objects[idx] = self.purged_object
+                self.genetic_codes[idx] = self.purged_object
 
         # Clean up the heap
         _logger.debug(f"{collect()} unreachable objects not collected after purge.")
@@ -112,18 +136,18 @@ class store:
             self.empty_indices[0] += 1
             self._remaining = self.empty_indices[0] < (self.size - 1)
         # Assign the object to the next index and return the index
-        self.objects[next_index] = obj
+        self.genetic_codes[next_index] = obj
         return next_index
 
     def assertions(self) -> None:
         """Validate assertions for the store."""
-        assert len(self.objects) == self.size
+        assert len(self.genetic_codes) == self.size
         assert len(self.access_sequence) == self.size
         assert len(self.empty_indices) <= self.size
         if self._remaining:
             assert self.empty_indices[0] < self.size
             for idx in range(self.empty_indices[0]):
-                self.objects[idx].assertions()
+                self.genetic_codes[idx].assertions()
         else:
-            for idx, obj in enumerate(self.objects):
+            for idx, obj in enumerate(self.genetic_codes):
                 obj.assertions()

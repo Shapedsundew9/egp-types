@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from logging import DEBUG, Logger, NullHandler, getLogger
 from random import choices, randint, shuffle
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 from numpy import array_equal, ndarray
 
@@ -39,9 +39,7 @@ from .egp_typing import (
 )
 from .ep_type import ep_type_lookup
 from .interface import EMPTY_INTERFACE, EMPTY_INTERFACE_C, INTERFACE_F, interface, interface_c
-
-if TYPE_CHECKING:
-    from .genetic_code import _genetic_code
+from .genetic_code import _genetic_code, EMPTY_GENETIC_CODE
 
 
 # Logging
@@ -53,15 +51,17 @@ _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 class rows(ndarray):
     """Rows of a genetic code graph."""
 
-    def __init__(self, json_graph: JSONGraph, gca: _genetic_code, gcb: _genetic_code, empty: _genetic_code) -> None:
+    def __init__(self, json_graph: JSONGraph, **kwargs) -> None:
         """Initialise the rows of a genetic code graph from a JSON graph and GCA & GCB."""
         # empty is always defined as the global empty genetic code instance. It is passed in to avoid circular imports.
         super().__init__()
+        gca: _genetic_code = kwargs.get("gca", EMPTY_GENETIC_CODE)
+        gcb: _genetic_code = kwargs.get("gcb", EMPTY_GENETIC_CODE)
         self[SrcRowIndex.I] = self.i_from_graph(json_graph)
         self[SrcRowIndex.C] = self.c_from_graph(json_graph)
         self[DstRowIndex.F] = INTERFACE_F if "F" in json_graph else EMPTY_INTERFACE
-        self[SrcRowIndex.A], self[DstRowIndex.A] = self.ab_from_graph(json_graph, "A", gca, empty)
-        self[SrcRowIndex.B], self[DstRowIndex.B] = self.ab_from_graph(json_graph, "B", gcb, empty)
+        self[SrcRowIndex.A], self[DstRowIndex.A] = self.ab_from_graph(json_graph, "A", gca)
+        self[SrcRowIndex.B], self[DstRowIndex.B] = self.ab_from_graph(json_graph, "B", gcb)
         self[DstRowIndex.O] = (
             interface([cast(EndPointType, src_ep[CPI.TYP]) for src_ep in json_graph["O"]])
             if "O" in json_graph and json_graph["O"]
@@ -72,7 +72,7 @@ class rows(ndarray):
             interface([cast(EndPointType, src_ep[CPI.TYP]) for src_ep in json_graph["U"]]) if "U" in json_graph else EMPTY_INTERFACE
         )
 
-    def __new__(cls, json_graph: JSONGraph, gca: _genetic_code, gcb: _genetic_code, empty: _genetic_code) -> rows:
+    def __new__(cls, json_graph: JSONGraph, **kwargs) -> rows:
         """Create the rows of a genetic code graph."""
         # All possible rows are defined in the rows class as this is more efficient than checking for the existence of a row.
         shape: tuple[int] = (len(SOURCE_ROWS) + len(DESTINATION_ROWS),)
@@ -125,9 +125,9 @@ class rows(ndarray):
         """Return the C source interface for a genetic code application graph."""
         return interface_c(*list(zip(*json_graph["C"]))) if "C" in json_graph and json_graph["C"] else EMPTY_INTERFACE_C
 
-    def ab_from_graph(self, json_graph: JSONGraph, row: Row, gcx: _genetic_code, empty: _genetic_code) -> tuple[interface, interface]:
+    def ab_from_graph(self, json_graph: JSONGraph, row: Row, gcx: _genetic_code) -> tuple[interface, interface]:
         """Return the A or B source and destination interfaces for a genetic code application graph."""
-        if gcx is empty:
+        if gcx is EMPTY_GENETIC_CODE:
             srcs: set = {tuple(dst_ep) for dst_eps in json_graph.values() for dst_ep in dst_eps if dst_ep[CPI.ROW] == row}
             sorted_srcs: list[list[EndPointType]] = sorted(srcs, key=lambda ep: ep[CPI.IDX])
             src_iface: interface = EMPTY_INTERFACE if not sorted_srcs else interface([ep[CPI.TYP] for ep in sorted_srcs])
@@ -135,15 +135,14 @@ class rows(ndarray):
                 EMPTY_INTERFACE if not row in json_graph else interface([cast(EndPointType, ep[CPI.TYP]) for ep in json_graph[row]])
             )
             return src_iface, dst_iface
-        return gcx.graph.rows[SrcRowIndex.I], gcx.graph.rows[DstRowIndex.O]
+        return gcx["graph"].rows[SrcRowIndex.I], gcx["graph"].rows[DstRowIndex.O]
 
     def random(
         self,
         rows_str: str,
         max_eps: int,
         ep_types: tuple[EndPointType, ...],
-        iif: interface = EMPTY_INTERFACE,
-        oif: interface = EMPTY_INTERFACE,
+        io: tuple[interface, interface],
     ) -> None:
         """Randomly generate the rows. Generate rows in the order they provide sources in
         the graph so that the types available for each dependent row are known at generation time.
@@ -151,8 +150,8 @@ class rows(ndarray):
         when gcx is defined the O interface should use only types at appear in the I interface.
         """
         has_f: bool = "F" in rows_str
-        if iif is not EMPTY_INTERFACE:
-            self[SrcRowIndex.I] = iif
+        if io[0] is not EMPTY_INTERFACE:
+            self[SrcRowIndex.I] = io[0]
         elif "I" in rows_str:
             # If F is to be defined ensure at least one endpoint has type bool.
             num_eps: int = randint(1, max_eps) if not has_f else randint(1, max_eps - 1)
@@ -192,8 +191,8 @@ class rows(ndarray):
                 # the A source interface shuffled.
                 self[SrcRowIndex.B] = self[SrcRowIndex.A].copy()
                 shuffle(self[SrcRowIndex.B])
-        if oif is not EMPTY_INTERFACE:
-            self[DstRowIndex.O] = oif
+        if io[1] is not EMPTY_INTERFACE:
+            self[DstRowIndex.O] = io[1]
         elif "O" in rows_str:
             self[DstRowIndex.O] = interface(choices(valid_types, k=randint(1, max_eps)))
         self[DstRowIndex.P] = self[DstRowIndex.O] if has_f else EMPTY_INTERFACE
@@ -206,6 +205,16 @@ class rows(ndarray):
     def valid(self, idx: SrcRowIndex | DstRowIndex) -> bool:
         """Return True if the row is valid."""
         return self[idx] is not EMPTY_INTERFACE if idx != SrcRowIndex.C else self[idx] is not EMPTY_INTERFACE_C
+
+    def get_interface(self, iface: str = "IO") -> tuple[interface, interface]:
+        """Return the source and destination interfaces."""
+        if iface == "IO":
+            return self[SrcRowIndex.I], self[DstRowIndex.O]
+        if iface == "A":
+            return self[SrcRowIndex.A], self[DstRowIndex.A]
+        if iface == "B":
+            return self[SrcRowIndex.B], self[DstRowIndex.B]
+        assert False, f"Unknown interface {iface}"
 
     def assertions(self) -> None:
         """Assertions for the rows."""

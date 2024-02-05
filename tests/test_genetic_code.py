@@ -1,48 +1,17 @@
 """Unit tests for genetic_code.py."""
-from json import dump, load
-from logging import DEBUG, INFO, Logger, NullHandler, getLogger
-from os.path import dirname, exists, join
+from logging import DEBUG, Logger, NullHandler, getLogger
 from random import randint
 
 from numpy import int64
 from numpy.typing import NDArray
-from tqdm import trange
 
-from egp_types.egp_typing import ConnectionGraph, DstRowIndex, JSONGraph, SrcRowIndex, connection_graph_to_json, json_to_connection_graph
-from egp_types.gc_graph import gc_graph, random_gc_graph
-from egp_types.genetic_code import DEFAULT_STORE_SIZE, EMPTY_GENETIC_CODE, FIRST_ACCESS_NUMBER, genetic_code
-from egp_types.graph_validators import graph_validator
-from egp_types.interface import EMPTY_INTERFACE, EMPTY_INTERFACE_C
+from egp_types.genetic_code import DEFAULT_STORE_SIZE, FIRST_ACCESS_NUMBER, genetic_code
+
 
 # Logging
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
 _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
-getLogger("surebrec").setLevel(INFO)
-getLogger("eGC").setLevel(INFO)
-getLogger("ep_type").setLevel(INFO)
-getLogger("gc_graph").setLevel(INFO)
-
-_RANDOM_GRAPHS_JSON = "data/random_graphs.json"
-NUM_TEST_CASES = 200
-
-
-# Generating graphs is slow so we generate them once as needed
-if not exists(join(dirname(__file__), _RANDOM_GRAPHS_JSON)):
-    json_graphs: list[JSONGraph] = [
-        connection_graph_to_json(random_gc_graph(graph_validator, True, i).connection_graph()) for i in trange(1000)
-    ]
-    with open(join(dirname(__file__), _RANDOM_GRAPHS_JSON), "w", encoding="utf-8") as random_file:
-        dump(json_graphs, random_file, indent=4)
-
-_logger.debug("Loading random graphs (can take a while)...")
-with open(join(dirname(__file__), _RANDOM_GRAPHS_JSON), "r", encoding="utf-8") as random_file:
-    connection_graphs: list[ConnectionGraph] = [json_to_connection_graph(j_graph) for j_graph in load(random_file)]
-random_graphs: list[gc_graph] = []
-for idx, random_graph in enumerate(connection_graphs):
-    _logger.debug(f"Random graph index: {idx}")
-    random_graphs.append(gc_graph(random_graph))
-_logger.debug("Random graphs loaded.")
 
 
 def test_genetic_code() -> None:
@@ -54,23 +23,6 @@ def test_genetic_code() -> None:
     _logger.debug("Gene pool generation completed.")
     assert gene_pool
     assert len(gene_pool) == DEFAULT_STORE_SIZE
-    for gc in gene_pool:
-        assert gc
-        assert gc.gca is EMPTY_GENETIC_CODE
-        assert gc.gcb is EMPTY_GENETIC_CODE
-        assert gc.ancestor_a is EMPTY_GENETIC_CODE
-        assert gc.ancestor_b is EMPTY_GENETIC_CODE
-        assert gc.graph.rows[SrcRowIndex.I] is EMPTY_INTERFACE
-        assert gc.graph.rows[SrcRowIndex.C] is EMPTY_INTERFACE_C
-        assert gc.graph.rows[DstRowIndex.F] is EMPTY_INTERFACE
-        assert gc.graph.rows[SrcRowIndex.A] is EMPTY_INTERFACE
-        assert gc.graph.rows[DstRowIndex.A] is EMPTY_INTERFACE
-        assert gc.graph.rows[SrcRowIndex.B] is EMPTY_INTERFACE
-        assert gc.graph.rows[DstRowIndex.B] is EMPTY_INTERFACE
-        assert gc.graph.rows[DstRowIndex.O] is EMPTY_INTERFACE
-        assert gc.graph.rows[DstRowIndex.P] is EMPTY_INTERFACE
-
-    _logger.debug("Gene pool validation completed.")
 
 
 def test_purge_basic() -> None:
@@ -130,13 +82,12 @@ def test_purge_complex() -> None:
         assert gc_access_num > newest_oldest_access or indx in genetic_code.data_store.empty_indices
 
 
-def test_loading_random_connection_graphs() -> None:
-    """Test loading random connection graphs from a JSON file."""
+def test_random_genetic_code() -> None:
+    """Test the random genetic code function.
+    The random genetic code method creates a binary tree structure with
+    rndm+1 depth. 
+    """
     genetic_code.reset()
-    _logger.debug("Loading random connection graphs in to genetic codes.")
-    for graph in connection_graphs:
-        genetic_code({"graph": graph})
-    _logger.debug("Validating load.")
-    assert len(genetic_code.data_store) == len(connection_graphs)
+    genetic_code({"rndm": 5})
     genetic_code.data_store.assertions()
-
+    assert len(genetic_code.data_store) == 2**6 - 1

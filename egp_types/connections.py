@@ -172,8 +172,6 @@ class connections(ndarray):
         # Define row U interface
         if row_u_types:
             nrows.setu(row_u_types)
-        _logger.debug(f"nrows:\n{repr(nrows)}")
-        _logger.debug(f"cons:\n{pformat(cons)}")
         return cons
 
     def assertions(self) -> None:

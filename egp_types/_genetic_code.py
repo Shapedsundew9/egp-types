@@ -69,7 +69,7 @@ A genetic code is defined by the genetic_code class derived from the codon class
 from __future__ import annotations
 
 from itertools import count
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from logging import DEBUG, Logger, NullHandler, getLogger
 
 from numpy import array
@@ -94,17 +94,19 @@ class _genetic_code():
     num_nodes: int = 0
     data_store: store = store()
     access_number: count = count(FIRST_ACCESS_NUMBER)
-    __slots__: list[str] = ["gca", "gcb", "graph", "_src_ifs", "_dst_ifs", "ancestor_a", "ancestor_b", "decendants", "idx"]
+    __slots__: list[str] = ["idx"]
 
     def __init__(self) -> None:
-        self.gca: _genetic_code
-        self.gcb: _genetic_code
-        self.graph: graph
-        self.ancestor_a: _genetic_code
-        self.ancestor_b: _genetic_code
-        self.decendants: NDArray
         self.idx: int
         super().__init__()
+
+    def __getitem__(self, member: str) -> Any:
+        """Return the specified member."""
+        return getattr(_genetic_code.data_store, member)[self.idx]
+
+    def __setitem__(self, member: str, value: object) -> None:
+        """Set the specified member to the specified value."""
+        getattr(_genetic_code.data_store, member)[self.idx] = value
 
     def touch(self) -> None:
         """Update the access sequence for the genetic code."""
@@ -121,14 +123,14 @@ class _genetic_code():
         # and a purged genetic code reference, we set the genetic code reference to the
         # purged genetic code if it is to be purged from the data store (and memory).
         if self is not EMPTY_GENETIC_CODE and self is not PURGED_GENETIC_CODE:
-            if self.gca in purged_gcs:
-                self.gca = PURGED_GENETIC_CODE
-            if self.gcb in purged_gcs:
-                self.gcb = PURGED_GENETIC_CODE
-            if self.ancestor_a in purged_gcs:
-                self.ancestor_a = PURGED_GENETIC_CODE
-            if self.ancestor_b in purged_gcs:
-                self.ancestor_b = PURGED_GENETIC_CODE
+            if self["gca"] in purged_gcs:
+                self["gca"] = PURGED_GENETIC_CODE
+            if self["gcb"] in purged_gcs:
+                self["gcb"] = PURGED_GENETIC_CODE
+            if self["ancestor_a"] in purged_gcs:
+                self["ancestor_a"] = PURGED_GENETIC_CODE
+            if self["ancestor_b"] in purged_gcs:
+                self["ancestor_b"] = PURGED_GENETIC_CODE
 
     def reference(self) -> bytes:
         """Return a globally unique reference for the genetic code."""

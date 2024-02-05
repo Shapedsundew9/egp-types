@@ -142,3 +142,4 @@ class interface_f(dst_interface):
 # Used as a default values: Referencing the same object saves space and time.
 EMPTY_INTERFACE_C = interface_c([], [])
 INTERFACE_F = interface_f()
+EMPTY_IO: tuple[empty_interface, empty_interface] = (EMPTY_INTERFACE, EMPTY_INTERFACE)

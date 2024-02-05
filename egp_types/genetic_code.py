@@ -73,11 +73,13 @@ from typing import Any
 from logging import DEBUG, Logger, NullHandler, getLogger
 
 from numpy import array
-from numpy.typing import NDArray
 
 from ._genetic_code import _genetic_code, EMPTY_GENETIC_CODE, NO_DESCENDANTS
-from .store import DEFAULT_STORE_SIZE, FIRST_ACCESS_NUMBER
+from .egp_typing import DstRowIndex, SrcRowIndex
+from .store import DEFAULT_STORE_SIZE, FIRST_ACCESS_NUMBER, store
 from .graph import graph
+from .rows import rows
+from .interface import interface, EMPTY_IO
 
 
 # Logging
@@ -86,24 +88,30 @@ _logger.addHandler(NullHandler())
 _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
 
-# Constants
-EGC_TRIPLE: tuple[_genetic_code, _genetic_code, _genetic_code] = (EMPTY_GENETIC_CODE, EMPTY_GENETIC_CODE, EMPTY_GENETIC_CODE)
-
-
 class genetic_code(_genetic_code):
     """A genetic code is a codon with a source interface and a destination interface."""
 
     def __init__(self, gc_dict: dict[str, Any] = {}) -> None:  # pylint: disable=dangerous-default-value
-        self.gca: _genetic_code = gc_dict.get("gca", EMPTY_GENETIC_CODE)
-        self.gcb: _genetic_code = gc_dict.get("gcb", EMPTY_GENETIC_CODE)
-        self.graph: graph = graph(gc_dict.get("graph", {}), self.gca, self.gcb, EMPTY_GENETIC_CODE)
-        self.ancestor_a: _genetic_code = gc_dict.get("ancestor_a", EMPTY_GENETIC_CODE)
-        self.ancestor_b: _genetic_code = gc_dict.get("ancestor_b", EMPTY_GENETIC_CODE)
-        self.decendants: NDArray = array(gc_dict["decendants"], dtype=object) if "descendants" in gc_dict else NO_DESCENDANTS
-        self.idx: int = _genetic_code.data_store.assign_index(self)
+        # All data is in the class store to keep it compact.
+        # The store is a singleton and is shared by all instances of the class.
+        # Runtime for genetic_code operations is not critical path but memory is.
+        data: store = _genetic_code.data_store
+        idx: int = data.assign_index(self)
+        io: tuple[interface, interface] = gc_dict.get("io", EMPTY_IO)
+        data.ancestor_a[idx] = gc_dict.get("ancestor_a", EMPTY_GENETIC_CODE)
+        data.ancestor_b[idx] = gc_dict.get("ancestor_b", EMPTY_GENETIC_CODE)
+        data.descendants[idx] = array(gc_dict["decendants"], dtype=object) if "descendants" in gc_dict else NO_DESCENDANTS
+        self.idx: int = idx
         self.touch()
         _genetic_code.num_nodes += 1
         super().__init__()
+        # Generate a random genetic code if the "rndm" key is in the gc_dict.
+        if "rndm" in gc_dict:
+            self.random(gc_dict["rndm"])
+        else:
+            data.gca[idx] = gc_dict.get("gca", EMPTY_GENETIC_CODE)
+            data.gcb[idx] = gc_dict.get("gcb", EMPTY_GENETIC_CODE)
+            data.graph[idx] = graph(gc_dict.get("graph", {}), gca=data.gca[idx], gcb=data.gcb[idx], io=io)
 
     def __del__(self) -> None:
         """Track the number of genetic codes deleted."""
@@ -123,3 +131,36 @@ class genetic_code(_genetic_code):
         _genetic_code.data_store.assertions()
         assert len(_genetic_code.data_store) == _genetic_code.num_nodes
         super().cls_assertions()
+
+    def mermaid(self) -> list[str]:
+        """Return the Mermaid Chart representation of the genetic code."""
+        header: list[str] = [
+            "---",
+            f"title: Genetic Code instance {id(self)}",
+            "---",
+            "flowchart TB"  
+        ]
+        # TODO: Complete this function
+        return header
+
+    def get_interface(self, iface: str = "IO") -> tuple[interface, interface]:
+        """Return the source and destination interfaces."""
+        _rows: rows = self["graph"].rows
+        if iface == "IO":
+            return _rows[SrcRowIndex.I], _rows[DstRowIndex.O]
+        if iface == "A":
+            return _rows[SrcRowIndex.A], _rows[DstRowIndex.A]
+        if iface == "B":
+            return _rows[SrcRowIndex.B], _rows[DstRowIndex.B]
+        assert False, f"Unknown interface {iface}"
+
+    def random(self, depth: int = 5, io: tuple[interface, interface] = EMPTY_IO) -> None:
+        """Create a random genetic code with up to depth levels of sub-graphs."""
+        self["graph"] = graph({}, rndm=True, io=io)
+        if depth:
+            self["gca"] = genetic_code({"rndm": depth-1, "io": self.get_interface("A")})
+            self["gcb"] = genetic_code({"rndm": depth-1, "io": self.get_interface("B")})
+
+    def assertions(self) -> None:
+        """Validate assertions for the genetic code."""
+        self["graph"].assertions()

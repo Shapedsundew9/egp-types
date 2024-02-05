@@ -7,6 +7,7 @@ from logging import DEBUG, Logger, NullHandler, getLogger
 from pprint import pformat
 from typing import Literal, LiteralString, Any
 from .ep_type import asint
+from .egp_typing import JSONGraph
 
 
 _logger: Logger = getLogger(__name__)
@@ -128,3 +129,11 @@ def define_signature(mgc: Any) -> bytes:
                 string += mgc["meta_data"]["function"]["python3"]["0"]["code"]
 
     return sha256(string.encode()).digest()
+
+
+def signature(gca_sig: bytes, gcb_sig: bytes, graph: JSONGraph, inline: str = "") -> bytes:
+    """Return the signature of a genetic code."""
+    # NOTE: This needs to be very specific and stand the test of time!
+    hashstr: str = pformat(graph, indent=0, sort_dicts=True, width=65535, compact=True)
+    hashstr += gca_sig.hex() + gcb_sig.hex() + inline
+    return sha256(hashstr.encode()).digest()
