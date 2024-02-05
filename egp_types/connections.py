@@ -113,7 +113,9 @@ class connections(ndarray):
             row_index: DstRowIndex = DESTINATION_ROW_INDEXES[row]
             if nrows.valid(row_index):
                 # If the destination row is not empty iterate through the endpoint to create a connection for each
-                for idx in range(len(nrows[row_index])):
+                for idx, ept in enumerate(nrows[row_index]):
+                    # Find valid source rows with the ept in it
+                    valid_src_rows = 
                     # The source row is randomly chosen from the valid sources for the destination row
                     cons[ConnIdx.SRC_ROW].append(SOURCE_ROW_INDEXES[choice(VALID_ROW_SOURCES[has_f][row])])
                     # The destination row is known
