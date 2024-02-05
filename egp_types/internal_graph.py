@@ -44,7 +44,7 @@ MERMAID_IGRAPH_CLASS_STR = (
     "class O0000 Oclass\n"
     "class P0000 Pclass\n"
 )
-MERMAID_IGRAPH_FORMAT_STR: str = MERMAID_IGRAPH_CLASS_DEF_STR + MERMAID_IGRAPH_CLASS_STR
+MERMAID_IGRAPH_FORMAT_STR: str = "\n".join(MERMAID_IGRAPH_CLASS_DEF_STR) + MERMAID_IGRAPH_CLASS_STR
 _logger.debug(f"Mermaid chart formatting for internal graph representation:\n{MERMAID_IGRAPH_FORMAT_STR}\n")
 
 

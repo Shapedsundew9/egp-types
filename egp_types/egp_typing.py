@@ -1,5 +1,6 @@
 """Common Erasmus GP Types."""
-from typing import Literal, Any, TypeGuard, TypedDict, NotRequired, cast
+
+from typing import Literal, Any, TypeGuard, TypedDict, NotRequired, cast, LiteralString
 from enum import IntEnum
 from graph_tool import Vertex as gt_vertex
 from graph_tool import Edge as gt_edge
@@ -32,10 +33,13 @@ ROWS: tuple[Row, ...] = tuple(sorted({*SOURCE_ROWS, *DESTINATION_ROWS}))
 
 # Indices for source and destination rows must match the order of the rows in the tuple.
 ROWS_INDEXED: tuple[Row, ...] = ("I", "C", "A", "B", "A", "B", "F", "O", "P", "U")
+ROW_CLS_INDEXED: tuple[str, ...] = ("Is", "Cs", "As", "Bs", "Ad", "Bd", "Fd", "Od", "Pd", "Ud")
+ALL_ROWS_STR: LiteralString = ''.join(row for row in ROWS if row != "U")
 
 
 class SrcRowIndex(IntEnum):
     """Indices for source rows."""
+
     I = 0
     C = 1
     A = 2
@@ -44,13 +48,29 @@ class SrcRowIndex(IntEnum):
 
 class DstRowIndex(IntEnum):
     """Indices for destination rows."""
+
     A = 4
     B = 5
     F = 6
     O = 7
-    P = 7  # O & P have the same definition
-    U = 8
+    P = 8
+    U = 9
 
+
+GRAPH_ROW_INDEX_ORDER: tuple[
+    SrcRowIndex, SrcRowIndex, DstRowIndex, DstRowIndex, SrcRowIndex, DstRowIndex, SrcRowIndex, DstRowIndex, DstRowIndex, DstRowIndex
+] = (
+    SrcRowIndex.I,
+    SrcRowIndex.C,
+    DstRowIndex.F,
+    DstRowIndex.A,
+    SrcRowIndex.A,
+    DstRowIndex.B,
+    SrcRowIndex.B,
+    DstRowIndex.O,
+    DstRowIndex.P,
+    DstRowIndex.U,
+)
 
 SOURCE_ROW_INDEXES: dict[SourceRow, SrcRowIndex] = {
     "I": SrcRowIndex.I,

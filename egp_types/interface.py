@@ -26,7 +26,7 @@ from typing import cast, Literal
 from numpy import int16, ndarray
 
 from .egp_typing import ConstantExecStr, EndPointType, Row, EndPointClassStr
-from .ep_type import ep_type_lookup, validate
+from .ep_type import ep_type_lookup, validate, asstr
 
 
 # Logging
@@ -42,6 +42,10 @@ class interface(ndarray):
 
     def __new__(cls, val: list[EndPointType]) -> interface:
         return super().__new__(cls, len(val), dtype=int16)  # pylint: disable=unexpected-keyword-arg
+
+    def __repr__(self) -> str:
+        """Return the string representation of the interface."""
+        return f"Interface instance: {id(self)}\n\t" + "\n\t".join(f"{i}: {asstr(val)} ({val})" for i, val in enumerate(self))
 
     def mermaid(self, row:Row, cls:EndPointClassStr) -> list[str]:
         """Return the mermaid charts string for the source interface.
@@ -118,7 +122,7 @@ class interface_c(src_interface):
         super().__init__(types)
         self.value: list[str] = values
 
-    def __new__(cls, _: list[ConstantExecStr], types: list[EndPointType]) -> interface_c:
+    def __new__(cls, values: list[ConstantExecStr], types: list[EndPointType]) -> interface_c:
         """Create a constants row from a list of values and a list of endpoint types."""
         return cast(interface_c, super().__new__(cls, types))
 

@@ -86,6 +86,10 @@ _logger.addHandler(NullHandler())
 _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
 
+# Constants
+EGC_TRIPLE: tuple[_genetic_code, _genetic_code, _genetic_code] = (EMPTY_GENETIC_CODE, EMPTY_GENETIC_CODE, EMPTY_GENETIC_CODE)
+
+
 class genetic_code(_genetic_code):
     """A genetic code is a codon with a source interface and a destination interface."""
 

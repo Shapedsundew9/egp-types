@@ -12,10 +12,15 @@ This format is efficient in memory usage at the cost of some runtime.
 from __future__ import annotations
 
 from enum import IntEnum
-from typing import cast
+from typing import cast, TYPE_CHECKING
+from random import choice
+from logging import DEBUG, Logger, NullHandler, getLogger
 
-from numpy import ndarray, uint8, unique
+from numpy import ndarray, uint8, unique, where
 from numpy.typing import NDArray
+
+if TYPE_CHECKING:
+    from .rows import rows
 
 from .egp_typing import (
     CPI,
@@ -30,7 +35,14 @@ from .egp_typing import (
     DestinationRow,
     SrcRowIndex,
     DstRowIndex,
+    VALID_ROW_SOURCES
 )
+
+
+# Logging
+_logger: Logger = getLogger(__name__)
+_logger.addHandler(NullHandler())
+_LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
 
 class ConnIdx(IntEnum):
@@ -41,24 +53,39 @@ class ConnIdx(IntEnum):
     SRC_IDX = 2
     DST_IDX = 3
 
-
 class connections(ndarray):
     """Connections between source and destination rows in a graph."""
 
-    def __init__(self, *_, **kwargs) -> None:
+    def __init__(self, json_graph: JSONGraph, **kwargs) -> None:
         super().__init__()
-        json_graph: JSONGraph = cast(JSONGraph, kwargs["json_graph"])
-        self[ConnIdx.SRC_ROW] = [
-            SOURCE_ROW_INDEXES[cast(SourceRow, ep[CPI.ROW])] for row in json_graph for ep in json_graph[row] if row in DESTINATION_ROWS
-        ]
-        self[ConnIdx.DST_ROW] = [DESTINATION_ROW_INDEXES[row] for row in json_graph for _ in json_graph[row] if row in DESTINATION_ROWS]
-        self[ConnIdx.SRC_IDX] = [cast(int, ep[CPI.IDX]) for row in json_graph for ep in json_graph[row] if row in DESTINATION_ROWS]
-        self[ConnIdx.DST_IDX] = [cast(int, ep[CPI.IDX]) for row in json_graph for ep in json_graph[row] if row in DESTINATION_ROWS]
+        if "rndm" in kwargs:
+            self._random(kwargs["rndm"])
+        else:
+            dst_rows: list[DestinationRow] = cast(list[DestinationRow], sorted(row for row in json_graph.keys() if row != "C"))
+            self[ConnIdx.SRC_ROW] = [SOURCE_ROW_INDEXES[cast(SourceRow, ep[CPI.ROW])] for row in dst_rows for ep in json_graph[row]]
+            self[ConnIdx.DST_ROW] = [DESTINATION_ROW_INDEXES[row] for row in dst_rows for _ in json_graph[row]]
+            self[ConnIdx.SRC_IDX] = [cast(int, ep[CPI.IDX]) for row in dst_rows for ep in json_graph[row]]
+            self[ConnIdx.DST_IDX] = [idx for row in dst_rows for idx, _ in enumerate(json_graph[row])]
 
-    def __new__(cls, *_, **kwargs) -> connections:
+    def __new__(cls, json_graph: JSONGraph, **kwargs) -> connections:
         """Create a byte array for the connection data"""
-        shape: tuple[int, int] = (4, sum(len(val) for row, val in kwargs["json_graph"].items() if row in DESTINATION_ROWS))
+        # A valid graph has 1 connection per destination endpoint.
+        shape: tuple[int, int] = (4, sum(len(val) for row, val in json_graph.items() if row in DESTINATION_ROWS))
+        if "rndm" in kwargs:
+            shape = (4, sum(len(kwargs["rndm"][row]) for row in DstRowIndex))
         return super().__new__(cls, shape, dtype=uint8)  # pylint: disable=unexpected-keyword-arg
+
+    def __repr__(self) -> str:
+        """Return the string representation of the connections."""
+        retval: list[str] = [f"Connections instance {id(self)}:"]
+        for row_idx in sorted(unique(self[ConnIdx.SRC_ROW])):
+            con: NDArray = self.get_src_connections(cast(SourceRow, ROWS_INDEXED[row_idx]))
+            cons: NDArray = con[:, con[ConnIdx.SRC_IDX].argsort()]
+            retval.append("\tSRC: " + " ".join(f"{ROWS_INDEXED[row]}{idx:03}" for row, idx in zip(cons[ConnIdx.SRC_ROW], cons[ ConnIdx.SRC_IDX])))
+            retval.append("\t     " + " ".join(" |  " for _ in cons[ConnIdx.SRC_ROW]))
+            retval.append("\tDST: " + " ".join(f"{ROWS_INDEXED[row]}{idx:03}" for row, idx in zip(cons[ConnIdx.DST_ROW], cons[ConnIdx.DST_IDX])))
+            retval.append("")
+        return "\n".join(retval)
 
     def get_connections(self, row: Row, cls: EndPointClassStr) -> ndarray:
         """Return the connections where one end matches row and key[1] class (s or d)."""
@@ -76,31 +103,43 @@ class connections(ndarray):
 
     def mermaid(self) -> list[str]:
         """Return the mermaid charts string for the connections."""
-        return [f"uid{ROWS_INDEXED[sr]}{si:03}s --> uid{ROWS_INDEXED[dr]}{di:03}d" for sr, dr, si, di in self.T]
+        return [f"uid{ROWS_INDEXED[sr]}{si:03}s --> uid{ROWS_INDEXED[dr]}{di:03}d" for sr, dr, si, di in self.T if dr != DstRowIndex.U]
+
+    def _random(self, nrows: rows) -> None:
+        """Create a random set of connections."""
+        cons: list[list[int]] = [[], [], [], []]
+        has_f: bool = nrows.valid(DstRowIndex.F)
+        for row in DESTINATION_ROWS:
+            row_index: DstRowIndex = DESTINATION_ROW_INDEXES[row]
+            if nrows.valid(row_index):
+                # If the destination row is not empty iterate through the endpoint to create a connection for each
+                for idx in range(len(nrows[row_index])):
+                    # The source row is randomly chosen from the valid sources for the destination row
+                    cons[ConnIdx.SRC_ROW].append(SOURCE_ROW_INDEXES[choice(VALID_ROW_SOURCES[has_f][row])])
+                    # The destination row is known
+                    cons[ConnIdx.DST_ROW].append(row_index)
+                    # Randomly choose an endpoint of the selected type in the source row
+                    cons[ConnIdx.SRC_IDX].append(choice(where(nrows[cons[ConnIdx.SRC_ROW][-1]] == nrows[row_index][idx])[0]))
+                    # Destination endpoint index is known
+                    cons[ConnIdx.DST_IDX].append(idx)
+        # Redefine the connections array with the new connections
+        self[ConnIdx.SRC_ROW] = cons[ConnIdx.SRC_ROW]
+        self[ConnIdx.DST_ROW] = cons[ConnIdx.DST_ROW]
+        self[ConnIdx.SRC_IDX] = cons[ConnIdx.SRC_IDX]
+        self[ConnIdx.DST_IDX] = cons[ConnIdx.DST_IDX]
 
     def assertions(self) -> None:
         """Validate assertions for the connections."""
         # Validate source row
         for src_row_index in unique(self[ConnIdx.SRC_ROW]):
-            if src_row_index not in SOURCE_ROW_INDEXES.values():
-                raise ValueError(f"Source row index {src_row_index} is not valid")
+            assert src_row_index in SOURCE_ROW_INDEXES.values(), "Source row index {src_row_index} is not valid"
             src_row_indices: NDArray = unique(self[ConnIdx.SRC_IDX][self[ConnIdx.SRC_ROW] == src_row_index])
-            if len(src_row_indices) > 256:
-                raise ValueError(f"Source row {ROWS_INDEXED[src_row_index]} has too many source endpoints")
-            for idx, src_idx in enumerate(src_row_indices):
-                if idx != src_idx:
-                    raise ValueError(
-                        f"Source row {ROWS_INDEXED[src_row_index]} has non-sequential source endpoint indices:\n{src_row_indices}"
-                    )
+            assert len(src_row_indices) <= 256, f"Source row {ROWS_INDEXED[src_row_index]} has too many source endpoints"
+
         # Validate destination row
         for dst_row_index in unique(self[ConnIdx.DST_ROW]):
-            if dst_row_index not in DESTINATION_ROW_INDEXES.values():
-                raise ValueError(f"Destination row index {dst_row_index} is not valid")
+            assert dst_row_index in DESTINATION_ROW_INDEXES.values(), f"Destination row index {dst_row_index} is not valid"
             dst_row_indices: NDArray = unique(self[ConnIdx.DST_IDX][self[ConnIdx.DST_ROW] == dst_row_index])
-            if len(dst_row_indices) > 256:
-                raise ValueError(f"Destination row {ROWS_INDEXED[dst_row_index]} has too many destination endpoints")
+            assert len(dst_row_indices) <= 256, f"Destination row {ROWS_INDEXED[dst_row_index]} has too many destination endpoints"
             for idx, dst_idx in enumerate(dst_row_indices):
-                if idx != dst_idx:
-                    raise ValueError(
-                        f"Destination row {ROWS_INDEXED[dst_row_index]} has non-sequential destination endpoint indices:\n{dst_row_indices}"
-                    )
+                assert idx == dst_idx, f"Destination row {ROWS_INDEXED[dst_row_index]} has non-sequential destination endpoint indices:\n{dst_row_indices}"

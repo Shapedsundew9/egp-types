@@ -1,11 +1,20 @@
 """Tests for the graph class."""
+import pytest
 from functools import partial
 from itertools import count
+from logging import DEBUG, Logger, NullHandler, getLogger
 
 from egp_types.eGC import set_reference_generator
 from egp_types.egp_typing import JSONGraph
-from egp_types.genetic_code import EMPTY_GENETIC_CODE, graph
+from egp_types.genetic_code import EGC_TRIPLE, graph
 from egp_types.reference import reference
+
+
+# Logging
+_logger: Logger = getLogger(__name__)
+_logger.addHandler(NullHandler())
+_LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
+
 
 # Reference generation for eGC's
 ref_generator = partial(reference, gpspuid=127, counter=count())
@@ -29,5 +38,13 @@ TEST_GRAPH: JSONGraph = {
 
 def test_graph_mermaid() -> None:
     """Test the mermaid function."""
-    grph: graph = graph(TEST_GRAPH, EMPTY_GENETIC_CODE, EMPTY_GENETIC_CODE, EMPTY_GENETIC_CODE)
-    print(grph)
+    grph: graph = graph(TEST_GRAPH, *EGC_TRIPLE)
+    grph.assertions()
+    _logger.debug(f"Graph data:\n{repr(grph)}")
+    _logger.debug(f"Graph Mermaid Chart:\n{grph}")
+
+
+@pytest.mark.parametrize("_", list(range(1000)))
+def test_random_graph(_) -> None:
+    """Test the random graph function."""
+    grph: graph = graph({}, *EGC_TRIPLE, rndm=True, rseed=1, verify=True)
