@@ -1,10 +1,10 @@
 """Common Erasmus GP Types."""
 
-from typing import Literal, Any, TypeGuard, TypedDict, NotRequired, cast, LiteralString
 from enum import IntEnum
-from graph_tool import Vertex as gt_vertex
-from graph_tool import Edge as gt_edge
+from typing import Any, Literal, LiteralString, NotRequired, TypedDict, TypeGuard, cast
 
+from graph_tool import Edge as gt_edge
+from graph_tool import Vertex as gt_vertex
 
 DestinationRow = Literal["A", "B", "F", "O", "P", "U"]
 SourceRow = Literal["I", "C", "A", "B"]
@@ -27,14 +27,14 @@ DST_EP: Literal[False] = False
 SRC_EP_CLS_STR: Literal["s"] = "s"
 DST_EP_CLS_STR: Literal["d"] = "d"
 EP_CLS_STR_TUPLE: tuple[Literal["d"], Literal["s"]] = (DST_EP_CLS_STR, SRC_EP_CLS_STR)
-DESTINATION_ROWS: tuple[DestinationRow, ...] = ("A", "B", "F", "O", "P", "U")
+DESTINATION_ROWS: tuple[DestinationRow, ...] = ("F", "A", "B", "O", "P", "U")
 SOURCE_ROWS: tuple[SourceRow, ...] = ("I", "C", "A", "B")
 ROWS: tuple[Row, ...] = tuple(sorted({*SOURCE_ROWS, *DESTINATION_ROWS}))
-ALL_ROWS_STR: LiteralString = ''.join(row for row in ROWS if row != "U")
+ALL_ROWS_STR: LiteralString = "".join(row for row in ROWS if row != "U")
 
 # Indices for source and destination rows must match the order of the rows in the tuple.
-ROWS_INDEXED: tuple[Row, ...] = ("I", "C", "A", "B", "A", "B", "F", "O", "P", "U")
-ROW_CLS_INDEXED: tuple[str, ...] = ("Is", "Cs", "As", "Bs", "Ad", "Bd", "Fd", "Od", "Pd", "Ud")
+ROWS_INDEXED: tuple[Row, ...] = ("I", "C", "A", "B", "F", "A", "B", "O", "P", "U")
+ROW_CLS_INDEXED: tuple[str, ...] = ("Is", "Cs", "As", "Bs", "Fd", "Ad", "Bd", "Od", "Pd", "Ud")
 
 
 class SrcRowIndex(IntEnum):
@@ -49,9 +49,9 @@ class SrcRowIndex(IntEnum):
 class DstRowIndex(IntEnum):
     """Indices for destination rows."""
 
-    A = 4
-    B = 5
-    F = 6
+    F = 4
+    A = 5
+    B = 6
     O = 7
     P = 8
     U = 9
@@ -79,12 +79,26 @@ SOURCE_ROW_INDEXES: dict[SourceRow, SrcRowIndex] = {
     "B": SrcRowIndex.B,
 }
 DESTINATION_ROW_INDEXES: dict[DestinationRow, DstRowIndex] = {
+    "F": DstRowIndex.F,
     "A": DstRowIndex.A,
     "B": DstRowIndex.B,
-    "F": DstRowIndex.F,
     "O": DstRowIndex.O,
     "P": DstRowIndex.P,
     "U": DstRowIndex.U,
+}
+SOURCE_ROW_LETTERS: dict[SrcRowIndex, SourceRow] = {
+    SrcRowIndex.I: "I",
+    SrcRowIndex.C: "C",
+    SrcRowIndex.A: "A",
+    SrcRowIndex.B: "B",
+}
+DESTINATION_ROW_LETTERS: dict[DstRowIndex, DestinationRow] = {
+    DstRowIndex.F: "F",
+    DstRowIndex.A: "A",
+    DstRowIndex.B: "B",
+    DstRowIndex.O: "O",
+    DstRowIndex.P: "P",
+    DstRowIndex.U: "U",
 }
 
 # Valid source rows for a given row.
@@ -112,13 +126,11 @@ VALID_ROW_SOURCES: tuple[dict[Row, tuple[SourceRow, ...]], dict[Row, tuple[Sourc
         "F": ("I",),
     },
 )
-VALID_DESTINATIONS: tuple[tuple[DestinationRow, ...], tuple[DestinationRow, ...]] = (
-    ("A", "B", "O", "U"),
-    ("F", "A", "B", "O", "P", "U")
-)
+VALID_DESTINATIONS: tuple[tuple[DestinationRow, ...], tuple[DestinationRow, ...]] = (("A", "B", "O", "U"), ("F", "A", "B", "O", "P", "U"))
 
 # Valid graph row combinations.
 # NB: These rules define a valid graph not necessarily a stable graph.
+# NB: Row U is implicit in all cases in the event of unconnected SRC endpoints.
 # Rules:
 #   1. If row F is present then row I must be present & an implied row A at least (0 inputs & 0 outputs, GCA defined)
 #   2. If row F and row O are present then row P must be present
@@ -224,7 +236,7 @@ ConnectionGraphPair = tuple[DestinationRow | Literal["C"], ConnectionRow | Const
 ConnectionPair = tuple[DestinationRow, ConnectionRow]
 ConstantPair = tuple[Literal["C"], ConstantRow]
 JSONGraph = dict[
-    Row,
+    DestinationRow | Literal["C"],
     list[list[SourceRow | EndPointIndex | EndPointType]] | list[list[ConstantExecStr | EndPointType]],
 ]
 

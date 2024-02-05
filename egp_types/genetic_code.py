@@ -93,8 +93,6 @@ EGC_TRIPLE: tuple[_genetic_code, _genetic_code, _genetic_code] = (EMPTY_GENETIC_
 class genetic_code(_genetic_code):
     """A genetic code is a codon with a source interface and a destination interface."""
 
-    __slots__: list[str] = ["gca", "gcb", "_src_ifs", "_dst_ifs", "ancestor_a", "ancestor_b", "decendants", "idx"]
-
     def __init__(self, gc_dict: dict[str, Any] = {}) -> None:  # pylint: disable=dangerous-default-value
         self.gca: _genetic_code = gc_dict.get("gca", EMPTY_GENETIC_CODE)
         self.gcb: _genetic_code = gc_dict.get("gcb", EMPTY_GENETIC_CODE)

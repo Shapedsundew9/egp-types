@@ -4,16 +4,19 @@
 
 The graph class is a collection of rows and connections between the rows.
 """
+
 from __future__ import annotations
+
 from logging import DEBUG, Logger, NullHandler, getLogger
 from random import seed
+from typing import cast
+
 from .connections import connections
-from .egp_typing import JSONGraph, ROWS_INDEXED, Row, ROWS, EndPointType, ALL_ROWS_STR, DstRowIndex, SrcRowIndex
+from .egp_typing import ALL_ROWS_STR, ROWS, ROWS_INDEXED, DestinationRow, DstRowIndex, EndPointType, JSONGraph, Row, SrcRowIndex
 from .ep_type import EP_TYPE_VALUES_TUPLE
-from .rows import rows
 from .genetic_code import _genetic_code
 from .mermaid_charts import MERMAID_IGRAPH_CLASS_DEF_STR, MERMAID_IGRAPH_COLORS
-
+from .rows import rows
 
 # Logging
 _logger: Logger = getLogger(__name__)
@@ -37,14 +40,14 @@ class graph:
         """
         if kwargs.get("rndm", False):
             if kwargs.get("rseed", None) is not None:
-                seed(kwargs["rseed"]) 
+                seed(kwargs["rseed"])
             rows_str: str = kwargs.get("rows", ALL_ROWS_STR)
             ep_types: tuple[EndPointType, ...] = kwargs.get("ep_types", EP_TYPE_VALUES_TUPLE)
             max_eps: int = kwargs.get("max_eps", 8)
             verify: bool = kwargs.get("verify", True)
             self.rows: rows = rows({}, empty, empty, empty)
             self.rows.random(rows_str, max_eps, ep_types)
-            self.connections: connections = connections({}, rndm=self.rows)
+            self.connections: connections = connections({}, _rndm=[self.rows])
             if verify:
                 self.assertions()
         else:
@@ -59,11 +62,19 @@ class graph:
         """Return the Mermaid Chart representation of the graph."""
         return "\n".join(self.mermaid()[0])
 
+    def __eq__(self, __value: object) -> bool:
+        """Return True if the graph is equal to the value."""
+        if not isinstance(__value, graph):
+            return False
+        return self.rows == __value.rows and self.connections == __value.connections
+
     def json_graph(self) -> JSONGraph:
         """Return the JSON graph representation of the graph."""
         json_graph: JSONGraph = {}
-        for dri in filter(lambda x: self.rows.valid(x), DstRowIndex):
-            json_graph[ROWS_INDEXED[dri]] = [[ROWS_INDEXED[sri], int(si), int(self.rows[dri][di])] for sri, _, si, di in self.connections.get_dst_connections(dri).T]
+        for dri in filter(lambda x: self.rows.valid(x), DstRowIndex):  # pylint: disable=unnecessary-lambda
+            json_graph[cast(DestinationRow, ROWS_INDEXED[dri])] = [
+                [ROWS_INDEXED[sri], int(si), int(self.rows[dri][di])] for sri, _, si, di in self.connections.get_dst_connections(dri).T
+            ]
         if self.rows.valid(SrcRowIndex.C):
             json_graph["C"] = [[val, int(typ)] for val, typ in zip(self.rows[SrcRowIndex.C].values, self.rows[SrcRowIndex.C])]
         return json_graph
@@ -85,7 +96,7 @@ class graph:
                 + ["end"]
             )
             return rows_str_list, [s.replace("uid", f"uid{uid:04x}") for s in self.connections.mermaid()]
-        header_list: list[str] = ["---", f"Graph instance {id(self)}", f"---", "flowchart TB"]
+        header_list: list[str] = ["---", f"Graph instance {id(self)}", "---", "flowchart TB"]
         rows_str_list = ["\t" + s.replace("uid", "") for s in self.rows.mermaid()]
         cstr_list: list[str] = self.connections.mermaid()
         link_list: dict[Row, list[str]] = {row: [str(idx) for idx, cstr in enumerate(cstr_list) if cstr[3] == row] for row in ROWS}

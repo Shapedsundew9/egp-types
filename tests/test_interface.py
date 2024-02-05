@@ -22,7 +22,7 @@ def test_empty_interface() -> None:
     with raises(AssertionError):
         empty_interface().insert(0, None)
     with raises(AssertionError):
-        empty_interface()[0] = None
+        empty_interface()[0] = [2,3]
 
 
 def test_interface_assertions() -> None:

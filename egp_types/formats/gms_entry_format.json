@@ -236,10 +236,7 @@
                     "required": false,
                     "schema": {
                         "items": [
-                            {
-                                "regex": "[a-zA-Z][a-zA-Z0-9_]{1,64}",
-                                "type": "string"
-                            },
+                            "ep_const_value",
                             "ep_type"
                         ],
                         "maxlength": 2,
@@ -348,10 +345,7 @@
                     "required": false,
                     "schema": {
                         "items": [
-                            {
-                                "regex": "[a-zA-Z][a-zA-Z0-9_]{1,64}",
-                                "type": "string"
-                            },
+                            "ep_const_value",
                             "ep_type"
                         ],
                         "maxlength": 2,

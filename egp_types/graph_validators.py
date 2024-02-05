@@ -59,7 +59,7 @@ GRAPH_RULES_SET: tuple[tuple[str, dict[str, Any]], ...] = (
     (
         # This can by any valid python constant or object instanciation expression
         "ep_const_value",
-        {"minlength": 1, "maxlength": 128, "type": "string"},
+        {"minlength": 1, "maxlength": 128, "type": "string", "regex": "[ -~]{1,128}"}
     ),
 )
 GRAPH_REGISTRY.extend(deepcopy(GRAPH_RULES_SET))

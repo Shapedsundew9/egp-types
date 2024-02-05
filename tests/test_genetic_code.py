@@ -138,3 +138,5 @@ def test_loading_random_connection_graphs() -> None:
         genetic_code({"graph": graph})
     _logger.debug("Validating load.")
     assert len(genetic_code.data_store) == len(connection_graphs)
+    genetic_code.data_store.assertions()
+

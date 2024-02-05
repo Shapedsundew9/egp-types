@@ -58,12 +58,18 @@ def test_graph_mermaid() -> None:
 
 @pytest.mark.parametrize("_", list(range(1000)))
 def test_random_graph(_) -> None:
-    """Test the random graph function."""
+    """Test the random graph function generates a valid graph that can be converted to JSON
+    and back again to a graph. The two graphs should be equal."""
     g1 = graph({}, *EGC_TRIPLE, rows=choice(VALID_COMBOS), rndm=True, rseed=None, verify=True)
+    #_logger.debug(f"Random graph:\n{repr(g1)}")
     json_graph: JSONGraph = g1.json_graph()
-    _logger.debug(f"Random JSON graph:\n{pformat(json_graph)}")
-    assert graph_validator.validate({"graph": json_graph}), f"Invalid JSON graph:\n{graph_validator.error_str()}\n{pformat(json_graph)}"
+    #_logger.debug(f"Random JSON graph:\n{pformat(json_graph)}")
+    valid: bool = graph_validator.validate({"graph": json_graph})
+    if not valid:
+        _logger.error(f"Invalid JSON graph:\n{graph_validator.error_str()}\n{pformat(json_graph)}")
+        assert valid, "Invalid JSON graph. See logs."
     g2 = graph(json_graph, *EGC_TRIPLE)
-    assert g1 == g2, f"Graphs are not equal:\n{g1}\n{g2}"
-
-
+    equal: bool = g1 == g2
+    if not equal:
+        _logger.error(f"Graphs are not equal:\n{repr(g1)}\n{repr(g2)}")
+        assert equal, "Graphs are not equal. See logs."
