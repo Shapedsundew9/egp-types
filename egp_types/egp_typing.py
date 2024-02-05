@@ -30,11 +30,11 @@ EP_CLS_STR_TUPLE: tuple[Literal["d"], Literal["s"]] = (DST_EP_CLS_STR, SRC_EP_CL
 DESTINATION_ROWS: tuple[DestinationRow, ...] = ("A", "B", "F", "O", "P", "U")
 SOURCE_ROWS: tuple[SourceRow, ...] = ("I", "C", "A", "B")
 ROWS: tuple[Row, ...] = tuple(sorted({*SOURCE_ROWS, *DESTINATION_ROWS}))
+ALL_ROWS_STR: LiteralString = ''.join(row for row in ROWS if row != "U")
 
 # Indices for source and destination rows must match the order of the rows in the tuple.
 ROWS_INDEXED: tuple[Row, ...] = ("I", "C", "A", "B", "A", "B", "F", "O", "P", "U")
 ROW_CLS_INDEXED: tuple[str, ...] = ("Is", "Cs", "As", "Bs", "Ad", "Bd", "Fd", "Od", "Pd", "Ud")
-ALL_ROWS_STR: LiteralString = ''.join(row for row in ROWS if row != "U")
 
 
 class SrcRowIndex(IntEnum):
@@ -111,6 +111,10 @@ VALID_ROW_SOURCES: tuple[dict[Row, tuple[SourceRow, ...]], dict[Row, tuple[Sourc
         "P": ("I", "C", "B"),
         "F": ("I",),
     },
+)
+VALID_DESTINATIONS: tuple[tuple[DestinationRow, ...], tuple[DestinationRow, ...]] = (
+    ("A", "B", "O", "U"),
+    ("F", "A", "B", "O", "P", "U")
 )
 
 # Valid graph row combinations.

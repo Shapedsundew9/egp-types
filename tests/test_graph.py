@@ -1,19 +1,31 @@
 """Tests for the graph class."""
-import pytest
 from functools import partial
 from itertools import count
 from logging import DEBUG, Logger, NullHandler, getLogger
+from random import choice, seed
+from pprint import pformat
+
+import pytest
 
 from egp_types.eGC import set_reference_generator
-from egp_types.egp_typing import JSONGraph
+from egp_types.egp_typing import VALID_GRAPH_ROW_COMBINATIONS, JSONGraph
 from egp_types.genetic_code import EGC_TRIPLE, graph
 from egp_types.reference import reference
+from egp_types.graph_validators import graph_validator
 
 
 # Logging
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
 _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
+
+
+# Constants
+VALID_COMBOS = tuple(VALID_GRAPH_ROW_COMBINATIONS)
+
+
+# Random seed
+seed(1)
 
 
 # Reference generation for eGC's
@@ -47,4 +59,11 @@ def test_graph_mermaid() -> None:
 @pytest.mark.parametrize("_", list(range(1000)))
 def test_random_graph(_) -> None:
     """Test the random graph function."""
-    grph: graph = graph({}, *EGC_TRIPLE, rndm=True, rseed=1, verify=True)
+    g1 = graph({}, *EGC_TRIPLE, rows=choice(VALID_COMBOS), rndm=True, rseed=None, verify=True)
+    json_graph: JSONGraph = g1.json_graph()
+    _logger.debug(f"Random JSON graph:\n{pformat(json_graph)}")
+    assert graph_validator.validate({"graph": json_graph}), f"Invalid JSON graph:\n{graph_validator.error_str()}\n{pformat(json_graph)}"
+    g2 = graph(json_graph, *EGC_TRIPLE)
+    assert g1 == g2, f"Graphs are not equal:\n{g1}\n{g2}"
+
+

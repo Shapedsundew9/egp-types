@@ -120,7 +120,7 @@ class interface_c(src_interface):
     def __init__(self, values: list[ConstantExecStr], types: list[EndPointType]) -> None:
         """Initialize a constants row from a list of values and a list of endpoint types."""
         super().__init__(types)
-        self.value: list[str] = values
+        self.values: list[str] = values
 
     def __new__(cls, values: list[ConstantExecStr], types: list[EndPointType]) -> interface_c:
         """Create a constants row from a list of values and a list of endpoint types."""

@@ -35,7 +35,8 @@ from .egp_typing import (
     DestinationRow,
     SrcRowIndex,
     DstRowIndex,
-    VALID_ROW_SOURCES
+    VALID_ROW_SOURCES,
+    VALID_DESTINATIONS
 )
 
 
@@ -70,16 +71,18 @@ class connections(ndarray):
     def __new__(cls, json_graph: JSONGraph, **kwargs) -> connections:
         """Create a byte array for the connection data"""
         # A valid graph has 1 connection per destination endpoint.
-        shape: tuple[int, int] = (4, sum(len(val) for row, val in json_graph.items() if row in DESTINATION_ROWS))
         if "rndm" in kwargs:
-            shape = (4, sum(len(kwargs["rndm"][row]) for row in DstRowIndex))
+            shape: tuple[int, int] = (4, sum(len(kwargs["rndm"][DESTINATION_ROW_INDEXES[row]]) for row in DESTINATION_ROWS))
+        else:
+            shape: tuple[int, int] = (4, sum(len(val) for row, val in json_graph.items() if row in DESTINATION_ROWS))
+
         return super().__new__(cls, shape, dtype=uint8)  # pylint: disable=unexpected-keyword-arg
 
     def __repr__(self) -> str:
         """Return the string representation of the connections."""
         retval: list[str] = [f"Connections instance {id(self)}:"]
         for row_idx in sorted(unique(self[ConnIdx.SRC_ROW])):
-            con: NDArray = self.get_src_connections(cast(SourceRow, ROWS_INDEXED[row_idx]))
+            con: NDArray = self.get_src_connections(row_idx)
             cons: NDArray = con[:, con[ConnIdx.SRC_IDX].argsort()]
             retval.append("\tSRC: " + " ".join(f"{ROWS_INDEXED[row]}{idx:03}" for row, idx in zip(cons[ConnIdx.SRC_ROW], cons[ ConnIdx.SRC_IDX])))
             retval.append("\t     " + " ".join(" |  " for _ in cons[ConnIdx.SRC_ROW]))
@@ -93,13 +96,13 @@ class connections(ndarray):
         row_index: SrcRowIndex | DstRowIndex = SOURCE_ROW_INDEXES[row] if cls == "s" else DESTINATION_ROW_INDEXES[row]  # type: ignore
         return self[:, self[sord] == row_index]
 
-    def get_src_connections(self, row: SourceRow) -> ndarray:
+    def get_src_connections(self, sri: SrcRowIndex) -> ndarray:
         """Return the connections where the source row matches row."""
-        return self[:, self[ConnIdx.SRC_ROW] == SOURCE_ROW_INDEXES[row]]
+        return self[:, self[ConnIdx.SRC_ROW] == sri]
 
-    def get_dst_connection(self, row: DestinationRow) -> ndarray:
+    def get_dst_connections(self, dri) -> ndarray:
         """Return the connections where the destination row matches row."""
-        return self[:, self[ConnIdx.DST_ROW] == DESTINATION_ROW_INDEXES[row]]
+        return self[:, self[ConnIdx.DST_ROW] == dri]
 
     def mermaid(self) -> list[str]:
         """Return the mermaid charts string for the connections."""
@@ -109,19 +112,19 @@ class connections(ndarray):
         """Create a random set of connections."""
         cons: list[list[int]] = [[], [], [], []]
         has_f: bool = nrows.valid(DstRowIndex.F)
-        for row in DESTINATION_ROWS:
-            row_index: DstRowIndex = DESTINATION_ROW_INDEXES[row]
-            if nrows.valid(row_index):
+        for row in filter(lambda x: x != "U", VALID_DESTINATIONS[has_f]):
+            dri: DstRowIndex = DESTINATION_ROW_INDEXES[row]
+            if nrows.valid(dri):
                 # If the destination row is not empty iterate through the endpoint to create a connection for each
-                for idx, ept in enumerate(nrows[row_index]):
+                for idx, ept in enumerate(nrows[dri]):
                     # Find valid source rows with the ept in it
-                    sri: SrcRowIndex = choice([nrows[SOURCE_ROW_INDEXES[r]] for r in VALID_ROW_SOURCES[has_f][row] if ept in nrows[SOURCE_ROW_INDEXES[r]]])
+                    sri: SrcRowIndex = choice([SOURCE_ROW_INDEXES[r] for r in VALID_ROW_SOURCES[has_f][row] if ept in nrows[SOURCE_ROW_INDEXES[r]]])
                     # The source row is randomly chosen from the valid sources for the destination row
                     cons[ConnIdx.SRC_ROW].append(sri)
                     # The destination row is known
-                    cons[ConnIdx.DST_ROW].append(row_index)
+                    cons[ConnIdx.DST_ROW].append(dri)
                     # Randomly choose an endpoint of the selected type in the source row
-                    cons[ConnIdx.SRC_IDX].append(choice(where(nrows[sri] == nrows[row_index][idx])[0]))
+                    cons[ConnIdx.SRC_IDX].append(choice(where(nrows[sri] == ept)[0]))
                     # Destination endpoint index is known
                     cons[ConnIdx.DST_IDX].append(idx)
         # Redefine the connections array with the new connections
@@ -141,7 +144,7 @@ class connections(ndarray):
         # Validate destination row
         for dst_row_index in unique(self[ConnIdx.DST_ROW]):
             assert dst_row_index in DESTINATION_ROW_INDEXES.values(), f"Destination row index {dst_row_index} is not valid"
-            dst_row_indices: NDArray = unique(self[ConnIdx.DST_IDX][self[ConnIdx.DST_ROW] == dst_row_index])
+            dst_row_indices: NDArray = self[ConnIdx.DST_IDX][self[ConnIdx.DST_ROW] == dst_row_index]
             assert len(dst_row_indices) <= 256, f"Destination row {ROWS_INDEXED[dst_row_index]} has too many destination endpoints"
             for idx, dst_idx in enumerate(dst_row_indices):
                 assert idx == dst_idx, f"Destination row {ROWS_INDEXED[dst_row_index]} has non-sequential destination endpoint indices:\n{dst_row_indices}"

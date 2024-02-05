@@ -8,7 +8,7 @@ from __future__ import annotations
 from logging import DEBUG, Logger, NullHandler, getLogger
 from random import seed
 from .connections import connections
-from .egp_typing import JSONGraph, ROWS_INDEXED, Row, ROWS, EndPointType, ALL_ROWS_STR
+from .egp_typing import JSONGraph, ROWS_INDEXED, Row, ROWS, EndPointType, ALL_ROWS_STR, DstRowIndex, SrcRowIndex
 from .ep_type import EP_TYPE_VALUES_TUPLE
 from .rows import rows
 from .genetic_code import _genetic_code
@@ -36,7 +36,8 @@ class graph:
         - verify: bool = True: If True then the graph is verified after initialisation.
         """
         if kwargs.get("rndm", False):
-            seed(kwargs.get("rseed", None))
+            if kwargs.get("rseed", None) is not None:
+                seed(kwargs["rseed"]) 
             rows_str: str = kwargs.get("rows", ALL_ROWS_STR)
             ep_types: tuple[EndPointType, ...] = kwargs.get("ep_types", EP_TYPE_VALUES_TUPLE)
             max_eps: int = kwargs.get("max_eps", 8)
@@ -57,6 +58,15 @@ class graph:
     def __str__(self) -> str:
         """Return the Mermaid Chart representation of the graph."""
         return "\n".join(self.mermaid()[0])
+
+    def json_graph(self) -> JSONGraph:
+        """Return the JSON graph representation of the graph."""
+        json_graph: JSONGraph = {}
+        for dri in filter(lambda x: self.rows.valid(x), DstRowIndex):
+            json_graph[ROWS_INDEXED[dri]] = [[ROWS_INDEXED[sri], int(si), int(self.rows[dri][di])] for sri, _, si, di in self.connections.get_dst_connections(dri).T]
+        if self.rows.valid(SrcRowIndex.C):
+            json_graph["C"] = [[val, int(typ)] for val, typ in zip(self.rows[SrcRowIndex.C].values, self.rows[SrcRowIndex.C])]
+        return json_graph
 
     def mermaid(self, uid: int = 0) -> tuple[list[str], list[str]]:
         """Return the mermaid charts list of strings for the graph.

@@ -82,7 +82,7 @@ ep_type_lookup["instanciation"][INVALID_EP_TYPE_VALUE] = (
     None,
     None,
     False,
-    "",
+    "INVALID",
 )
 ep_type_lookup["n2v"][UNKNOWN_EP_TYPE_NAME] = UNKNOWN_EP_TYPE_VALUE
 ep_type_lookup["v2n"][UNKNOWN_EP_TYPE_VALUE] = UNKNOWN_EP_TYPE_NAME
@@ -92,7 +92,7 @@ ep_type_lookup["instanciation"][UNKNOWN_EP_TYPE_VALUE] = (
     None,
     None,
     False,
-    "",
+    "INVALID",
 )
 
 
@@ -189,7 +189,8 @@ for i in tuple(filter(func2, ep_type_lookup["instanciation"].values())):
 # Must be defined after the imports
 EP_TYPE_NAMES: set[str] = set(ep_type_lookup["n2v"].keys())
 EP_TYPE_VALUES: set[int] = set(ep_type_lookup["v2n"].keys())
-EP_TYPE_VALUES_TUPLE: tuple[int, ...] = tuple(sorted(EP_TYPE_VALUES))
+# Remove the special types
+EP_TYPE_VALUES_TUPLE: tuple[int, ...] = tuple(sorted(EP_TYPE_VALUES)[2:])
 
 
 def validate(obj: Any, value_t: vtype = vtype.EP_TYPE_INT) -> bool:

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from typing import Generator, cast, TYPE_CHECKING
 from random import choices, randint, shuffle
+from logging import DEBUG, Logger, NullHandler, getLogger
 
 from numpy import ndarray
 
@@ -33,6 +34,8 @@ from .egp_typing import (
     SrcRowIndex,
     SRC_EP_CLS_STR,
     DST_EP_CLS_STR,
+    VALID_ROW_SOURCES,
+    CPI
 )
 from .interface import EMPTY_INTERFACE, EMPTY_INTERFACE_C, INTERFACE_F, interface, interface_c
 from .common import random_constant_str
@@ -41,6 +44,12 @@ from .ep_type import ep_type_lookup
 
 if TYPE_CHECKING:
     from .genetic_code import _genetic_code
+
+
+# Logging
+_logger: Logger = getLogger(__name__)
+_logger.addHandler(NullHandler())
+_LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
 
 class rows(ndarray):
@@ -60,7 +69,7 @@ class rows(ndarray):
             if "O" in json_graph and json_graph["O"]
             else EMPTY_INTERFACE
         )
-        self[DstRowIndex.P] = self[DstRowIndex.O]
+        self[DstRowIndex.P] = self[DstRowIndex.O] if "F" in json_graph else EMPTY_INTERFACE
         self[DstRowIndex.U] = (
             interface([cast(EndPointType, src_ep[CPI.TYP]) for src_ep in json_graph["U"]]) if "U" in json_graph else EMPTY_INTERFACE
         )
@@ -116,7 +125,14 @@ class rows(ndarray):
         """Return the A or B source and destination interfaces for a genetic code application graph."""
         if gcx is empty:
             srcs: Generator = (dst_ep for dst_eps in json_graph.values() for dst_ep in dst_eps if dst_ep[CPI.ROW] == row)
-            sorted_srcs: list[list[EndPointType]] = sorted(srcs, key=lambda ep: ep[CPI.IDX])
+            # Remove duplicate endpoints
+            idx_set = set()
+            srcs_set = []
+            for dst_ep in srcs:
+                if not dst_ep[CPI.IDX] in idx_set:
+                    idx_set.add(dst_ep[CPI.IDX])
+                    srcs_set.append(dst_ep)
+            sorted_srcs: list[list[EndPointType]] = sorted(srcs_set, key=lambda ep: ep[CPI.IDX])
             src_iface: interface = EMPTY_INTERFACE if not sorted_srcs else interface([ep[CPI.TYP] for ep in sorted_srcs])
             dst_iface: interface = (
                 EMPTY_INTERFACE if not row in json_graph else interface([cast(EndPointType, ep[CPI.TYP]) for ep in json_graph[row]])
@@ -127,31 +143,40 @@ class rows(ndarray):
     def random(self, rows_str:str, max_eps: int, ep_types: tuple[EndPointType, ...]) -> None:
         """Randomly generate the rows. Generate rows in the order they provide sources in
         the graph so that the types available for each dependent row are known at generation time."""
+        has_f = "F" in rows_str
         if "I" in rows_str:
             # If F is to be defined ensure at least one endpoint has type bool.
-            num_eps: int = randint(1, max_eps) if "F" not in rows_str else randint(1, max_eps - 1)
-            bool_type_extension: list[int] = [ep_type_lookup["n2v"]["bool"]] if "F" in rows_str else []
+            num_eps: int = randint(1, max_eps) if not has_f else randint(1, max_eps - 1)
+            bool_type_extension: list[int] = [ep_type_lookup["n2v"]["bool"]] if has_f else []
             self[SrcRowIndex.I] = interface(choices(ep_types, k=num_eps) + bool_type_extension)
         if "C" in rows_str:
-
             types: list[EndPointType] = choices(ep_types, k=max_eps)
             values: list[str] = [random_constant_str(ept) for ept in types]
             self[SrcRowIndex.C] = interface_c(values=values, types=types)
-        if "F" in rows_str:
+        if has_f:
             self[DstRowIndex.F] = INTERFACE_F
-        valid_types: tuple[EndPointType, ...] = tuple(set(self[SrcRowIndex.I]) & set(self[SrcRowIndex.C]))
+        valid_types: tuple[EndPointType, ...] = tuple(set(self[SrcRowIndex.I]) | set(self[SrcRowIndex.C]))
+        #_logger.debug(f"valid_types: {valid_types}")
         if "A" in rows_str:
-            self[SrcRowIndex.A] = interface(choices(valid_types, k=randint(1, max_eps)))
-            self[DstRowIndex.A] = interface(choices(ep_types, k=randint(1, max_eps)))
+            self[SrcRowIndex.A] = interface(choices(ep_types, k=randint(1, max_eps)))
+            # Need valid source rows to be present to have a valid destination row.
+            if any(row in rows_str for row in VALID_ROW_SOURCES[has_f]["A"]):
+                self[DstRowIndex.A] = interface(choices(valid_types, k=randint(1, max_eps)))
+            else:
+                self[DstRowIndex.A] = EMPTY_INTERFACE
             # If there is no row F row sources are valid for rows B & O
-            if "F" not in rows_str:
-                valid_types = tuple(set(valid_types) & set(self[SrcRowIndex.A]))
+            if not has_f:
+                valid_types = tuple(set(valid_types) | set(self[SrcRowIndex.A]))
         if "B" in rows_str:
-            self[SrcRowIndex.B] = interface(choices(valid_types, k=randint(1, max_eps)))
-            if "F" not in rows_str:
+            # Need valid source rows to be present to have a valid destination row.
+            if any(row in rows_str for row in VALID_ROW_SOURCES[has_f]["B"]):
+                self[DstRowIndex.B] = interface(choices(valid_types, k=randint(1, max_eps)))
+            else:
+                self[DstRowIndex.B] = EMPTY_INTERFACE
+            if not has_f:
                 # If there is no row F row B sources are valid for O
-                self[DstRowIndex.B] = interface(choices(ep_types, k=randint(1, max_eps)))
-                valid_types = tuple(set(valid_types) & set(self[SrcRowIndex.B]))
+                self[SrcRowIndex.B] = interface(choices(ep_types, k=randint(1, max_eps)))
+                valid_types = tuple(set(valid_types) | set(self[SrcRowIndex.B]))
             else:
                 # If there is a row F row B sources are valid for P and must have the same
                 # types available as for O. Easiest way to do this is just be duplicating
@@ -160,13 +185,13 @@ class rows(ndarray):
                 shuffle(self[SrcRowIndex.B])
         if "O" in rows_str:
             self[DstRowIndex.O] = interface(choices(valid_types, k=randint(1, max_eps)))
-        self[DstRowIndex.P] = self[DstRowIndex.O]
+        self[DstRowIndex.P] = self[DstRowIndex.O] if has_f else EMPTY_INTERFACE
         self[DstRowIndex.U] = EMPTY_INTERFACE
 
     def valid(self, idx: SrcRowIndex | DstRowIndex) -> bool:
         """Return True if the row is valid."""
-        return self[idx] is not EMPTY_INTERFACE
-    
+        return self[idx] is not EMPTY_INTERFACE if idx != SrcRowIndex.C else self[idx] is not EMPTY_INTERFACE_C
+
     def assertions(self) -> None:
         """Assertions for the rows."""
         # REMINDER: It is valid for a row to exist but have no endpoints i.e. an empty interface.
