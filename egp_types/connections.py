@@ -115,13 +115,13 @@ class connections(ndarray):
                 # If the destination row is not empty iterate through the endpoint to create a connection for each
                 for idx, ept in enumerate(nrows[row_index]):
                     # Find valid source rows with the ept in it
-                    valid_src_rows = 
+                    sri: SrcRowIndex = choice([nrows[SOURCE_ROW_INDEXES[r]] for r in VALID_ROW_SOURCES[has_f][row] if ept in nrows[SOURCE_ROW_INDEXES[r]]])
                     # The source row is randomly chosen from the valid sources for the destination row
-                    cons[ConnIdx.SRC_ROW].append(SOURCE_ROW_INDEXES[choice(VALID_ROW_SOURCES[has_f][row])])
+                    cons[ConnIdx.SRC_ROW].append(sri)
                     # The destination row is known
                     cons[ConnIdx.DST_ROW].append(row_index)
                     # Randomly choose an endpoint of the selected type in the source row
-                    cons[ConnIdx.SRC_IDX].append(choice(where(nrows[cons[ConnIdx.SRC_ROW][-1]] == nrows[row_index][idx])[0]))
+                    cons[ConnIdx.SRC_IDX].append(choice(where(nrows[sri] == nrows[row_index][idx])[0]))
                     # Destination endpoint index is known
                     cons[ConnIdx.DST_IDX].append(idx)
         # Redefine the connections array with the new connections
