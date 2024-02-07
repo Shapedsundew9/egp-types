@@ -89,7 +89,7 @@ _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
 # Type checking
 if TYPE_CHECKING:
-    from .store import store
+    from .store import static_store
 
 
 # Constants
@@ -102,7 +102,7 @@ class _genetic_code():
     """A genetic code is a codon with a source interface and a destination interface."""
 
     num_nodes: int = 0
-    gene_pool_cache: store
+    gene_pool_cache: static_store
     access_number: count = count(FIRST_ACCESS_NUMBER)
     __slots__: list[str] = ["idx"]
 

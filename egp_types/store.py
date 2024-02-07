@@ -21,7 +21,7 @@ _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 DEFAULT_STORE_SIZE: int = 2**16
 
 
-class store:
+class static_store:
     """A memory efficient store for numeric data.
 
     Data is stored in public members as arrays and indexed.
@@ -123,7 +123,7 @@ class store:
             assert self.empty_indices[0] < self.size
 
 
-class gene_pool_cache(store):
+class gene_pool_cache(static_store):
     """A memory efficient store genetic codes."""
 
     # The global genomic library

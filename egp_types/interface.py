@@ -36,6 +36,15 @@ _logger.addHandler(NullHandler())
 
 class interface(ndarray):
     """An interface is a node in the genomic library."""
+    # NOTE: There is a 112 byte overhead for a numpy array. For 16 bit integers this is about the
+    # same as a list with 1 ints (80 + 28 = 108). Therefore it is efficient in almost all scenarios.
+    # However, it is still a lot of overhead for an interface that typically consists of only a few
+    # endpoints. e.g. 8 endpoints = 112 + 2 * 8 = 128 bytes. 700% overhead.
+    # A more efficient implementation (in memory) would be to use a dynamic_store with a contiguous
+    # indexed numpy array. This would be a lot of work and
+    # complexity but, if the typical interface, has 8 endpoints of which every GC has 2 could save
+    # 224 MB on a 2**20 (1,000,000) entry Gene Pool Cache.
+    # The base implmentation could be shared with the connections class. 
 
     def __init__(self, val: list[EndPointType]) -> None:
         self[:] = val
