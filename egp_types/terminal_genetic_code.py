@@ -24,6 +24,8 @@ class terminal_genetic_code(genetic_code):
         """A terminal genetic code subsumes the data of the genetic code that forms it."""
         self.idx: int = gc.idx
         self["objects"] = self
+        # Not self.touch()'ing as the node becomes a leaf due to inactivity
+        # Intentionally not calling parent __init__()
 
     def assertions(self) -> None:
         """Validate assertions for the genetic code."""
