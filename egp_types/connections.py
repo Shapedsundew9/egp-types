@@ -137,24 +137,24 @@ class connections(ndarray):
         return [f"uid{ROWS_INDEXED[sr]}{si:03}s --> uid{ROWS_INDEXED[dr]}{di:03}d" for sr, dr, si, di in self.T]
 
     @classmethod
-    def _random(cls, nrows: rows) -> list[list[int]]:
+    def _random(cls, _rows: rows) -> list[list[int]]:
         """Create a random set of connections."""
         cons: list[list[int]] = [[], [], [], []]
-        has_f: bool = nrows.valid(DstRowIndex.F)
+        has_f: bool = _rows.valid(DstRowIndex.F)
         for row in VALID_DESTINATIONS[has_f]:
             dri: DstRowIndex = DESTINATION_ROW_INDEXES[row]
             # Empty rows will be skipped
-            for idx, ept in enumerate(nrows[dri]):
+            for idx, ept in enumerate(_rows[dri]):
                 # Find valid source rows with the ept in it
                 sri: SrcRowIndex = choice(
-                    [SOURCE_ROW_INDEXES[r] for r in VALID_ROW_SOURCES[has_f][row] if ept in nrows[SOURCE_ROW_INDEXES[r]]]
+                    [SOURCE_ROW_INDEXES[r] for r in VALID_ROW_SOURCES[has_f][row] if ept in _rows[SOURCE_ROW_INDEXES[r]]]
                 )
                 # The source row is randomly chosen from the valid sources for the destination row
                 cons[ConnIdx.SRC_ROW].append(sri)
                 # The destination row is known
                 cons[ConnIdx.DST_ROW].append(dri)
                 # Randomly choose an endpoint of the selected type in the source row
-                cons[ConnIdx.SRC_IDX].append(choice(where(nrows[sri] == ept)[0]))
+                cons[ConnIdx.SRC_IDX].append(choice(where(_rows[sri] == ept)[0]))
                 # Destination endpoint index is known
                 cons[ConnIdx.DST_IDX].append(idx)
         # Can now figure out row U interface & connections
@@ -163,15 +163,15 @@ class connections(ndarray):
         row_u_types: list[int] = []
         for sri in SrcRowIndex:
             # Find the unconnected set of source row endpoint indices (as a list to preserve order)
-            usri: list[int] = sorted(set(range(len(nrows[sri]))) - set(tcons[ConnIdx.SRC_IDX][where(tcons[ConnIdx.SRC_ROW] == sri)]))
+            usri: list[int] = sorted(set(range(len(_rows[sri]))) - set(tcons[ConnIdx.SRC_IDX][where(tcons[ConnIdx.SRC_ROW] == sri)]))
             cons[ConnIdx.SRC_ROW].extend([sri] * len(usri))
             cons[ConnIdx.SRC_IDX].extend(usri)
             cons[ConnIdx.DST_ROW].extend([DstRowIndex.U] * len(usri))
             cons[ConnIdx.DST_IDX].extend(range(len(row_u_types), len(row_u_types) + len(usri)))
-            row_u_types.extend(nrows[sri][usri])
+            row_u_types.extend(_rows[sri][usri])
         # Define row U interface
         if row_u_types:
-            nrows.setu(row_u_types)
+            _rows.setu(row_u_types)
         return cons
 
     def assertions(self) -> None:

@@ -75,8 +75,7 @@ from logging import DEBUG, Logger, NullHandler, getLogger
 from numpy import array
 from numpy.typing import NDArray
 
-from .store import FIRST_ACCESS_NUMBER, store
-
+from .gc_type_tools import signature
 
 if TYPE_CHECKING:
     from .graph import graph
@@ -88,34 +87,52 @@ _logger.addHandler(NullHandler())
 _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
 
+# Type checking
+if TYPE_CHECKING:
+    from .store import store
+
+
+# Constants
+FIRST_ACCESS_NUMBER: int = -(2**63)
+GPC_DEFAULT_SIZE: int = 2**20
+
+
+
 class _genetic_code():
     """A genetic code is a codon with a source interface and a destination interface."""
 
     num_nodes: int = 0
-    data_store: store = store()
+    gene_pool_cache: store
     access_number: count = count(FIRST_ACCESS_NUMBER)
     __slots__: list[str] = ["idx"]
 
     def __init__(self) -> None:
         self.idx: int
-        super().__init__()
 
     def __getitem__(self, member: str) -> Any:
         """Return the specified member."""
-        return getattr(_genetic_code.data_store, member)[self.idx]
+        return getattr(_genetic_code.gene_pool_cache, member)[self.idx]
 
     def __setitem__(self, member: str, value: object) -> None:
         """Set the specified member to the specified value."""
-        getattr(_genetic_code.data_store, member)[self.idx] = value
+        getattr(_genetic_code.gene_pool_cache, member)[self.idx] = value
 
     def touch(self) -> None:
         """Update the access sequence for the genetic code."""
-        _genetic_code.data_store.access_sequence[self.idx] = next(_genetic_code.access_number)
+        self["access_sequence"] = next(_genetic_code.access_number)
 
     @classmethod
     def get_num_nodes(cls) -> int:
         """Return the number of nodes in the genomic library."""
         return cls.num_nodes
+
+    @classmethod
+    def reset(cls) -> None:
+        """A full reset of the store allows the size to be changed. All genetic codes
+        are deleted which pushes the genetic codes to the genomic library as required."""
+        _genetic_code.gene_pool_cache.reset()
+        _genetic_code.access_number = count(FIRST_ACCESS_NUMBER)
+        _genetic_code.num_nodes = 0
 
     def purge(self, purged_gcs: set[_genetic_code]) -> None:
         """Remove any references to the purged genetic codes."""
@@ -132,7 +149,7 @@ class _genetic_code():
             if self["ancestor_b"] in purged_gcs:
                 self["ancestor_b"] = PURGED_GENETIC_CODE
 
-    def reference(self) -> bytes:
+    def signature(self) -> bytes:
         """Return a globally unique reference for the genetic code."""
         # TODO: This is just a placeholder
         return self.idx.to_bytes(32, "big")
@@ -149,4 +166,4 @@ PURGED_GENETIC_CODE = _genetic_code()
 NO_DESCENDANTS: NDArray = array([], dtype=object)
 
 # This is an unpleasant hack to get around the circular dependencies
-_genetic_code.data_store.purged_object = PURGED_GENETIC_CODE
+_genetic_code.gene_pool_cache.purged_object = PURGED_GENETIC_CODE

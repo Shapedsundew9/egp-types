@@ -36,7 +36,7 @@ def test_purge_basic() -> None:
     genetic_code.reset()
     genetic_code()
     genetic_code()
-    num_touches: int = genetic_code.data_store.access_sequence[1] - genetic_code.data_store.access_sequence[0]
+    num_touches: int = genetic_code.gene_pool_cache.access_sequence[1] - genetic_code.gene_pool_cache.access_sequence[0]
     _logger.debug(f"Number of accesses to create a genetic code: {num_touches}")
     for _ in range(DEFAULT_STORE_SIZE * 2 - 2):
         genetic_code()
@@ -46,10 +46,10 @@ def test_purge_basic() -> None:
 
     # The oldest access should be the first genetic code in the store.
     last_access: int = FIRST_ACCESS_NUMBER + DEFAULT_STORE_SIZE * num_touches
-    assert genetic_code.data_store.access_sequence[0] == last_access
+    assert genetic_code.gene_pool_cache.access_sequence[0] == last_access
 
     # See if the allocations are correct.
-    for gc_access_num in genetic_code.data_store.access_sequence:
+    for gc_access_num in genetic_code.gene_pool_cache.access_sequence:
         assert gc_access_num == last_access
         last_access += num_touches
 
@@ -68,7 +68,7 @@ def test_purge_complex() -> None:
     # Randomly access genetic codes
     _logger.debug("Random access started.")
     for _ in range(DEFAULT_STORE_SIZE * 10):
-        genetic_code.data_store[randint(0, DEFAULT_STORE_SIZE - 1)].touch()
+        genetic_code.gene_pool_cache[randint(0, DEFAULT_STORE_SIZE - 1)].touch()
 
     # Add a genetic code causing a purge
     _logger.debug("Trigger purge.")
@@ -76,10 +76,10 @@ def test_purge_complex() -> None:
 
     # There should be nothing older than the youngest purged genetic code.
     _logger.debug("Validate purge.")
-    oldest_accesses: NDArray[int64] = genetic_code.data_store.access_sequence[genetic_code.data_store.empty_indices]
+    oldest_accesses: NDArray[int64] = genetic_code.gene_pool_cache.access_sequence[genetic_code.gene_pool_cache.empty_indices]
     newest_oldest_access: int64 = oldest_accesses.max()
-    for indx, gc_access_num in enumerate(genetic_code.data_store.access_sequence):
-        assert gc_access_num > newest_oldest_access or indx in genetic_code.data_store.empty_indices
+    for indx, gc_access_num in enumerate(genetic_code.gene_pool_cache.access_sequence):
+        assert gc_access_num > newest_oldest_access or indx in genetic_code.gene_pool_cache.empty_indices
 
 
 def test_random_genetic_code() -> None:
@@ -89,5 +89,5 @@ def test_random_genetic_code() -> None:
     """
     genetic_code.reset()
     genetic_code({"rndm": 5})
-    genetic_code.data_store.assertions()
-    assert len(genetic_code.data_store) == 2**6 - 1
+    genetic_code.gene_pool_cache.assertions()
+    assert len(genetic_code.gene_pool_cache) == 2**6 - 1

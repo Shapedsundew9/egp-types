@@ -68,7 +68,6 @@ A genetic code is defined by the genetic_code class derived from the codon class
 
 from __future__ import annotations
 
-from itertools import count
 from typing import Any
 from logging import DEBUG, Logger, NullHandler, getLogger
 
@@ -76,7 +75,6 @@ from numpy import array
 
 from ._genetic_code import _genetic_code, EMPTY_GENETIC_CODE, NO_DESCENDANTS
 from .egp_typing import DstRowIndex, SrcRowIndex
-from .store import DEFAULT_STORE_SIZE, FIRST_ACCESS_NUMBER, store
 from .graph import graph
 from .rows import rows
 from .interface import interface, EMPTY_IO
@@ -95,14 +93,12 @@ class genetic_code(_genetic_code):
         # All data is in the class store to keep it compact.
         # The store is a singleton and is shared by all instances of the class.
         # Runtime for genetic_code operations is not critical path but memory is.
-        data: store = _genetic_code.data_store
-        idx: int = data.assign_index(self)
+        self.idx: int = _genetic_code.gene_pool_cache.assign_index(self)
         io: tuple[interface, interface] = gc_dict.get("io", EMPTY_IO)
-        data.ancestor_a[idx] = gc_dict.get("ancestor_a", EMPTY_GENETIC_CODE)
-        data.ancestor_b[idx] = gc_dict.get("ancestor_b", EMPTY_GENETIC_CODE)
-        data.descendants[idx] = array(gc_dict["decendants"], dtype=object) if "descendants" in gc_dict else NO_DESCENDANTS
-        data.state[idx] = gc_dict.get("state", 0)
-        self.idx: int = idx
+        self["ancestor_a"] = gc_dict.get("ancestor_a", EMPTY_GENETIC_CODE)
+        self["ancestor_b"] = gc_dict.get("ancestor_b", EMPTY_GENETIC_CODE)
+        self["descendants"] = array(gc_dict["decendants"], dtype=object) if "descendants" in gc_dict else NO_DESCENDANTS
+        self["state"] = gc_dict.get("state", 0)
         self.touch()
         _genetic_code.num_nodes += 1
         super().__init__()
@@ -110,27 +106,19 @@ class genetic_code(_genetic_code):
         if "rndm" in gc_dict:
             self.random(gc_dict["rndm"])
         else:
-            data.gca[idx] = gc_dict.get("gca", EMPTY_GENETIC_CODE)
-            data.gcb[idx] = gc_dict.get("gcb", EMPTY_GENETIC_CODE)
-            data.graph[idx] = graph(gc_dict.get("graph", {}), gca=data.gca[idx], gcb=data.gcb[idx], io=io)
+            self["gca"] = gc_dict.get("gca", EMPTY_GENETIC_CODE)
+            self["gcb"] = gc_dict.get("gcb", EMPTY_GENETIC_CODE)
+            self["graph"] = graph(gc_dict.get("graph", {}), gca=self["gca"], gcb=self["gcb"], io=io)
 
     def __del__(self) -> None:
         """Track the number of genetic codes deleted."""
         _genetic_code.num_nodes -= 1
 
     @classmethod
-    def reset(cls, size: int = DEFAULT_STORE_SIZE) -> None:
-        """A full reset of the store allows the size to be changed. All genetic codes
-        are deleted which pushes the genetic codes to the genomic library as required."""
-        _genetic_code.data_store.reset(size)
-        _genetic_code.access_number = count(FIRST_ACCESS_NUMBER)
-        _genetic_code.num_nodes = 0
-
-    @classmethod
     def cls_assertions(cls) -> None:
         """Validate assertions for the genetic code."""
-        _genetic_code.data_store.assertions()
-        assert len(_genetic_code.data_store) == _genetic_code.num_nodes
+        _genetic_code.gene_pool_cache.assertions()
+        assert len(_genetic_code.gene_pool_cache) == _genetic_code.num_nodes
         super().cls_assertions()
 
     def mermaid(self) -> list[str]:
