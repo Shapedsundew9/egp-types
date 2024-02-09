@@ -5,7 +5,9 @@ from random import randint
 from numpy import int64
 from numpy.typing import NDArray
 
-from egp_types.genetic_code import DEFAULT_STORE_SIZE, FIRST_ACCESS_NUMBER, genetic_code
+from egp_stores.gene_pool_cache import GPC_DEFAULT_SIZE
+from egp_types._genetic_code import FIRST_ACCESS_NUMBER
+from egp_types.genetic_code import genetic_code
 
 
 # Logging
@@ -19,10 +21,10 @@ def test_genetic_code() -> None:
     Verify empty genetic codes are what we expect.
     """
     _logger.debug("Gene pool generation started.")
-    gene_pool: list[genetic_code] = [genetic_code() for _ in range(DEFAULT_STORE_SIZE)]
+    gene_pool: list[genetic_code] = [genetic_code() for _ in range(GPC_DEFAULT_SIZE)]
     _logger.debug("Gene pool generation completed.")
     assert gene_pool
-    assert len(gene_pool) == DEFAULT_STORE_SIZE
+    assert len(gene_pool) == GPC_DEFAULT_SIZE
 
 
 def test_purge_basic() -> None:
@@ -38,14 +40,14 @@ def test_purge_basic() -> None:
     genetic_code()
     num_touches: int = genetic_code.gene_pool_cache.access_sequence[1] - genetic_code.gene_pool_cache.access_sequence[0]
     _logger.debug(f"Number of accesses to create a genetic code: {num_touches}")
-    for _ in range(DEFAULT_STORE_SIZE * 2 - 2):
+    for _ in range(GPC_DEFAULT_SIZE * 2 - 2):
         genetic_code()
 
     # The size of the data store plus the empty and purged instances.
-    assert genetic_code.num_nodes == DEFAULT_STORE_SIZE
+    assert len(genetic_code.gene_pool_cache) == GPC_DEFAULT_SIZE
 
     # The oldest access should be the first genetic code in the store.
-    last_access: int = FIRST_ACCESS_NUMBER + DEFAULT_STORE_SIZE * num_touches
+    last_access: int = FIRST_ACCESS_NUMBER + GPC_DEFAULT_SIZE * num_touches
     assert genetic_code.gene_pool_cache.access_sequence[0] == last_access
 
     # See if the allocations are correct.
@@ -62,13 +64,13 @@ def test_purge_complex() -> None:
     # Fill the gene pool
     _logger.debug("Gene pool generation started.")
     genetic_code.reset()
-    for _ in range(DEFAULT_STORE_SIZE):
+    for _ in range(GPC_DEFAULT_SIZE):
         genetic_code()
 
     # Randomly access genetic codes
     _logger.debug("Random access started.")
-    for _ in range(DEFAULT_STORE_SIZE * 10):
-        genetic_code.gene_pool_cache[randint(0, DEFAULT_STORE_SIZE - 1)].touch()
+    for _ in range(GPC_DEFAULT_SIZE * 10):
+        genetic_code.gene_pool_cache[randint(0, GPC_DEFAULT_SIZE - 1)].touch()
 
     # Add a genetic code causing a purge
     _logger.debug("Trigger purge.")

@@ -98,9 +98,7 @@ class genetic_code(_genetic_code):
         self["ancestor_a"] = gc_dict.get("ancestor_a", EMPTY_GENETIC_CODE)
         self["ancestor_b"] = gc_dict.get("ancestor_b", EMPTY_GENETIC_CODE)
         self["descendants"] = array(gc_dict["decendants"], dtype=object) if "descendants" in gc_dict else NO_DESCENDANTS
-        self["state"] = gc_dict.get("state", 0)
         self.touch()
-        _genetic_code.num_nodes += 1
         super().__init__()
         # Generate a random genetic code if the "rndm" key is in the gc_dict.
         if "rndm" in gc_dict:
@@ -110,15 +108,10 @@ class genetic_code(_genetic_code):
             self["gcb"] = gc_dict.get("gcb", EMPTY_GENETIC_CODE)
             self["graph"] = graph(gc_dict.get("graph", {}), gca=self["gca"], gcb=self["gcb"], io=io)
 
-    def __del__(self) -> None:
-        """Track the number of genetic codes deleted."""
-        _genetic_code.num_nodes -= 1
-
     @classmethod
     def cls_assertions(cls) -> None:
         """Validate assertions for the genetic code."""
         _genetic_code.gene_pool_cache.assertions()
-        assert len(_genetic_code.gene_pool_cache) == _genetic_code.num_nodes
         super().cls_assertions()
 
     def mermaid(self) -> list[str]:

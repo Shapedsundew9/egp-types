@@ -7,10 +7,8 @@ from pprint import pformat
 
 import pytest
 
-from egp_types.eGC import set_reference_generator
 from egp_types.egp_typing import VALID_GRAPH_ROW_COMBINATIONS, JSONGraph
 from egp_types.genetic_code import graph
-from egp_types.reference import reference
 from egp_types.graph_validators import graph_validator
 
 
@@ -28,15 +26,6 @@ VALID_COMBOS = tuple(VALID_GRAPH_ROW_COMBINATIONS)
 seed(1)
 
 
-# Reference generation for eGC's
-ref_generator = partial(reference, gpspuid=127, counter=count())
-set_reference_generator(ref_generator)
-
-# GC_GRAPH = gc_graph(i_graph=random_internal_graph("ICFABOP", ep_types=(2,), verify=True, rseed=1, row_stablization=True))
-# GC_GRAPH.normalize()
-# assert GC_GRAPH.validate()
-# TEST_GRAPH: JSONGraph = connection_graph_to_json(GC_GRAPH.connection_graph())
-# print(TEST_GRAPH)
 TEST_GRAPH: JSONGraph = {
     "A": [["C", 5, 2], ["I", 1, 2], ["C", 6, 2], ["I", 1, 2], ["C", 3, 2], ["C", 4, 2], ["C", 4, 2]],
     "B": [["I", 2, 2]],

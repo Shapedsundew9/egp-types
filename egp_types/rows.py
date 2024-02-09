@@ -39,7 +39,7 @@ from .egp_typing import (
 )
 from .ep_type import ep_type_lookup
 from .interface import EMPTY_INTERFACE, EMPTY_INTERFACE_C, INTERFACE_F, interface, interface_c
-from .genetic_code import _genetic_code, EMPTY_GENETIC_CODE
+from ._genetic_code import _genetic_code, EMPTY_GENETIC_CODE
 
 
 # Logging

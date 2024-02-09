@@ -14,7 +14,7 @@ from typing import cast
 from .connections import connections
 from .egp_typing import ALL_ROWS_STR, ROWS, ROWS_INDEXED, DestinationRow, DstRowIndex, EndPointType, JSONGraph, Row, SrcRowIndex
 from .ep_type import EP_TYPE_VALUES_TUPLE
-from .genetic_code import _genetic_code, EMPTY_GENETIC_CODE
+from ._genetic_code import _genetic_code, EMPTY_GENETIC_CODE
 from .mermaid_charts import MERMAID_IGRAPH_CLASS_DEF_STR, MERMAID_IGRAPH_COLORS
 from .rows import rows
 from .interface import EMPTY_INTERFACE, interface
