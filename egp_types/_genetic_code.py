@@ -91,6 +91,9 @@ _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
 # Constants
 FIRST_ACCESS_NUMBER: int = -(2**63)
+EMPTY_GC_IDX = 0
+PURGED_GC_IDX = 1
+GC_FIELDS: tuple[str, ...] = ("gca", "gcb", "ancestor_a", "ancestor_b")
 
 
 class _genetic_code():
@@ -102,9 +105,10 @@ class _genetic_code():
 
     def __init__(self) -> None:
         self.idx: int
-       
+
     def __getitem__(self, member: str) -> Any:
         """Return the specified member."""
+        _genetic_code.gene_pool_cache.access_sequence[self.idx] = next(_genetic_code.access_number)
         return getattr(_genetic_code.gene_pool_cache, member)[self.idx]
 
     def __setitem__(self, member: str, value: object) -> None:
@@ -122,25 +126,37 @@ class _genetic_code():
         _genetic_code.gene_pool_cache.reset()
         _genetic_code.access_number = count(FIRST_ACCESS_NUMBER)
 
-    def purge(self, purged_gcs: set[_genetic_code]) -> None:
-        """Remove any references to the purged genetic codes."""
-        # So that we can tell the difference between a genuinely null genetic code reference
-        # and a purged genetic code reference, we set the genetic code reference to the
-        # purged genetic code if it is to be purged from the data store (and memory).
-        if self is not EMPTY_GENETIC_CODE and self is not PURGED_GENETIC_CODE:
-            if self["gca"] in purged_gcs:
-                self["gca"] = PURGED_GENETIC_CODE
-            if self["gcb"] in purged_gcs:
-                self["gcb"] = PURGED_GENETIC_CODE
-            if self["ancestor_a"] in purged_gcs:
-                self["ancestor_a"] = PURGED_GENETIC_CODE
-            if self["ancestor_b"] in purged_gcs:
-                self["ancestor_b"] = PURGED_GENETIC_CODE
+    def make_leaf(self, purged_gcs: set[int]) -> list[int]:
+        """Turn the GC into a leaf node if aany of its GC dependencies are to be purged.
+        A leaf node has all its values derived from dependent GCs stored freeing the dependent
+        GCs to be pushed to the GL or deleted. If only a subset of the dependent GCs are to be
+        purged then the other may become orphaned i.e. they are no longer needed by this GC and
+        if no other GCs need them they can be pushed to the GL or deleted.
+        NOTE: Orphans do not HAVE to be purged/deleted. They were not purged for a reason in
+        the first place. They may be needed in the future and so are returned to the caller.
+        """
+        # Determine if anything has been purged
+        purged: dict[str, bool] = {m: self[m].idx in purged_gcs for m in GC_FIELDS}
+
+        # Return if nothing has been purged there is nothing to do an no orphans
+        if not any(purged.values()):
+            return []
+
+        # Calculate fields if anything has been purged
+        self["signature"] = self.signature()
+        self["genetation"] = self.generation()
+
+        # Which was purged and which is an orphan.
+        return [self[m].idx for m in ("gca", "gcb", "ancestor_a", "ancestor_b") if purged[m]]
 
     def signature(self) -> bytes:
         """Return a globally unique reference for the genetic code."""
         # TODO: This is just a placeholder
-        return self.idx.to_bytes(32, "big")
+        return signature(self["gca"]["signature"], self["gcb"]["signature"], self["graph"].json_graph())
+
+    def generation(self) -> int:
+        """Return the generation of the genetic code."""
+        return max(self["gca"]["generation"], self["gcb"]["generation"]) + 1
 
     @classmethod
     def cls_assertions(cls) -> None:

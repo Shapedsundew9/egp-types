@@ -78,10 +78,10 @@ def test_purge_complex() -> None:
 
     # There should be nothing older than the youngest purged genetic code.
     _logger.debug("Validate purge.")
-    oldest_accesses: NDArray[int64] = genetic_code.gene_pool_cache.access_sequence[genetic_code.gene_pool_cache.empty_indices]
+    oldest_accesses: NDArray[int64] = genetic_code.gene_pool_cache.access_sequence[genetic_code.gene_pool_cache._empty_indices]
     newest_oldest_access: int64 = oldest_accesses.max()
     for indx, gc_access_num in enumerate(genetic_code.gene_pool_cache.access_sequence):
-        assert gc_access_num > newest_oldest_access or indx in genetic_code.gene_pool_cache.empty_indices
+        assert gc_access_num > newest_oldest_access or indx in genetic_code.gene_pool_cache._empty_indices
 
 
 def test_random_genetic_code() -> None:
