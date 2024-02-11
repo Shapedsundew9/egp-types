@@ -69,14 +69,13 @@ A genetic code is defined by the genetic_code class derived from the codon class
 from __future__ import annotations
 
 from itertools import count
-from typing import TYPE_CHECKING, Any
 from logging import DEBUG, Logger, NullHandler, getLogger
+from typing import TYPE_CHECKING, Any
 
 from numpy import array
 from numpy.typing import NDArray
 
 from .gc_type_tools import signature
-
 
 # Type checking
 if TYPE_CHECKING:
@@ -87,16 +86,15 @@ if TYPE_CHECKING:
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
 _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
+_LOG_DEEP_DEBUG: bool = _logger.isEnabledFor(DEBUG - 1)
 
 
 # Constants
-FIRST_ACCESS_NUMBER: int = -(2**63)
-EMPTY_GC_IDX = 0
-PURGED_GC_IDX = 1
+FIRST_ACCESS_NUMBER: int = 0  # iinfo(int64).min
 GC_FIELDS: tuple[str, ...] = ("gca", "gcb", "ancestor_a", "ancestor_b")
 
 
-class _genetic_code():
+class _genetic_code:
     """A genetic code is a codon with a source interface and a destination interface."""
 
     gene_pool_cache: gene_pool_cache
@@ -109,21 +107,32 @@ class _genetic_code():
     def __getitem__(self, member: str) -> Any:
         """Return the specified member."""
         _genetic_code.gene_pool_cache.access_sequence[self.idx] = next(_genetic_code.access_number)
-        return getattr(_genetic_code.gene_pool_cache, member)[self.idx]
+        if _LOG_DEEP_DEBUG:
+            _logger.debug(
+                f"Read access of '{member}' of genetic code {self.idx} sequence number "
+                f"{_genetic_code.gene_pool_cache.access_sequence[self.idx]}."
+            )
+        return _genetic_code.gene_pool_cache[member][self.idx]
 
     def __setitem__(self, member: str, value: object) -> None:
         """Set the specified member to the specified value."""
-        getattr(_genetic_code.gene_pool_cache, member)[self.idx] = value
+        _genetic_code.gene_pool_cache.access_sequence[self.idx] = next(_genetic_code.access_number)
+        if _LOG_DEEP_DEBUG:
+            _logger.debug(
+                f"Write access of '{member}' of genetic code {self.idx} sequence number "
+                f"{_genetic_code.gene_pool_cache.access_sequence[self.idx]}."
+            )
+        _genetic_code.gene_pool_cache[member][self.idx] = value
 
     def touch(self) -> None:
         """Update the access sequence for the genetic code."""
-        self["access_sequence"] = next(_genetic_code.access_number)
+        _genetic_code.gene_pool_cache.access_sequence[self.idx] = next(_genetic_code.access_number)
 
     @classmethod
-    def reset(cls) -> None:
+    def reset(cls, size: int | None = None) -> None:
         """A full reset of the store allows the size to be changed. All genetic codes
         are deleted which pushes the genetic codes to the genomic library as required."""
-        _genetic_code.gene_pool_cache.reset()
+        _genetic_code.gene_pool_cache.reset(size)
         _genetic_code.access_number = count(FIRST_ACCESS_NUMBER)
 
     def make_leaf(self, purged_gcs: set[int]) -> list[int]:
@@ -135,8 +144,8 @@ class _genetic_code():
         NOTE: Orphans do not HAVE to be purged/deleted. They were not purged for a reason in
         the first place. They may be needed in the future and so are returned to the caller.
         """
-        # Determine if anything has been purged
-        purged: dict[str, bool] = {m: self[m].idx in purged_gcs for m in GC_FIELDS}
+        # Determine if anything has been purged: This is a search so a "no touch" activity.
+        purged: dict[str, bool] = {m: getattr(getattr(_genetic_code.gene_pool_cache, m), "idx", -1) in purged_gcs for m in GC_FIELDS}
 
         # Return if nothing has been purged there is nothing to do an no orphans
         if not any(purged.values()):
@@ -151,8 +160,14 @@ class _genetic_code():
 
     def signature(self) -> bytes:
         """Return a globally unique reference for the genetic code."""
-        # TODO: This is just a placeholder
-        return signature(self["gca"]["signature"], self["gcb"]["signature"], self["graph"].json_graph())
+        # TODO: This is just a placeholder - need to add inline string
+        gca_sig: bytes | NDArray = self["gca"]["signature"]
+        gcb_sig: bytes | NDArray= self["gcb"]["signature"]
+        if not isinstance(gca_sig, bytes):
+            gca_sig = bytes(gca_sig)
+        if not isinstance(gcb_sig, bytes):
+            gcb_sig = bytes(gcb_sig)
+        return signature(gca_sig, gcb_sig, self["graph"].json_graph())
 
     def generation(self) -> int:
         """Return the generation of the genetic code."""

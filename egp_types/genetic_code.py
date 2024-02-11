@@ -70,10 +70,9 @@ from __future__ import annotations
 
 from typing import Any
 from logging import DEBUG, Logger, NullHandler, getLogger
+from random import randbytes
 
-from numpy import array
-
-from ._genetic_code import _genetic_code, EMPTY_GENETIC_CODE, NO_DESCENDANTS
+from ._genetic_code import _genetic_code, EMPTY_GENETIC_CODE
 from .egp_typing import DstRowIndex, SrcRowIndex
 from .graph import graph
 from .rows import rows
@@ -97,7 +96,6 @@ class genetic_code(_genetic_code):
         io: tuple[interface, interface] = gc_dict.get("io", EMPTY_IO)
         self["ancestor_a"] = gc_dict.get("ancestor_a", EMPTY_GENETIC_CODE)
         self["ancestor_b"] = gc_dict.get("ancestor_b", EMPTY_GENETIC_CODE)
-        self["descendants"] = array(gc_dict["decendants"], dtype=object) if "descendants" in gc_dict else NO_DESCENDANTS
         self.touch()
         super().__init__()
         # Generate a random genetic code if the "rndm" key is in the gc_dict.
@@ -139,9 +137,16 @@ class genetic_code(_genetic_code):
     def random(self, depth: int = 5, io: tuple[interface, interface] = EMPTY_IO) -> None:
         """Create a random genetic code with up to depth levels of sub-graphs."""
         self["graph"] = graph({}, rndm=True, io=io)
+        assert 2**depth < _genetic_code.gene_pool_cache.size(), "Recursive depth too large."
         if depth:
             self["gca"] = genetic_code({"rndm": depth-1, "io": self.get_interface("A")})
             self["gcb"] = genetic_code({"rndm": depth-1, "io": self.get_interface("B")})
+        if depth == 1:
+            # At the leaf level the graph is a single codon.
+            self["gca"]["signature"] = randbytes(32)
+            self["gcb"]["signature"] = randbytes(32)
+            self["gca"]["generation"] = 0
+            self["gcb"]["generation"] = 0
 
     def assertions(self) -> None:
         """Validate assertions for the genetic code."""

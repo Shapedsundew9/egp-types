@@ -49,26 +49,29 @@ class store:
         """Return the object at the specified index."""
         raise NotImplementedError
 
-    def __setitem__(self, idx, val) -> Any:
-        """Set the object at the specified index."""
-        raise NotImplementedError
-
     def __len__(self) -> int:
         """Return the number of occupied entries."""
         if self._remaining:
             return self._size - self._remaining
         return self._size - len(self._empty_indices)
 
-    def space(self) -> int:
-        """Return the space remaining in the store."""
-        return self._size - len(self)
+    def __setitem__(self, idx, val) -> Any:
+        """Set the object at the specified index."""
+        raise NotImplementedError
 
-    def reset(self, size: int | None = None) -> None:
-        """A full reset of the store allows the size to be changed. All genetic codes
-        are deleted which pushes the genetic codes to the genomic library as required."""
-        self._empty_indices: list[int] = []
-        self._size: int = size if size is not None else self._size
-        self._remaining: int = self._size
+    def assertions(self) -> None:
+        """Validate assertions for the store."""
+        assert len(self._empty_indices) <= self._size
+        if self._remaining:
+            assert not self._empty_indices
+
+    def clone(self) -> Self:
+        """Return a clone of the store. i.e. same parameters but uninitialized data."""
+        return type(self)(self._size)
+
+    def empty_indices(self) -> list[int]:
+        """Return the empty indices."""
+        return list(range(len(self), self._size)) if self._remaining else self._empty_indices
 
     def last_index(self) -> int:
         """Return the last index used."""
@@ -85,15 +88,20 @@ class store:
             return self._last_index
         raise OverflowError("No more space available.")
 
-    def clone(self) -> Self:
-        """Return a clone of the store. i.e. same parameters but uninitialized data."""
-        return type(self)(self._size)
+    def reset(self, size: int | None = None) -> None:
+        """A full reset of the store allows the size to be changed. All genetic codes
+        are deleted which pushes the genetic codes to the genomic library as required."""
+        self._empty_indices: list[int] = []
+        self._size: int = size if size is not None else self._size
+        self._remaining: int = self._size
 
-    def assertions(self) -> None:
-        """Validate assertions for the store."""
-        assert len(self._empty_indices) <= self._size
-        if self._remaining:
-            assert not self._empty_indices
+    def size(self) -> int:
+        """Return the size of the store."""
+        return self._size
+    
+    def space(self) -> int:
+        """Return the space remaining in the store."""
+        return self._size - len(self)
 
 
 class static_store_member():
@@ -207,17 +215,21 @@ class dynamic_store(store):
         """Return the specified member."""
         return self.members[member]
 
-    def __setitem__(self, member: str, val: Any) -> None:
-        """Set the member at the last index returned by self.next_index()"""
-        self.members[member][self._last_index] = val
-
     def __len__(self) -> int:
         """The length of the store is the sum of the lengths of the static stores."""
         return sum(len(store) for store in self._stores)
 
+    def __setitem__(self, member: str, val: Any) -> None:
+        """Set the member at the last index returned by self.next_index()"""
+        self.members[member][self._last_index] = val
+
     def allocation(self) -> int:
         """Return the total space allocated in objects."""
         return len(self._stores) * 2**self._log2size
+
+    def empty_indices(self) -> list[int]:
+        """Return the empty indices."""
+        return [(si << self._log2size) + idx for si, s in enumerate(self._stores) for idx in s.empty_indices()]
 
     def next_index(self) -> int:
         """Return the next index for a new node."""
@@ -243,6 +255,10 @@ class dynamic_store(store):
         self._store_idx: int = 0
         self._stores: list[static_store] = []
         self._stores.append(self._store_t(2**self._log2size))
+
+    def size(self) -> int:
+        """Return the size of the store."""
+        return len(self._stores) * 2**self._log2size
 
     def space(self) -> int:
         """Return the space remaining in the store."""

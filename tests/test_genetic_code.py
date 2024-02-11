@@ -5,8 +5,7 @@ from random import randint
 from numpy import int64
 from numpy.typing import NDArray
 
-from egp_stores.gene_pool_cache import GPC_DEFAULT_SIZE
-from egp_types._genetic_code import FIRST_ACCESS_NUMBER
+from egp_stores.gene_pool_cache import GPC_DEFAULT_SIZE, INT64_MAX
 from egp_types.genetic_code import genetic_code
 
 
@@ -32,28 +31,20 @@ def test_purge_basic() -> None:
     The purge function should remove 25% of the genetic codes 4 times
     resulting in the oldest genetic code being in position 0.
     """
-    # Since all genetic codes are made the same way in this test the number of accesses
-    # to create them is the same for all genetic codes.
-    # Reset the data store and create a genetic code.
     genetic_code.reset()
-    genetic_code()
-    genetic_code()
-    num_touches: int = genetic_code.gene_pool_cache.access_sequence[1] - genetic_code.gene_pool_cache.access_sequence[0]
-    _logger.debug(f"Number of accesses to create a genetic code: {num_touches}")
-    for _ in range(GPC_DEFAULT_SIZE * 2 - 2):
-        genetic_code()
+    ids: list[int] = [id(genetic_code()) for _ in range(GPC_DEFAULT_SIZE * 2)]
 
-    # The size of the data store plus the empty and purged instances.
+    # The store should be full.
     assert len(genetic_code.gene_pool_cache) == GPC_DEFAULT_SIZE
 
-    # The oldest access should be the first genetic code in the store.
-    last_access: int = FIRST_ACCESS_NUMBER + GPC_DEFAULT_SIZE * num_touches
-    assert genetic_code.gene_pool_cache.access_sequence[0] == last_access
+    # Expecting the oldest genetic code to be in position 0 & max to be in position GPC_DEFAULT_SIZE - 1
+    assert genetic_code.gene_pool_cache.access_sequence.argmin() == 0
+    assert genetic_code.gene_pool_cache.access_sequence.argmax() == GPC_DEFAULT_SIZE - 1
 
-    # See if the allocations are correct.
-    for gc_access_num in genetic_code.gene_pool_cache.access_sequence:
-        assert gc_access_num == last_access
-        last_access += num_touches
+    # Expecting the GPC_DEFAULT_SIZE element of the id list to be in position 0
+    # and the last id to be in the last position
+    assert id(genetic_code.gene_pool_cache.genetic_code[0]) == ids[GPC_DEFAULT_SIZE]
+    assert id(genetic_code.gene_pool_cache.genetic_code[-1]) == ids[-1]
 
 
 def test_purge_complex() -> None:
@@ -70,7 +61,8 @@ def test_purge_complex() -> None:
     # Randomly access genetic codes
     _logger.debug("Random access started.")
     for _ in range(GPC_DEFAULT_SIZE * 10):
-        genetic_code.gene_pool_cache[randint(0, GPC_DEFAULT_SIZE - 1)].touch()
+        idx: int = randint(0, GPC_DEFAULT_SIZE - 1)
+        genetic_code.gene_pool_cache[idx].touch()
 
     # Add a genetic code causing a purge
     _logger.debug("Trigger purge.")
@@ -78,10 +70,9 @@ def test_purge_complex() -> None:
 
     # There should be nothing older than the youngest purged genetic code.
     _logger.debug("Validate purge.")
-    oldest_accesses: NDArray[int64] = genetic_code.gene_pool_cache.access_sequence[genetic_code.gene_pool_cache._empty_indices]
-    newest_oldest_access: int64 = oldest_accesses.max()
-    for indx, gc_access_num in enumerate(genetic_code.gene_pool_cache.access_sequence):
-        assert gc_access_num > newest_oldest_access or indx in genetic_code.gene_pool_cache._empty_indices
+    empty_indices: set[int] = set(genetic_code.gene_pool_cache.empty_indices())
+    for idx, access in enumerate(genetic_code.gene_pool_cache.access_sequence):
+        assert (idx in empty_indices) == (access == INT64_MAX)
 
 
 def test_random_genetic_code() -> None:
@@ -89,7 +80,14 @@ def test_random_genetic_code() -> None:
     The random genetic code method creates a binary tree structure with
     rndm+1 depth. 
     """
-    genetic_code.reset()
-    genetic_code({"rndm": 5})
+    levels = 15
+    genetic_code.reset(2**(levels + 1))
+    gc = genetic_code({"rndm": levels})
     genetic_code.gene_pool_cache.assertions()
-    assert len(genetic_code.gene_pool_cache) == 2**6 - 1
+    assert len(genetic_code.gene_pool_cache) == 2**(levels + 1) - 1
+    assert gc["generation"] == levels
+    assert gc.signature()
+
+
+if __name__ == "__main__":
+    test_random_genetic_code()
