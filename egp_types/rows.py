@@ -88,6 +88,10 @@ class rows(ndarray):
             return super().__eq__(__value)
         return all(array_equal(self[i], __value[i]) for i in GRAPH_ROW_INDEX_ORDER)
 
+    def __hash__(self) -> int:
+        """Return the hash of the rows."""
+        return hash(self.data)
+
     def mermaid(self) -> list[str]:
         """Return the mermaid charts string for the rows."""
         retval: list[str] = []

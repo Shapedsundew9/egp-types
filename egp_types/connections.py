@@ -14,7 +14,6 @@ from __future__ import annotations
 
 from enum import IntEnum
 from logging import DEBUG, Logger, NullHandler, getLogger
-from pprint import pformat
 from random import choice
 from typing import TYPE_CHECKING, cast
 
