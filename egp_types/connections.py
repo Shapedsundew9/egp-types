@@ -127,6 +127,10 @@ class connections(ndarray):
             return super().__eq__(__value)
         return array_equal(self, __value)
 
+    def __hash__(self):
+        """Generate a hash for the connections object."""
+        return hash(self.data)
+
     def get_connections(self, row: Row, cls: EndPointClassStr) -> ndarray:
         """Return the connections where one end matches row and key[1] class (s or d)."""
         sord: ConnIdx = ConnIdx.SRC_ROW if cls == "s" else ConnIdx.DST_ROW
