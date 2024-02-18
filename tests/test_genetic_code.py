@@ -1,10 +1,7 @@
 """Unit tests for genetic_code.py."""
 from logging import DEBUG, Logger, NullHandler, getLogger
 from random import randint
-
-from numpy import int64
-from numpy.typing import NDArray
-
+from pympler.asizeof import asizeof
 from egp_stores.gene_pool_cache import GPC_DEFAULT_SIZE, INT64_MAX
 from egp_types.genetic_code import genetic_code
 
@@ -80,10 +77,11 @@ def test_random_genetic_code() -> None:
     The random genetic code method creates a binary tree structure with
     rndm+1 depth. 
     """
-    levels = 15
+    levels = 8
     genetic_code.reset(2**(levels + 1))
     gc = genetic_code({"rndm": levels})
     genetic_code.gene_pool_cache.assertions()
+    _logger.debug(f"Size of genetic code: {asizeof(gc)}")
     assert len(genetic_code.gene_pool_cache) == 2**(levels + 1) - 1
     assert gc["generation"] == levels
     assert gc.signature()

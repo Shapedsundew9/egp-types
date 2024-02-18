@@ -72,7 +72,7 @@ from itertools import count
 from logging import DEBUG, Logger, NullHandler, getLogger
 from typing import TYPE_CHECKING, Any
 
-from numpy import array
+from numpy import array, dtype, zeros, bytes_
 from numpy.typing import NDArray
 
 from .gc_type_tools import signature
@@ -91,7 +91,9 @@ _LOG_DEEP_DEBUG: bool = _logger.isEnabledFor(DEBUG - 1)
 
 # Constants
 FIRST_ACCESS_NUMBER: int = 0  # iinfo(int64).min
-GC_FIELDS: tuple[str, ...] = ("gca", "gcb", "ancestor_a", "ancestor_b")
+SIGNATURE_FIELDS: tuple[str, ...] = ("gca", "gcb", "ancestor_a", "ancestor_b", "pgc")
+NULL_SIGNATURE: NDArray[bytes_] = zeros(32, dtype=bytes_)
+DEFAULT_MEMBERS: dict[str, Any] = {m: NULL_SIGNATURE for m in SIGNATURE_FIELDS}
 
 
 class _genetic_code:
@@ -128,6 +130,10 @@ class _genetic_code:
         """Update the access sequence for the genetic code."""
         _genetic_code.gene_pool_cache.access_sequence[self.idx] = next(_genetic_code.access_number)
 
+    def valid(self) -> bool:
+        """Return True if the genetic code is not empty or purged."""
+        return self.idx >= 0
+
     @classmethod
     def reset(cls, size: int | None = None) -> None:
         """A full reset of the store allows the size to be changed. All genetic codes
@@ -135,8 +141,13 @@ class _genetic_code:
         _genetic_code.gene_pool_cache.reset(size)
         _genetic_code.access_number = count(FIRST_ACCESS_NUMBER)
 
+    @classmethod
+    def get_gpc(cls) -> gene_pool_cache:
+        """Return the gene pool cache."""
+        return _genetic_code.gene_pool_cache
+
     def make_leaf(self, purged_gcs: set[int]) -> list[int]:
-        """Turn the GC into a leaf node if aany of its GC dependencies are to be purged.
+        """Turn the GC into a leaf node if any of its GC dependencies are to be purged.
         A leaf node has all its values derived from dependent GCs stored freeing the dependent
         GCs to be pushed to the GL or deleted. If only a subset of the dependent GCs are to be
         purged then the other may become orphaned i.e. they are no longer needed by this GC and
@@ -145,7 +156,7 @@ class _genetic_code:
         the first place. They may be needed in the future and so are returned to the caller.
         """
         # Determine if anything has been purged: This is a search so a "no touch" activity.
-        purged: dict[str, bool] = {m: getattr(getattr(_genetic_code.gene_pool_cache, m), "idx", -1) in purged_gcs for m in GC_FIELDS}
+        purged: dict[str, bool] = {m: getattr(getattr(_genetic_code.gene_pool_cache, m), "idx", -1) in purged_gcs for m in SIGNATURE_FIELDS}
 
         # Return if nothing has been purged there is nothing to do an no orphans
         if not any(purged.values()):
@@ -158,16 +169,17 @@ class _genetic_code:
         # Which was purged and which is an orphan.
         return [self[m].idx for m in ("gca", "gcb", "ancestor_a", "ancestor_b") if purged[m]]
 
-    def signature(self) -> bytes:
+    def signature(self) -> NDArray:
         """Return a globally unique reference for the genetic code."""
         # TODO: This is just a placeholder - need to add inline string
-        gca_sig: bytes | NDArray = self["gca"]["signature"]
-        gcb_sig: bytes | NDArray= self["gcb"]["signature"]
-        if not isinstance(gca_sig, bytes):
-            gca_sig = bytes(gca_sig)
-        if not isinstance(gcb_sig, bytes):
-            gcb_sig = bytes(gcb_sig)
-        return signature(gca_sig, gcb_sig, self["graph"].json_graph())
+        io_data = self["graph"].get_io()
+        return signature(
+            self["gca"]["signature"].data,
+            self["gcb"]["signature"].data,
+            io_data[0].data,
+            io_data[1].data,
+            self["graph"].connections.data
+        )
 
     def generation(self) -> int:
         """Return the generation of the genetic code."""
@@ -178,8 +190,43 @@ class _genetic_code:
         """Validate assertions for the _genetic_code."""
 
 
+class _special_genetic_code(_genetic_code):
+    """A special genetic code is simply a stub that returns a constant value for all its members."""
+
+    def __init__(self) -> None:
+        self.idx: int = -1
+
+    def __getitem__(self, member: str) -> Any:
+        """Return the specified member. Always the default value for a special genetic code."""
+        return DEFAULT_MEMBERS.get(member, 0)
+
+    def __setitem__(self, member: str, value: object) -> None:
+        """Set the specified member to the specified value. Always raises an error."""
+        raise RuntimeError("Cannot set a member of a special genetic code.")
+
+    def touch(self) -> None:
+        """Do nothing. A special genetic code is never touched."""
+        pass
+
+    def valid(self) -> bool:
+        """Return False. A special genetic code is never valid."""
+        return False
+
+    def make_leaf(self, purged_gcs: set[int]) -> list[int]:
+        """Return an empty list. A special genetic code is never a leaf."""
+        return []
+    
+    def signature(self) -> NDArray:
+        """This method should never be run as getitem should always return NULL_SIGNATURE."""
+        raise RuntimeError("Cannot run signature on a special genetic code.")
+    
+    def generation(self) -> int:
+        """This method should never be run as getitem should always return 0."""
+        raise RuntimeError("Cannot run generation on a special genetic code.")
+
+
 # Constants
 EMPTY_TUPLE = tuple()
-EMPTY_GENETIC_CODE = _genetic_code()
-PURGED_GENETIC_CODE = _genetic_code()
+EMPTY_GENETIC_CODE = _special_genetic_code()
+PURGED_GENETIC_CODE = _special_genetic_code()
 NO_DESCENDANTS: NDArray = array([], dtype=object)

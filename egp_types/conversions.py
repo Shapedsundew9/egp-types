@@ -9,6 +9,8 @@ from base64 import b64decode, b64encode
 from json import dumps, loads
 from typing import Union
 from zlib import compress, decompress
+from numpy import asarray, bytes_
+from numpy.typing import NDArray
 
 from egp_types.gc_type_tools import PROPERTIES
 
@@ -124,6 +126,34 @@ def memoryview_to_bytes(obj) -> bytes | None:
     (bytes or NoneType)
     """
     return None if obj is None else bytes(obj)
+
+
+def memoryview_to_ndarray(obj) -> NDArray | None:
+    """Convert a memory view to a numpy ndarray.
+
+    Args
+    ----
+    obj (memoryview or NoneType):
+
+    Returns
+    -------
+    (numpy.ndarray or NoneType)
+    """
+    return None if obj is None else asarray(obj, dtype=bytes_)
+
+
+def ndarray_to_memoryview(obj) -> memoryview | None:
+    """Convert a numpy ndarray to a memory view.
+
+    Args
+    ----
+    obj (numpy.ndarray or NoneType):
+
+    Returns
+    -------
+    (memoryview or NoneType)
+    """
+    return None if obj is None else obj.data
 
 
 def encode_properties(obj: dict[str, bool] | int | None) -> int:

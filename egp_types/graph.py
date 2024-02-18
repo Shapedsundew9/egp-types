@@ -115,13 +115,17 @@ class graph:
         """Return the source and destination interfaces."""
         _rows: rows = self.rows
         if iface == "IO":
-            return _rows[SrcRowIndex.I], _rows[DstRowIndex.O]
+            return self.get_io()
         if iface == "A":
             return _rows[SrcRowIndex.A], _rows[DstRowIndex.A]
         if iface == "B":
             return _rows[SrcRowIndex.B], _rows[DstRowIndex.B]
         assert False, f"Unknown interface {iface}"
 
+    def get_io(self) -> tuple[interface, interface]:
+        """Return the IO interface."""
+        return self.rows[SrcRowIndex.I], self.rows[DstRowIndex.O]
+    
     def assertions(self) -> None:
         """Run the assertions for the graph."""
         try:

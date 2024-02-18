@@ -5,9 +5,13 @@ NOTE: Cannot depend on any *GC types. This is a circular dependency.
 from hashlib import sha256
 from logging import DEBUG, Logger, NullHandler, getLogger
 from pprint import pformat
-from typing import Literal, LiteralString, Any
+from typing import Literal, LiteralString, Any, TYPE_CHECKING
 from .ep_type import asint
-from .egp_typing import JSONGraph
+from numpy.typing import NDArray
+from numpy import asarray, bytes_
+
+if TYPE_CHECKING:
+    from hashlib import _Hash
 
 
 _logger: Logger = getLogger(__name__)
@@ -131,9 +135,14 @@ def define_signature(mgc: Any) -> bytes:
     return sha256(string.encode()).digest()
 
 
-def signature(gca_sig: bytes, gcb_sig: bytes, graph: JSONGraph, inline: str = "") -> bytes:
+def signature(gca_sig: memoryview, gcb_sig: memoryview, i_data: memoryview, o_data: memoryview, con_data: memoryview, inline: str = "") -> NDArray:
     """Return the signature of a genetic code."""
     # NOTE: This needs to be very specific and stand the test of time!
-    hashstr: str = pformat(graph, indent=0, sort_dicts=True, width=65535, compact=True)
-    hashstr += gca_sig.hex() + gcb_sig.hex() + inline
-    return sha256(hashstr.encode()).digest()
+    hash_obj: _Hash = sha256(gca_sig)
+    hash_obj.update(gcb_sig)
+    hash_obj.update(i_data)
+    hash_obj.update(o_data)
+    hash_obj.update(con_data)
+    if inline:
+        hash_obj.update(inline.encode())
+    return asarray(hash_obj.digest(), dtype=bytes_)
