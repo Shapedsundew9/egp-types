@@ -56,6 +56,10 @@ class interface(ndarray):
         """Return the string representation of the interface."""
         return f"Interface instance: {id(self)}\n\t" + "\n\t".join(f"{i}: {asstr(val)} ({val})" for i, val in enumerate(self))
 
+    def __hash__(self):
+        """Create a hash for the interface object."""
+        return hash(self.data)
+
     def mermaid(self, row:Row, cls:EndPointClassStr) -> list[str]:
         """Return the mermaid charts string for the source interface.
         e.g. uidA001d["A001d: 1"]"""
