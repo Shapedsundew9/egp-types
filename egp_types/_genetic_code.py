@@ -175,28 +175,37 @@ class _genetic_code:
         the first place. They may be needed in the future and so are returned to the caller.
         """
         # Determine if anything has been purged: This is a search so a "no touch" activity.
-        purged: dict[str, bool] = {m: getattr(getattr(_genetic_code.gene_pool_cache, m), "idx", -1) in purged_gcs for m in SIGNATURE_FIELDS}
+        purged: dict[str, bool] = {m: getattr(getattr(_genetic_code.gene_pool_cache, m), "idx", -1) in purged_gcs for m in GC_OBJ_FIELDS}
 
         # Return if nothing has been purged there is nothing to do an no orphans
         if not any(purged.values()):
             return []
 
-        # Mark those purged as purged, make the genetic code a leaf node and return the potential orphans.
+        # Make the genetic code a leaf node, mark those purged as purged and return the potential orphans.
+        self.make_leaf()
         for member, _ in filter(lambda x: x[1], purged.items()):
             self[member] = PURGED_GENETIC_CODE
-        self.make_leaf()
-        return [self[m].idx for m in ("gca", "gcb", "ancestor_a", "ancestor_b") if not purged[m]]
+        return [self[m].idx for m in GC_OBJ_FIELDS if not purged[m]]
+
+    def init_as_leaf(self, gc_dict: dict[str, Any]) -> None:
+        """Initialise the leaf members deriving where possible."""
+        for mstr, mobj in filter(lambda x: x[0] in GC_OBJ_FIELDS and isinstance(x[1], memoryview), gc_dict.items()):
+            self[mstr + "_signature"] = mobj
+            self[mstr] = PURGED_GENETIC_CODE
+        if self["gca"] is not PURGED_GENETIC_CODE and self["gcb"] is not PURGED_GENETIC_CODE:
+            self.make_leaf()
+        else:
+            # If either one of GCA or GCB is purged then the derived values have to be in gc_dict.
+            self["generation"] = gc_dict["generation"]
+        self["signature"] = self.signature()
 
     def make_leaf(self) -> None:
         """Make the genetic code a leaf node by calculating the fields that are derived from other
         genetic codes and stored. This allows the other genetic codes to be purged or deleted."""
         _logger.debug(f"Making genetic code {self.idx} a leaf node:\n{self}")
-        self["ancestor_a_signature"] = self["ancestor_a"]["signature"]
-        self["ancestor_b_signature"] = self["ancestor_b"]["signature"]
-        self["gca_signature"] = self["gca"]["signature"]
-        self["gcb_signature"] = self["gcb"]["signature"]
+        for member in filter(lambda x: self[x] is not PURGED_GENETIC_CODE, GC_OBJ_FIELDS):
+            self[member + "_signature"] = self[member]["signature"]
         self["generation"] = self.generation()
-        self["pgc_signature"] = self["pgc"]["signature"]
         self["signature"] = self.signature()
         _logger.debug(f"Leaf node genetic code {self.idx} a leaf node:\n{self}")
 

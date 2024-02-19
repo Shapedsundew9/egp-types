@@ -72,7 +72,7 @@ from typing import Any
 from logging import DEBUG, Logger, NullHandler, getLogger
 from random import randbytes
 
-from ._genetic_code import _genetic_code, EMPTY_GENETIC_CODE, SIGNATURE_FIELDS, PURGED_GENETIC_CODE
+from ._genetic_code import _genetic_code, EMPTY_GENETIC_CODE, SIGNATURE_FIELDS, PURGED_GENETIC_CODE, GC_OBJ_FIELDS
 from .egp_typing import DstRowIndex, SrcRowIndex
 from .graph import graph
 from .rows import rows
@@ -93,29 +93,16 @@ class genetic_code(_genetic_code):
         # The store is a singleton and is shared by all instances of the class.
         # Runtime for genetic_code operations is not critical path but memory is.
         self.idx: int = _genetic_code.gene_pool_cache.assign_index(self)
-        io: tuple[interface, interface] = gc_dict.get("io", EMPTY_IO)
-        self._init_signature(gc_dict)
+        if any(isinstance(mobj, memoryview) for mstr, mobj in gc_dict.items() if mstr in SIGNATURE_FIELDS):
+            self.init_as_leaf(gc_dict)
         self.touch()
         super().__init__()
         # Generate a random genetic code if the "rndm" key is in the gc_dict.
         if "rndm" in gc_dict:
             self.random(gc_dict["rndm"])
         else:
+            io: tuple[interface, interface] = gc_dict.get("io", EMPTY_IO)
             self["graph"] = graph(gc_dict.get("graph", {}), gca=self["gca"], gcb=self["gcb"], io=io)
-
-    def _init_signature(self, gc_dict: dict[str, Any]) -> None:
-        """Initialise the signature members. If any are memoryview then all le"""
-        if isinstance(mobj, _genetic_code):
-            self[mstr] = mobj
-        elif mobj is None:
-            self[mstr] = EMPTY_GENETIC_CODE
-        elif isinstance(mobj, memoryview):
-            # The signature member is this genetic_code instance.
-            if mstr != "signature":
-                self[mstr + "_signature"] = mobj
-                self[mstr] = PURGED_GENETIC_CODE
-        else:
-            assert False, f"Unknown member type initializing signature {type(mobj)}"
 
     @classmethod
     def cls_assertions(cls) -> None:
