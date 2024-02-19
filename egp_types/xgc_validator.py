@@ -57,7 +57,7 @@ with open(
 _LGC_JSON_DUMP_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(LGC_JSON_DUMP_ENTRY_SCHEMA)
 
 # GGC is the storage schema for the Gene Pool
-GGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GMS_ENTRY_SCHEMA)
+GGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(LGC_ENTRY_SCHEMA)
 with open(join(dirname(__file__), "formats/gGC_entry_format.json"), "r", encoding="utf8") as file_ptr:
     merge(GGC_ENTRY_SCHEMA, load(file_ptr), update=True)
 _GGC_ENTRY_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GGC_ENTRY_SCHEMA)
@@ -448,58 +448,8 @@ class _LGC_json_dump_entry_validator(_LGC_entry_validator):
         return value.hex() if isinstance(value, (bytes, memoryview, bytearray)) else value
 
 
-class _gGC_entry_validator(_gms_entry_validator):
-    def _check_with_valid_ancestor_a_ref(self, field: str, value: Any) -> None:
-        if value is None and self.document["generation"]:
-            self._error(
-                field,
-                "GC has no primary parent (ancestor A) but is not a codon (0th generation).",
-            )
-        if value is not None and not self.document["generation"]:
-            self._error(
-                field,
-                "GC has a primary parent (ancestor A) but is a codon (0th generation).",
-            )
-        if value is not None and value == self.document["ref"]:
-            self._error(field, "A GC cannot be its own ancestor (A).")
-
-    def _check_with_valid_ancestor_b_ref(self, field: str, value: Any) -> None:
-        if value is not None and self.document["ancestor_a_ref"] is None:
-            self._error(
-                field,
-                "GC has a secondary parent (ancestor B) but no primary parent (ancestor A).",
-            )
-        if value is not None and value == self.document["ref"]:
-            self._error(field, "A GC cannot be its own ancestor (B).")
-
-    def _check_with_valid_gca_ref(self, field: str, value: Any) -> None:
-        if "A" in self.document["graph"] and value is None:
-            self._error(field, "graph references row A but gca_ref is None.")
-        if "A" not in self.document["graph"] and value is not None:
-            self._error(field, "No reference to row A in graph but gca_ref is not None.")
-        if value is not None and value == self.document["ref"]:
-            self._error(field, "A GC cannot reference itself in row A.")
-
-    def _check_with_valid_gcb_ref(self, field: str, value: Any) -> None:
-        if "B" in self.document["graph"] and value is None:
-            self._error(field, "graph references row B but gcb_ref is None.")
-        if "B" not in self.document["graph"] and value is not None:
-            self._error(field, "No reference to row B in graph but gcb_ref is not None.")
-        if value is not None and self.document["gca"] is None:
-            self._error(field, "gcb_ref is defined but gca_ref is None.")
-
-    def _check_with_valid_pgc_ref(self, field: str, value: Any) -> None:
-        if self.document["generation"] and value is None:
-            self._error(field, "Generation is > 0 but pgc_ref is None.")
-        if not self.document["generation"] and value is not None:
-            self._error(field, f"Generation is 0 but pgc_ref is defined as {value}.")
-        if self.document["ancestor_a"] is None and value is not None:
-            self._error(
-                field,
-                f"GC has no primary parent (ancestor A) but pgc_ref is defined as {value}.",
-            )
-        if value is not None and value == self.document["ref"]:
-            self._error(field, "A GC cannot have been created by itself (pgc_ref == ref).")
+class _gGC_entry_validator(_LGC_entry_validator):
+    """Validator for the Gene Pool Genetic Code."""
 
 
 gms_entry_validator: _gms_entry_validator = _gms_entry_validator()

@@ -1,22 +1,9 @@
 {
-    "ancestor_a_ref": {
-        "default": null,
+    "f_count": {
+        "default": 0,
         "nullable": true,
+        "min": 0,
         "type": "integer"
-    },
-    "ancestor_b_ref": {
-        "default": null,
-        "nullable": true,
-        "type": "integer"
-    },
-    "cb":{
-        "default": null,
-        "nullable": true,
-        "type": "string"
-    },
-    "callable":{
-        "default": null,
-        "nullable": true
     },
     "fitness": {
         "default": null,
@@ -25,38 +12,10 @@
         "min": 0.0,
         "type": "float"
     },
-    "gca_ref": {
-        "default": null,
-        "nullable": true,
-        "type": "integer"
-    },
-    "gcb_ref": {
-        "default": null,
-        "nullable": true,
-        "type": "integer"
-    },
-    "gc_graph": {
-        "default": null,
-        "nullable": true
-    },
-    "modified":{
-        "type": "boolean",
-        "default": false
-    },
     "offspring_count": {
         "default": 0,
         "max": 2147483647,
         "min": 0,
-        "type": "integer"
-    },
-    "next_pgc_ref": {
-        "default": null,
-        "nullable": true,
-        "type": "integer"
-    },
-    "pgc_ref": {
-        "default": null,
-        "nullable": true,
         "type": "integer"
     },
     "population_uid": {
@@ -65,22 +24,6 @@
         "max": 32767,
         "min": 1,
         "type": "integer"
-    },
-    "ref": {
-        "required": true,
-        "type": "integer"
-    },
-    "sms_ref": {
-        "default": null,
-        "nullable": true,
-        "type": "integer"
-    },
-    "signature": {
-        "maxlength": 32,
-        "minlength": 32,
-        "nullable": true,
-        "type": "binary",
-        "default": null
     },
     "survivability": {
         "default": null,

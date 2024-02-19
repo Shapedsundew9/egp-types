@@ -72,6 +72,10 @@ class graph:
             return False
         return self.rows == __value.rows and self.connections == __value.connections
 
+    def __hash__(self) -> int:
+        """Return the hash of the graph."""
+        return hash((hash(self.rows), hash(self.connections)))
+
     def json_graph(self) -> JSONGraph:
         """Return the JSON graph representation of the graph."""
         json_graph: JSONGraph = {}
