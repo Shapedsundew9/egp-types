@@ -39,7 +39,7 @@ from .egp_typing import (
 )
 from .ep_type import ep_type_lookup
 from .interface import EMPTY_INTERFACE, EMPTY_INTERFACE_C, INTERFACE_F, interface, interface_c
-from ._genetic_code import _genetic_code, EMPTY_GENETIC_CODE
+from ._genetic_code import _genetic_code, EMPTY_GENETIC_CODE, PURGED_GENETIC_CODE
 
 
 # Logging
@@ -86,11 +86,11 @@ class rows(ndarray):
         """Return True if the rows are equal to the value."""
         if not isinstance(__value, rows):
             return super().__eq__(__value)
-        return all(array_equal(self[i], __value[i]) for i in GRAPH_ROW_INDEX_ORDER)
+        return array_equal(self, __value)
 
     def __hash__(self) -> int:
         """Return the hash of the rows."""
-        return hash(self.data)
+        return hash(self.tobytes())
 
     def mermaid(self) -> list[str]:
         """Return the mermaid charts string for the rows."""
@@ -131,7 +131,7 @@ class rows(ndarray):
 
     def ab_from_graph(self, json_graph: JSONGraph, row: Row, gcx: _genetic_code) -> tuple[interface, interface]:
         """Return the A or B source and destination interfaces for a genetic code application graph."""
-        if gcx is EMPTY_GENETIC_CODE:
+        if gcx is EMPTY_GENETIC_CODE or gcx is PURGED_GENETIC_CODE:
             srcs: set = {tuple(dst_ep) for dst_eps in json_graph.values() for dst_ep in dst_eps if dst_ep[CPI.ROW] == row}
             sorted_srcs: list[list[EndPointType]] = sorted(srcs, key=lambda ep: ep[CPI.IDX])
             src_iface: interface = EMPTY_INTERFACE if not sorted_srcs else interface([ep[CPI.TYP] for ep in sorted_srcs])

@@ -92,8 +92,9 @@ _LOG_DEEP_DEBUG: bool = _logger.isEnabledFor(DEBUG - 1)
 
 # Constants
 FIRST_ACCESS_NUMBER: int = 0  # iinfo(int64).min
-SIGNATURE_FIELDS: tuple[str, ...] = ("signature", "gca_signature", "gcb_signature", "ancestor_a_signature", "ancestor_b_signature", "pgc_signature")
 GC_OBJ_FIELDS: tuple[str, ...] = ("gca", "gcb", "ancestor_a", "ancestor_b", "pgc")
+PROXY_SIGNATURE_FIELDS: tuple[str, ...] = tuple(m + "_signature" for m in GC_OBJ_FIELDS)
+SIGNATURE_FIELDS: tuple[str, ...] = PROXY_SIGNATURE_FIELDS + ("signature",)
 NULL_SIGNATURE: NDArray[bytes_] = zeros(32, dtype=bytes_)
 DIRTY_MEMBERS: set[str] = set()
 
@@ -196,22 +197,32 @@ class _genetic_code:
             self.make_leaf()
         else:
             # If either one of GCA or GCB is purged then the derived values have to be in gc_dict.
+            self["code_depth"] = gc_dict["code_depth"]
+            self["codon_depth"] = gc_dict["codon_depth"]
             self["generation"] = gc_dict["generation"]
+            self["num_codes"] = gc_dict["num_codes"]
+            self["num_codons"] = gc_dict["num_codons"]
         self["signature"] = self.signature()
 
     def make_leaf(self) -> None:
         """Make the genetic code a leaf node by calculating the fields that are derived from other
         genetic codes and stored. This allows the other genetic codes to be purged or deleted."""
-        _logger.debug(f"Making genetic code {self.idx} a leaf node:\n{self}")
+        if _LOG_DEEP_DEBUG:
+            _logger.debug(f"Making genetic code {self.idx} a leaf node:\n{self}")
         for member in filter(lambda x: self[x] is not PURGED_GENETIC_CODE, GC_OBJ_FIELDS):
             self[member + "_signature"] = self[member]["signature"]
+        self["code_depth"] = self.code_depth()
+        self["codon_depth"] = self.codon_depth()
         self["generation"] = self.generation()
+        self["num_codes"] = self.num_codes()
+        self["num_codons"] = self.num_codons()
         self["signature"] = self.signature()
-        _logger.debug(f"Leaf node genetic code {self.idx} a leaf node:\n{self}")
 
     def signature(self) -> NDArray:
         """Return a globally unique reference for the genetic code."""
-        # TODO: This is just a placeholder - need to add inline string
+        # NOTE: Since a codon is always a leaf it always has its signature defined in the
+        # dynamic store when loaded. Therefore the inline part of the signature definition
+        # is never needed.
         io_data: tuple[interface, interface] = self["graph"].get_io()
         return signature(
             self["gca"]["signature"].data,
@@ -221,9 +232,25 @@ class _genetic_code:
             self["graph"].connections.data
         )
 
+    def code_depth(self) -> int:
+        """Return the depth of the genetic code."""
+        return max(self["gca"]["code_depth"], self["gcb"]["code_depth"]) + 1
+
+    def codon_depth(self) -> int:
+        """Return the depth of the genetic code."""
+        return max(self["gca"]["codon_depth"], self["gcb"]["codon_depth"]) + 1
+
     def generation(self) -> int:
         """Return the generation of the genetic code."""
         return max(self["gca"]["generation"], self["gcb"]["generation"]) + 1
+
+    def num_codes(self) -> int:
+        """Return the number of genetic sub-codes that make up this genetic code."""
+        return self["gca"]["num_codes"] + self["gcb"]["num_codes"] + 1
+
+    def num_codons(self) -> int:
+        """Return the number of codons that make up this genetic code."""
+        return self["gca"]["num_codons"] + self["gcb"]["num_codons"] + 1
 
     @classmethod
     def cls_assertions(cls) -> None:
@@ -238,6 +265,7 @@ class _special_genetic_code(_genetic_code):
 
     def __getitem__(self, member: str) -> Any:
         """Return the specified member. Always the default value for a special genetic code."""
+        # _logger.debug(f"Read access of '{member}:{DEFAULT_MEMBERS.get(member, 0)}' of special genetic code.")
         return DEFAULT_MEMBERS.get(member, 0)
 
     def __setitem__(self, member: str, value: object) -> None:

@@ -23,7 +23,7 @@ from __future__ import annotations
 from logging import Logger, NullHandler, getLogger
 from typing import cast, Literal
 
-from numpy import int16, ndarray
+from numpy import int16, ndarray, array_equal
 
 from .egp_typing import ConstantExecStr, EndPointType, Row, EndPointClassStr
 from .ep_type import ep_type_lookup, validate, asstr
@@ -56,9 +56,15 @@ class interface(ndarray):
         """Return the string representation of the interface."""
         return f"Interface instance: {id(self)}\n\t" + "\n\t".join(f"{i}: {asstr(val)} ({val})" for i, val in enumerate(self))
 
-    def __hash__(self):
+    def __eq__(self, __value: object) -> bool:
+        """Return True if the rows are equal to the value."""
+        if not isinstance(__value, interface):
+            return super().__eq__(__value)
+        return array_equal(self, __value)
+
+    def __hash__(self) -> int:
         """Create a hash for the interface object."""
-        return hash(self.data)
+        return hash(self.tobytes())
 
     def mermaid(self, row:Row, cls:EndPointClassStr) -> list[str]:
         """Return the mermaid charts string for the source interface.

@@ -93,22 +93,28 @@ class genetic_code(_genetic_code):
         # The store is a singleton and is shared by all instances of the class.
         # Runtime for genetic_code operations is not critical path but memory is.
         self.idx: int = _genetic_code.gene_pool_cache.assign_index(self)
-        if any(isinstance(mobj, memoryview) for mstr, mobj in gc_dict.items() if mstr in SIGNATURE_FIELDS):
-            self.init_as_leaf(gc_dict)
         self.touch()
         super().__init__()
         # Generate a random genetic code if the "rndm" key is in the gc_dict.
         if "rndm" in gc_dict:
             self.random(gc_dict["rndm"])
         else:
+            self["gca"] = self.gcx(gc_dict.get("gca"))
+            self["gcb"] = self.gcx(gc_dict.get("gcb"))
             io: tuple[interface, interface] = gc_dict.get("io", EMPTY_IO)
             self["graph"] = graph(gc_dict.get("graph", {}), gca=self["gca"], gcb=self["gcb"], io=io)
+            if any(isinstance(mobj, memoryview) for mstr, mobj in gc_dict.items() if mstr in GC_OBJ_FIELDS):
+                self.init_as_leaf(gc_dict)
 
-    @classmethod
-    def cls_assertions(cls) -> None:
-        """Validate assertions for the genetic code."""
-        _genetic_code.gene_pool_cache.assertions()
-        super().cls_assertions()
+    def gcx(self, gcx: Any) -> _genetic_code:
+        """Return the appropriate value for GCx based on its type."""
+        if isinstance(gcx, _genetic_code):
+            return gcx
+        if gcx is None:
+            return EMPTY_GENETIC_CODE
+        if isinstance(gcx, memoryview):
+            return PURGED_GENETIC_CODE
+        assert False, f"Invalid genetic code type {type(gcx)}"
 
     def mermaid(self) -> list[str]:
         """Return the Mermaid Chart representation of the genetic code."""
