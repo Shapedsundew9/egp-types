@@ -206,11 +206,8 @@ class _genetic_code:
             self.make_leaf()
         else:
             # If either one of GCA or GCB is purged then the derived values have to be in gc_dict.
-            self["code_depth"] = gc_dict["code_depth"]
-            self["codon_depth"] = gc_dict["codon_depth"]
-            self["generation"] = gc_dict["generation"]
-            self["num_codes"] = gc_dict["num_codes"]
-            self["num_codons"] = gc_dict["num_codons"]
+            for member in OTHER_FIELDS:
+                self[member] = gc_dict[member]
         _logger.debug(f"Initialised genetic code {self.idx} as a leaf node: {self.signature().data.hex()}")
         self["signature"] = self.signature()
 
