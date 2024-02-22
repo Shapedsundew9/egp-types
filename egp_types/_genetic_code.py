@@ -69,10 +69,11 @@ A genetic code is defined by the genetic_code class derived from the codon class
 from __future__ import annotations
 
 from itertools import count
+from functools import partial
 from logging import DEBUG, Logger, NullHandler, getLogger
 from typing import TYPE_CHECKING, Any
 
-from numpy import array, zeros, bytes_
+from numpy import array, zeros, bytes_, int32, int64, float32
 from numpy.typing import NDArray
 
 from .gc_type_tools import signature
@@ -96,9 +97,15 @@ GC_OBJ_FIELDS: tuple[str, ...] = ("gca", "gcb", "ancestor_a", "ancestor_b", "pgc
 PROXY_SIGNATURE_FIELDS: tuple[str, ...] = tuple(m + "_signature" for m in GC_OBJ_FIELDS)
 SIGNATURE_FIELDS: tuple[str, ...] = PROXY_SIGNATURE_FIELDS + ("signature",)
 NULL_SIGNATURE: NDArray[bytes_] = zeros(32, dtype=bytes_)
-DIRTY_MEMBERS: set[str] = set()
-OTHER_FIELDS: tuple[str, ...] = ("e_count", "evolvability", "f_count", "fitness", "properties", "reference_count", "survivability")
+DIRTY_FIELDS: set[str] = set()
+OTHER_FIELDS: tuple[str, ...] = (
+    "e_count", "evolvability", "f_count", "fitness", "generation", "properties", "reference_count", "survivability"
+)
 ALL_FIELDS: tuple[str, ...] = SIGNATURE_FIELDS + GC_OBJ_FIELDS + OTHER_FIELDS
+
+INT32_ZERO = int32(0)
+INT64_ZERO = int64(0)
+FLOAT32_ZERO = float32(0.0)
 
 
 class _genetic_code:
@@ -133,7 +140,7 @@ class _genetic_code:
         """Set the specified member to the specified value."""
         # Touch
         _genetic_code.gene_pool_cache.access_sequence[self.idx] = next(_genetic_code.access_number)
-        if member in DIRTY_MEMBERS:
+        if member in DIRTY_FIELDS:
             # Mark as dirty (push to GP on eviction) if the member updated is one that needs to be preserved.
             _genetic_code.gene_pool_cache.status_byte[self.idx] |= 1
         if _LOG_DEEP_DEBUG:
@@ -214,12 +221,8 @@ class _genetic_code:
             _logger.debug(f"Making genetic code {self.idx} a leaf node.")
         for member in filter(lambda x: self[x] is not PURGED_GENETIC_CODE, GC_OBJ_FIELDS):
             self[member + "_signature"] = self[member]["signature"]
-        self["code_depth"] = self.code_depth()
-        self["codon_depth"] = self.codon_depth()
-        self["generation"] = self.generation()
-        self["num_codes"] = self.num_codes()
-        self["num_codons"] = self.num_codons()
-        self["signature"] = self.signature()
+        for member in OTHER_FIELDS:
+            self[member] = self[member]()
 
     def signature(self) -> NDArray:
         """Return a globally unique reference for the genetic code."""
@@ -235,25 +238,53 @@ class _genetic_code:
             self["graph"].connections.data
         )
 
-    def code_depth(self) -> int:
+    def code_depth(self) -> int32:
         """Return the depth of the genetic code."""
         return max(self["gca"]["code_depth"], self["gcb"]["code_depth"]) + 1
 
-    def codon_depth(self) -> int:
+    def codon_depth(self) -> int32:
         """Return the depth of the genetic code."""
         return max(self["gca"]["codon_depth"], self["gcb"]["codon_depth"]) + 1
 
-    def generation(self) -> int:
+    def e_count(self) -> int32:
+        """Return the number of evolutions of the genetic code that have occurred."""
+        return INT32_ZERO
+
+    def evolvability(self) -> float32:
+        """Return the evolvability of the genetic code."""
+        return FLOAT32_ZERO
+
+    def f_count(self) -> int32:
+        """Return the number of fitness evaluations of the genetic code."""
+        return INT32_ZERO
+
+    def fitness(self) -> float32:
+        """Return the fitness of the genetic code."""
+        return FLOAT32_ZERO
+
+    def generation(self) -> int64:
         """Return the generation of the genetic code."""
         return max(self["gca"]["generation"], self["gcb"]["generation"]) + 1
 
-    def num_codes(self) -> int:
+    def num_codes(self) -> int32:
         """Return the number of genetic sub-codes that make up this genetic code."""
         return self["gca"]["num_codes"] + self["gcb"]["num_codes"] + 1
 
-    def num_codons(self) -> int:
+    def num_codons(self) -> int32:
         """Return the number of codons that make up this genetic code."""
         return self["gca"]["num_codons"] + self["gcb"]["num_codons"] + 1
+
+    def properties(self) -> int64:
+        """Return the properties of the genetic code."""
+        return INT64_ZERO
+
+    def reference_count(self) -> int64:
+        """Return the reference count of the genetic code."""
+        return INT64_ZERO
+
+    def survivability(self) -> float32:
+        """Return the survivability of the genetic code."""
+        return FLOAT32_ZERO
 
     @classmethod
     def cls_assertions(cls) -> None:
@@ -264,36 +295,44 @@ class _special_genetic_code(_genetic_code):
     """A special genetic code is simply a stub that returns a constant value for all its members."""
 
     def __init__(self) -> None:
+        """Initialise the special genetic code. Index is always -1."""
+        super().__init__()
         self.idx: int = -1
-
-    def __getitem__(self, member: str) -> Any:
-        """Return the specified member. Always the default value for a special genetic code."""
-        # _logger.debug(f"Read access of '{member}:{DEFAULT_MEMBERS.get(member, 0)}' of special genetic code.")
-        return DEFAULT_MEMBERS.get(member, 0)
 
     def __setitem__(self, member: str, value: object) -> None:
         """Set the specified member to the specified value. Always raises an error."""
         raise RuntimeError("Cannot set a member of a special genetic code.")
 
-    def touch(self) -> None:
-        """Do nothing. A special genetic code is never touched."""
-        pass
+    def code_depth(self) -> int32:
+        """Return the depth of the genetic code."""
+        return INT32_ZERO
 
-    def valid(self) -> bool:
-        """Return False. A special genetic code is never valid."""
-        return False
+    def codon_depth(self) -> int32:
+        """Return the depth of the genetic code."""
+        return INT32_ZERO
+
+    def generation(self) -> int64:
+        """Return the generation of the genetic code."""
+        return INT64_ZERO
+
+    def num_codes(self) -> int32:
+        """Return the number of genetic sub-codes that make up this genetic code."""
+        return INT32_ZERO
+
+    def num_codons(self) -> int32:
+        """Return the number of codons that make up this genetic code."""
+        return INT32_ZERO
 
     def purge(self, purged_gcs: set[int]) -> list[int]:
         """Return an empty list. A special genetic code is never a leaf."""
         return []
-    
-    def signature(self) -> NDArray:
-        """This method should never be run as getitem should always return NULL_SIGNATURE."""
-        raise RuntimeError("Cannot run signature on a special genetic code.")
-    
-    def generation(self) -> int:
-        """This method should never be run as getitem should always return 0."""
-        raise RuntimeError("Cannot run generation on a special genetic code.")
+
+    def touch(self) -> None:
+        """Do nothing. A special genetic code is never touched."""
+
+    def valid(self) -> bool:
+        """Return False. A special genetic code is never valid."""
+        return False
 
 
 # Constants
