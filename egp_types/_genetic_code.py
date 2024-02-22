@@ -97,6 +97,8 @@ PROXY_SIGNATURE_FIELDS: tuple[str, ...] = tuple(m + "_signature" for m in GC_OBJ
 SIGNATURE_FIELDS: tuple[str, ...] = PROXY_SIGNATURE_FIELDS + ("signature",)
 NULL_SIGNATURE: NDArray[bytes_] = zeros(32, dtype=bytes_)
 DIRTY_MEMBERS: set[str] = set()
+OTHER_FIELDS: tuple[str, ...] = ("e_count", "evolvability", "f_count", "fitness", "properties", "reference_count", "survivability")
+ALL_FIELDS: tuple[str, ...] = SIGNATURE_FIELDS + GC_OBJ_FIELDS + OTHER_FIELDS
 
 
 class _genetic_code:
@@ -202,13 +204,14 @@ class _genetic_code:
             self["generation"] = gc_dict["generation"]
             self["num_codes"] = gc_dict["num_codes"]
             self["num_codons"] = gc_dict["num_codons"]
+        _logger.debug(f"Initialised genetic code {self.idx} as a leaf node: {self.signature().data.hex()}")
         self["signature"] = self.signature()
 
     def make_leaf(self) -> None:
         """Make the genetic code a leaf node by calculating the fields that are derived from other
         genetic codes and stored. This allows the other genetic codes to be purged or deleted."""
         if _LOG_DEEP_DEBUG:
-            _logger.debug(f"Making genetic code {self.idx} a leaf node:\n{self}")
+            _logger.debug(f"Making genetic code {self.idx} a leaf node.")
         for member in filter(lambda x: self[x] is not PURGED_GENETIC_CODE, GC_OBJ_FIELDS):
             self[member + "_signature"] = self[member]["signature"]
         self["code_depth"] = self.code_depth()

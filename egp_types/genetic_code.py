@@ -72,7 +72,7 @@ from typing import Any
 from logging import DEBUG, Logger, NullHandler, getLogger
 from random import randbytes
 
-from ._genetic_code import _genetic_code, EMPTY_GENETIC_CODE, SIGNATURE_FIELDS, PURGED_GENETIC_CODE, GC_OBJ_FIELDS
+from ._genetic_code import _genetic_code, EMPTY_GENETIC_CODE, PURGED_GENETIC_CODE, GC_OBJ_FIELDS, OTHER_FIELDS
 from .egp_typing import DstRowIndex, SrcRowIndex
 from .graph import graph
 from .rows import rows
@@ -99,12 +99,16 @@ class genetic_code(_genetic_code):
         if "rndm" in gc_dict:
             self.random(gc_dict["rndm"])
         else:
+            # Build a genetic code from the gc_dict
+            # First see if it needs to be a leaf node
             self["gca"] = self.gcx(gc_dict.get("gca"))
             self["gcb"] = self.gcx(gc_dict.get("gcb"))
             io: tuple[interface, interface] = gc_dict.get("io", EMPTY_IO)
             self["graph"] = graph(gc_dict.get("graph", {}), gca=self["gca"], gcb=self["gcb"], io=io)
             if any(isinstance(mobj, memoryview) for mstr, mobj in gc_dict.items() if mstr in GC_OBJ_FIELDS):
                 self.init_as_leaf(gc_dict)
+            for field in filter(lambda f: f in gc_dict, OTHER_FIELDS):
+                self[field] = gc_dict[field]
 
     def gcx(self, gcx: Any) -> _genetic_code:
         """Return the appropriate value for GCx based on its type."""
