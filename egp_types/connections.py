@@ -203,3 +203,6 @@ class connections(ndarray):
                 assert (
                     idx == dst_idx
                 ), f"Destination row {ROWS_INDEXED[dst_row_index]} has non-sequential destination endpoint indices:\n{dst_row_indices}"
+
+
+EMPTY_CONNECTIONS = connections({})

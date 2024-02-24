@@ -227,3 +227,6 @@ class rows(ndarray):
             assert self[DstRowIndex.P] is EMPTY_INTERFACE, "Row P must be empty when row F is empty."
         else:
             assert self[DstRowIndex.P] is self[DstRowIndex.O], "Row P must be the same as row O when F is defined."
+
+
+EMPTY_ROWS = rows({})

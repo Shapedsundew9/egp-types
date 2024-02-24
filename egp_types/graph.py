@@ -11,12 +11,12 @@ from logging import DEBUG, Logger, NullHandler, getLogger
 from random import seed
 from typing import cast
 
-from .connections import connections
+from .connections import connections, EMPTY_CONNECTIONS
 from .egp_typing import ALL_ROWS_STR, ROWS, ROWS_INDEXED, DestinationRow, DstRowIndex, EndPointType, JSONGraph, Row, SrcRowIndex
 from .ep_type import EP_TYPE_VALUES_TUPLE
 from ._genetic_code import _genetic_code, EMPTY_GENETIC_CODE
 from .mermaid_charts import MERMAID_IGRAPH_CLASS_DEF_STR, MERMAID_IGRAPH_COLORS
-from .rows import rows
+from .rows import rows, EMPTY_ROWS
 from .interface import EMPTY_INTERFACE, interface
 
 # Logging
@@ -39,8 +39,6 @@ class graph:
         - max_eps: int = 8: The maximum number of endpoints to use if rndm is True.
         - verify: bool = True: If True then the graph is verified after initialisation.
         """
-        gca: _genetic_code = kwargs.get("gca", EMPTY_GENETIC_CODE)
-        gcb: _genetic_code = kwargs.get("gcb", EMPTY_GENETIC_CODE)
         io: tuple[interface, interface] = kwargs.get("io", (EMPTY_INTERFACE, EMPTY_INTERFACE))
         if kwargs.get("rndm", False):
             if kwargs.get("rseed", None) is not None:
@@ -54,9 +52,14 @@ class graph:
             self.connections: connections = connections({}, _rndm=[self.rows])
             if verify:
                 self.assertions()
-        else:
+        elif json_graph:
+            gca: _genetic_code = kwargs.get("gca", EMPTY_GENETIC_CODE)
+            gcb: _genetic_code = kwargs.get("gcb", EMPTY_GENETIC_CODE)
             self.rows: rows = rows(json_graph=json_graph, gca=gca, gcb=gcb, io=io)
             self.connections: connections = connections(json_graph=json_graph)
+        else:
+            self.rows = EMPTY_ROWS
+            self.connections = EMPTY_CONNECTIONS
 
     def __repr__(self) -> str:
         """Return the string representation of the graph data."""
@@ -129,7 +132,7 @@ class graph:
     def get_io(self) -> tuple[interface, interface]:
         """Return the IO interface."""
         return self.rows[SrcRowIndex.I], self.rows[DstRowIndex.O]
-    
+
     def assertions(self) -> None:
         """Run the assertions for the graph."""
         try:
@@ -147,3 +150,6 @@ class graph:
             _logger.error(f"Graph assertions failed: {e}")
             _logger.error(f"Graph data:\n{repr(self)}")
             raise e
+
+
+EMPTY_GRAPH = graph({})

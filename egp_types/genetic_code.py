@@ -72,9 +72,9 @@ from typing import Any
 from logging import DEBUG, Logger, NullHandler, getLogger
 from random import randbytes
 
-from ._genetic_code import _genetic_code, EMPTY_GENETIC_CODE, PURGED_GENETIC_CODE, STORE_GC_OBJ_MEMBERS, STORE_OTHER_MEMBERS, STORE_ALL_MEMBERS
+from ._genetic_code import _genetic_code, EMPTY_GENETIC_CODE, PURGED_GENETIC_CODE, STORE_GC_OBJ_MEMBERS, STORE_STATIC_MEMBERS, STORE_ALL_MEMBERS, DEFAULT_STATIC_MEMBER_VALUES
 from .egp_typing import DstRowIndex, SrcRowIndex
-from .graph import graph
+from .graph import graph, EMPTY_GRAPH
 from .rows import rows
 from .interface import interface, EMPTY_IO
 
@@ -83,6 +83,10 @@ from .interface import interface, EMPTY_IO
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
 _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
+
+
+# Circular reference on graph definition in _genetic_code.py
+DEFAULT_STATIC_MEMBER_VALUES["graph"] = EMPTY_GRAPH
 
 
 class genetic_code(_genetic_code):
@@ -107,8 +111,8 @@ class genetic_code(_genetic_code):
             self["graph"] = graph(gc_dict.get("graph", {}), gca=self["gca"], gcb=self["gcb"], io=io)
             if any(isinstance(mobj, memoryview) for mstr, mobj in gc_dict.items() if mstr in STORE_GC_OBJ_MEMBERS):
                 self.init_as_leaf(gc_dict)
-            for field in filter(lambda f: f in gc_dict, STORE_OTHER_MEMBERS):
-                self[field] = gc_dict[field]
+            for field in filter(lambda f: f in gc_dict, STORE_STATIC_MEMBERS):
+                self[field] = gc_dict.get(field, DEFAULT_STATIC_MEMBER_VALUES[field])
 
     def gcx(self, gcx: Any) -> _genetic_code:
         """Return the appropriate value for GCx based on its type."""
