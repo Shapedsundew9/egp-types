@@ -5,10 +5,12 @@ NOTE: Cannot depend on any *GC types. This is a circular dependency.
 from hashlib import sha256
 from logging import DEBUG, Logger, NullHandler, getLogger
 from pprint import pformat
-from typing import Literal, LiteralString, Any, TYPE_CHECKING
-from .ep_type import asint
-from numpy.typing import NDArray
+from typing import TYPE_CHECKING, Any, Literal, LiteralString
+
 from numpy import asarray, bytes_
+from numpy.typing import NDArray
+
+from .ep_type import asint
 
 if TYPE_CHECKING:
     from hashlib import _Hash

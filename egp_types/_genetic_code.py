@@ -72,7 +72,7 @@ from itertools import count
 from logging import DEBUG, Logger, NullHandler, getLogger
 from typing import TYPE_CHECKING, Any, Callable
 
-from numpy import array, zeros, bytes_, int32, int64, float32
+from numpy import array, zeros, bytes_, int32, int64, float32, ndarray
 from numpy.typing import NDArray
 
 from .gc_type_tools import signature
@@ -142,14 +142,20 @@ class _genetic_code:
         # If the dynamic member is not stored then it is calculated.
         if _LOG_DEBUG:
             assert member in STORE_DYNAMIC_MEMBERS, f"Member '{member}' is not a dynamic member of genetic code."
-        didx: int32 = gpc.common_ds_idx[self.idx]
-        return getattr(self, member)() if didx < 0 else gpc._common_ds[member][didx]
+        return gpc._common_ds[member][self.idx]
 
     def __repr__(self) -> str:
         """Return the string representation of the genetic code."""
         str_list: list[str] = [f"Genetic Code {self.idx}"]
-        str_list.extend([f"  {m}: {type(self[m])}: {self[m]}" for m in STORE_SIGNATURE_MEMBERS])
-        str_list.extend([f"  {m}: {type(self[m])}: <---NOT DISPLAYED-->" for m in STORE_GC_OBJ_MEMBERS])
+        for member in STORE_ALL_MEMBERS:
+            raw_value: Any = self[member]
+            if isinstance(raw_value, _genetic_code):
+                value: Any = raw_value["signature"].data.hex()
+            elif isinstance(raw_value, ndarray):
+                value = raw_value.data.hex()
+            else:
+                value = raw_value
+            str_list.append(f"  {member}: {type(self[member])}: {value}")
         return "\n".join(str_list)
 
     def __setitem__(self, member: str, value: object) -> None:
@@ -159,7 +165,7 @@ class _genetic_code:
         gpc.access_sequence[self.idx] = next(_genetic_code.access_number)
         if member in STORE_DIRTY_MEMBERS:
             # Mark as dirty (push to GP on eviction) if the member updated is one that needs to be preserved.
-            gpc.status_byte[self.idx] |= 1
+            self.dirty()
         if _LOG_DEEP_DEBUG:
             _logger.debug(
                 f"Write access of '{member}' of genetic code {self.idx} sequence number "
@@ -170,38 +176,88 @@ class _genetic_code:
             getattr(gpc, member)[self.idx] = value
         else:
             # Setting a dynamic member.
-            if _LOG_DEBUG:
+            if _LOG_DEEP_DEBUG:
+                _logger.debug(f"Setting dynamic member '{member}' index {gpc.common_ds_idx[self.idx]}.")
                 assert member in STORE_DYNAMIC_MEMBERS, f"Member '{member}' is not a dynamic member of genetic code."
-            didx: int32 = gpc.common_ds_idx[self.idx]
-            if didx < 0:
-                # Need to create an index before the data can be stored
-                didx = int32(gpc._common_ds.next_index())
-            gpc._common_ds[member][didx] = value
+            gpc._common_ds[member][self.idx] = value
 
-    def touch(self) -> None:
-        """Update the access sequence for the genetic code."""
-        _genetic_code.gene_pool_cache.access_sequence[self.idx] = next(_genetic_code.access_number)
+    def ancestor_a_signature(self) -> NDArray:
+        """Return the signature of the genetic code."""
+        return self["ancestor_a"]["signature"]
 
-    def valid(self) -> bool:
-        """Return True if the genetic code is not empty or purged."""
-        return self.idx >= 0
+    def ancestor_b_signature(self) -> NDArray:
+        """Return the signature of the genetic code."""
+        return self["ancestor_b"]["signature"]
 
-    @classmethod
-    def reset(cls, size: int | None = None) -> None:
-        """A full reset of the store allows the size to be changed. All genetic codes
-        are deleted which pushes the genetic codes to the genomic library as required."""
-        _genetic_code.gene_pool_cache.reset(size)
-        _genetic_code.access_number = count(FIRST_ACCESS_NUMBER)
+    def clean(self) -> None:
+        """Set the state of the GC to clean."""
+        _genetic_code.gene_pool_cache.status_byte[self.idx] &= 0xFE
 
-    @classmethod
-    def get_gpc(cls) -> gene_pool_cache:
-        """Return the gene pool cache."""
-        return _genetic_code.gene_pool_cache
+    def code_depth(self) -> int32:
+        """Return the depth of the genetic code."""
+        return max(self["gca"]["code_depth"], self["gcb"]["code_depth"]) + 1
 
-    @classmethod
-    def set_gpc(cls, gpc: Any) -> None:
-        """Set the gene pool cache."""
-        _genetic_code.gene_pool_cache = gpc
+    def codon_depth(self) -> int32:
+        """Return the depth of the genetic code."""
+        return max(self["gca"]["codon_depth"], self["gcb"]["codon_depth"]) + 1
+
+    def dirty(self) -> None:
+        """Set the state of the GC to dirty."""
+        _genetic_code.gene_pool_cache.status_byte[self.idx] |= 1
+
+    def gca_signature(self) -> NDArray:
+        """Return the signature of the genetic code."""
+        return self["gca"]["signature"]
+
+    def gcb_signature(self) -> NDArray:
+        """Return the signature of the genetic code."""
+        return self["gcb"]["signature"]
+
+    def gcx(self, gcx: Any) -> _genetic_code:
+        """Return the appropriate value for GCx based on its type."""
+        if isinstance(gcx, _genetic_code):
+            return gcx
+        if gcx is None:
+            return EMPTY_GENETIC_CODE
+        if isinstance(gcx, memoryview):
+            return PURGED_GENETIC_CODE
+        assert False, f"Invalid genetic code type {type(gcx)}"
+
+    def generation(self) -> int64:
+        """Return the generation of the genetic code."""
+        return max(self["gca"]["generation"], self["gcb"]["generation"]) + 1
+
+    def is_dirty(self) -> bool:
+        """Return True if the genetic code is dirty."""
+        return bool(_genetic_code.gene_pool_cache.status_byte[self.idx] & 1)
+
+    def make_leaf(self) -> None:
+        """Make the genetic code a leaf node by calculating the fields that are derived from other
+        genetic codes and stored. This allows the other genetic codes to be purged or deleted."""
+        if _LOG_DEEP_DEBUG:
+            _logger.debug(f"Making genetic code {self.idx} a leaf node.")
+        for member in STORE_GC_OBJ_MEMBERS:
+            self[member + "_signature"] = self[member]["signature"]
+        for member in STORE_DERIVED_MEMBERS:
+            # This looks weird but it will generate the derived members when __getitem__ is called.
+            self[member] = self[member]
+
+    def num_codes(self) -> int32:
+        """Return the number of genetic sub-codes that make up this genetic code."""
+        return self["gca"]["num_codes"] + self["gcb"]["num_codes"] + 1
+
+    def num_codons(self) -> int32:
+        """Return the number of codons that make up this genetic code."""
+        return self["gca"]["num_codons"] + self["gcb"]["num_codons"] + 1
+
+    def pgc_signature(self) -> NDArray:
+        """Return the signature of the genetic code."""
+        return self["pgc"]["signature"]
+
+    def properties(self) -> int64:
+        """Return the properties of the genetic code."""
+        # FIXME: Properties are derived from GCA & GCB but may be AND'd, OR'd and may be added too.
+        return self["gca"]["properties"] | self["gcb"]["properties"]
 
     def purge(self, purged_gcs: set[int]) -> list[int]:
         """Turn the GC into a leaf node if any of its GC dependencies are to be purged.
@@ -225,29 +281,6 @@ class _genetic_code:
             self[member] = PURGED_GENETIC_CODE
         return [self[m].idx for m in STORE_GC_OBJ_MEMBERS if not purged[m]]
 
-    def init_as_leaf(self, gc_dict: dict[str, Any]) -> None:
-        """Initialise the leaf members deriving where possible."""
-        for mstr, mobj in filter(lambda x: x[0] in STORE_GC_OBJ_MEMBERS and isinstance(x[1], memoryview), gc_dict.items()):
-            self[mstr + "_signature"] = mobj
-            self[mstr] = PURGED_GENETIC_CODE
-        if self["gca"] is not PURGED_GENETIC_CODE and self["gcb"] is not PURGED_GENETIC_CODE:
-            self.make_leaf()
-        else:
-            # If either one of GCA or GCB is purged then the derived values have to be in gc_dict or default
-            for member in STORE_DERIVED_MEMBERS:
-                self[member] = gc_dict.get(member, DEFAULT_DYNAMIC_MEMBER_VALUES[member])
-        _logger.debug(f"Initialised genetic code {self.idx} as a leaf node: {self.signature().data.hex()}")
-
-    def make_leaf(self) -> None:
-        """Make the genetic code a leaf node by calculating the fields that are derived from other
-        genetic codes and stored. This allows the other genetic codes to be purged or deleted."""
-        if _LOG_DEEP_DEBUG:
-            _logger.debug(f"Making genetic code {self.idx} a leaf node.")
-        for member in STORE_GC_OBJ_MEMBERS:
-            self[member + "_signature"] = self[member]["signature"]
-        for member in STORE_DERIVED_MEMBERS:
-            self[member] = self[member]()
-
     def signature(self) -> NDArray:
         """Return a globally unique reference for the genetic code."""
         # NOTE: Since a codon is always a leaf it always has its signature defined in the
@@ -262,34 +295,34 @@ class _genetic_code:
             self["graph"].connections.data
         )
 
-    def code_depth(self) -> int32:
-        """Return the depth of the genetic code."""
-        return max(self["gca"]["code_depth"], self["gcb"]["code_depth"]) + 1
+    def touch(self) -> None:
+        """Update the access sequence for the genetic code."""
+        _genetic_code.gene_pool_cache.access_sequence[self.idx] = next(_genetic_code.access_number)
 
-    def codon_depth(self) -> int32:
-        """Return the depth of the genetic code."""
-        return max(self["gca"]["codon_depth"], self["gcb"]["codon_depth"]) + 1
-
-    def generation(self) -> int64:
-        """Return the generation of the genetic code."""
-        return max(self["gca"]["generation"], self["gcb"]["generation"]) + 1
-
-    def num_codes(self) -> int32:
-        """Return the number of genetic sub-codes that make up this genetic code."""
-        return self["gca"]["num_codes"] + self["gcb"]["num_codes"] + 1
-
-    def num_codons(self) -> int32:
-        """Return the number of codons that make up this genetic code."""
-        return self["gca"]["num_codons"] + self["gcb"]["num_codons"] + 1
-
-    def properties(self) -> int64:
-        """Return the properties of the genetic code."""
-        # FIXME: Properties are derived from GCA & GCB but may be AND'd, OR'd and may be added too.
-        return self["gca"]["properties"] | self["gcb"]["properties"]
+    def valid(self) -> bool:
+        """Return True if the genetic code is not empty or purged."""
+        return self.idx >= 0
 
     @classmethod
     def cls_assertions(cls) -> None:
         """Validate assertions for the _genetic_code."""
+
+    @classmethod
+    def get_gpc(cls) -> gene_pool_cache:
+        """Return the gene pool cache."""
+        return _genetic_code.gene_pool_cache
+
+    @classmethod
+    def reset(cls, size: int | None = None) -> None:
+        """A full reset of the store allows the size to be changed. All genetic codes
+        are deleted which pushes the genetic codes to the genomic library as required."""
+        _genetic_code.gene_pool_cache.reset(size)
+        _genetic_code.access_number = count(FIRST_ACCESS_NUMBER)
+
+    @classmethod
+    def set_gpc(cls, gpc: Any) -> None:
+        """Set the gene pool cache."""
+        _genetic_code.gene_pool_cache = gpc
 
 
 class _special_genetic_code(_genetic_code):
@@ -304,7 +337,7 @@ class _special_genetic_code(_genetic_code):
         """Return the specified member default value."""
         if member in STORE_STATIC_MEMBERS:
             return DEFAULT_STATIC_MEMBER_VALUES[member]
-        return super().__getitem__(member)
+        return DEFAULT_DYNAMIC_MEMBER_VALUES[member]
 
     def __setitem__(self, member: str, value: object) -> None:
         """Set the specified member to the specified value. Always raises an error."""

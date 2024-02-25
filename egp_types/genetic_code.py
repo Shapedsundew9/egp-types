@@ -68,16 +68,20 @@ A genetic code is defined by the genetic_code class derived from the codon class
 
 from __future__ import annotations
 
-from typing import Any
 from logging import DEBUG, Logger, NullHandler, getLogger
+from pprint import pformat
 from random import randbytes
+from typing import Any
+from uuid import UUID
 
-from ._genetic_code import _genetic_code, EMPTY_GENETIC_CODE, PURGED_GENETIC_CODE, STORE_GC_OBJ_MEMBERS, STORE_STATIC_MEMBERS, STORE_ALL_MEMBERS, DEFAULT_STATIC_MEMBER_VALUES
+from ._genetic_code import (DEFAULT_DYNAMIC_MEMBER_VALUES,
+                            DEFAULT_STATIC_MEMBER_VALUES, PURGED_GENETIC_CODE,
+                            STORE_DERIVED_MEMBERS, STORE_GC_OBJ_MEMBERS,
+                            _genetic_code)
 from .egp_typing import DstRowIndex, SrcRowIndex
-from .graph import graph, EMPTY_GRAPH
+from .graph import EMPTY_GRAPH, graph
+from .interface import EMPTY_IO, interface
 from .rows import rows
-from .interface import interface, EMPTY_IO
-
 
 # Logging
 _logger: Logger = getLogger(__name__)
@@ -87,6 +91,8 @@ _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
 # Circular reference on graph definition in _genetic_code.py
 DEFAULT_STATIC_MEMBER_VALUES["graph"] = EMPTY_GRAPH
+PREDEFINED_MEMBERS: set[str] = {"gca", "gcb", "graph"}
+CODON_CREATOR_UUID = UUID('22c23596-df90-4b87-88a4-9409a0ea764f')
 
 
 class genetic_code(_genetic_code):
@@ -103,26 +109,32 @@ class genetic_code(_genetic_code):
         if "rndm" in gc_dict:
             self.random(gc_dict["rndm"])
         else:
+            if _LOG_DEBUG:
+                _logger.debug(f"genetic_code {self.idx} creating from:\n{pformat(gc_dict)}")
+                if 'signature' in gc_dict and isinstance(gc_dict['signature'], memoryview):
+                    _logger.debug(f"'signature' {gc_dict['signature'].hex()}")
             # Build a genetic code from the gc_dict
             # First see if it needs to be a leaf node
-            self["gca"] = self.gcx(gc_dict.get("gca"))
-            self["gcb"] = self.gcx(gc_dict.get("gcb"))
+            codon: bool = "creator" in gc_dict and gc_dict["creator"] == CODON_CREATOR_UUID
+            for member in STORE_GC_OBJ_MEMBERS:
+                self[member] = self.gcx(gc_dict.get(member))
+                if isinstance(gc_dict.get(member), memoryview):
+                    self[member + "_signature"] = gc_dict[member]
             io: tuple[interface, interface] = gc_dict.get("io", EMPTY_IO)
             self["graph"] = graph(gc_dict.get("graph", {}), gca=self["gca"], gcb=self["gcb"], io=io)
-            if any(isinstance(mobj, memoryview) for mstr, mobj in gc_dict.items() if mstr in STORE_GC_OBJ_MEMBERS):
-                self.init_as_leaf(gc_dict)
-            for field in filter(lambda f: f in gc_dict, STORE_STATIC_MEMBERS):
-                self[field] = gc_dict.get(field, DEFAULT_STATIC_MEMBER_VALUES[field])
-
-    def gcx(self, gcx: Any) -> _genetic_code:
-        """Return the appropriate value for GCx based on its type."""
-        if isinstance(gcx, _genetic_code):
-            return gcx
-        if gcx is None:
-            return EMPTY_GENETIC_CODE
-        if isinstance(gcx, memoryview):
-            return PURGED_GENETIC_CODE
-        assert False, f"Invalid genetic code type {type(gcx)}"
+            if self["gca"] is not PURGED_GENETIC_CODE and self["gcb"] is not PURGED_GENETIC_CODE and not codon:
+                for member in STORE_DERIVED_MEMBERS:
+                    # This looks weird but it will generate the derived members when __getitem__ is called.
+                    self[member] = self[member]
+            else:
+                # If either one of GCA or GCB is purged then the derived values have to be in gc_dict or default
+                # The direct update to the GC derived members will mark them dirty but they are not so
+                # the GC dirty bit is cleared.
+                for member in STORE_DERIVED_MEMBERS:
+                    self[member] = gc_dict.get(member, DEFAULT_DYNAMIC_MEMBER_VALUES[member])
+                self.clean()
+        if _LOG_DEBUG:
+            _logger.debug(f"genetic_code {self.idx} created:\n{self}")
 
     def mermaid(self) -> list[str]:
         """Return the Mermaid Chart representation of the genetic code."""
