@@ -72,7 +72,7 @@ from itertools import count
 from logging import DEBUG, Logger, NullHandler, getLogger
 from typing import TYPE_CHECKING, Any, Callable
 
-from numpy import array, zeros, bytes_, int32, int64, float32, ndarray
+from numpy import array, zeros, bytes_, int32, int64, intp, float32, ndarray, signedinteger, floating
 from numpy.typing import NDArray
 
 from .gc_type_tools import signature
@@ -101,10 +101,12 @@ STORE_DEFAULT_MEMBERS: tuple[str, ...] = (
     "e_count", "evolvability", "f_count", "fitness", "reference_count", "survivability"
 )
 STORE_DIRTY_MEMBERS: set[str] = set(STORE_DEFAULT_MEMBERS)
-STORE_STATIC_MEMBERS: tuple[str, ...] = STORE_GC_OBJ_MEMBERS + ("e_count", "evolvability", "f_count", "fitness",
-    "graph", "properties", "reference_count", "survivability")
+STORE_STATIC_NON_OBJECT_MEMBERS: tuple[str, ...] = ("e_count", "evolvability", "f_count", "fitness",
+    "properties", "reference_count", "survivability")  # graph is a non-gc object object member
+STORE_STATIC_MEMBERS: tuple[str, ...] = STORE_GC_OBJ_MEMBERS + STORE_STATIC_NON_OBJECT_MEMBERS + ("graph", )
 STORE_DERIVED_MEMBERS: tuple[str, ...] = ("code_depth", "codon_depth", "generation", "num_codes", "num_codons", "signature")
 STORE_DYNAMIC_MEMBERS: tuple[str, ...] = STORE_PROXY_SIGNATURE_MEMBERS + STORE_DERIVED_MEMBERS
+HIGHER_LAYER_MEMBERS: tuple[str, ...] = STORE_DERIVED_MEMBERS + STORE_STATIC_MEMBERS
 STORE_ALL_MEMBERS: tuple[str, ...] = STORE_DYNAMIC_MEMBERS + STORE_STATIC_MEMBERS
 INT32_ZERO = int32(0)
 INT32_ONE = int32(1)
@@ -181,6 +183,39 @@ class _genetic_code:
                 assert member in STORE_DYNAMIC_MEMBERS, f"Member '{member}' is not a dynamic member of genetic code."
             gpc._common_ds[member][self.idx] = value
 
+    def as_dict(self) -> dict[str, Any]:
+        """Return the genetic code as a dictionary."""
+        retval: dict[str, Any] = {}
+        for member in HIGHER_LAYER_MEMBERS:
+            raw_value: Any = self[member]
+            if isinstance(raw_value, _genetic_code):
+                if raw_value is EMPTY_GENETIC_CODE:
+                    value = None
+                elif raw_value is PURGED_GENETIC_CODE:
+                    value: Any = self[member + "_signature"].data
+                else:
+                    value = raw_value["signature"].data
+            elif isinstance(raw_value, signedinteger):
+                value = int(raw_value)
+            elif isinstance(raw_value, floating):
+                value = float(raw_value)
+            elif member == "signature":
+                value = raw_value.data
+            elif isinstance(raw_value, ndarray):
+                value = raw_value.tolist()
+            elif raw_value is None:
+                value = None
+            elif member == "graph":
+                value = raw_value.json_graph()
+            else:
+                raise RuntimeError(f"Unknown type {type(raw_value)} for member {member}")
+            retval[member] = value
+        return retval
+
+    def assertions(self) -> None:
+        """Validate assertions for the genetic code."""
+        self["graph"].assertions()
+
     def ancestor_a_signature(self) -> NDArray:
         """Return the signature of the genetic code."""
         return self["ancestor_a"]["signature"]
@@ -242,6 +277,17 @@ class _genetic_code:
             # This looks weird but it will generate the derived members when __getitem__ is called.
             self[member] = self[member]
 
+    def mermaid(self) -> list[str]:
+        """Return the Mermaid Chart representation of the genetic code."""
+        header: list[str] = [
+            "---",
+            f"title: Genetic Code instance {id(self)}",
+            "---",
+            "flowchart TB"  
+        ]
+        # TODO: Complete this function
+        return header
+
     def num_codes(self) -> int32:
         """Return the number of genetic sub-codes that make up this genetic code."""
         return self["gca"]["num_codes"] + self["gcb"]["num_codes"] + 1
@@ -259,7 +305,7 @@ class _genetic_code:
         # FIXME: Properties are derived from GCA & GCB but may be AND'd, OR'd and may be added too.
         return self["gca"]["properties"] | self["gcb"]["properties"]
 
-    def purge(self, purged_gcs: set[int]) -> list[int]:
+    def purge(self, purged_gcs: set[intp]) -> list[intp]:
         """Turn the GC into a leaf node if any of its GC dependencies are to be purged.
         A leaf node has all its values derived from dependent GCs stored freeing the dependent
         GCs to be pushed to the GL or deleted. If only a subset of the dependent GCs are to be
@@ -302,10 +348,6 @@ class _genetic_code:
     def valid(self) -> bool:
         """Return True if the genetic code is not empty or purged."""
         return self.idx >= 0
-
-    @classmethod
-    def cls_assertions(cls) -> None:
-        """Validate assertions for the _genetic_code."""
 
     @classmethod
     def get_gpc(cls) -> gene_pool_cache:
@@ -391,6 +433,9 @@ DEFAULT_MEMBERS: dict[str, Any] = {m: NULL_SIGNATURE for m in STORE_SIGNATURE_ME
 DEFAULT_MEMBERS.update({m: EMPTY_GENETIC_CODE for m in STORE_GC_OBJ_MEMBERS})
 DEFAULT_PROPERTIES: int64 = INT64_ZERO
 DEFAULT_STATIC_MEMBER_VALUES: dict[str, Any] = {
+    "_e_count": INT32_ONE,
+    "_evolvability": FLOAT32_ONE,
+    "_reference_count": INT64_ZERO,
     "ancestor_a": EMPTY_GENETIC_CODE,
     "ancestor_b": EMPTY_GENETIC_CODE,
     "e_count": INT32_ONE,

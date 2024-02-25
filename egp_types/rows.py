@@ -136,7 +136,7 @@ class rows(ndarray):
             sorted_srcs: list[list[EndPointType]] = sorted(srcs, key=lambda ep: ep[CPI.IDX])
             src_iface: interface = EMPTY_INTERFACE if not sorted_srcs else interface([ep[CPI.TYP] for ep in sorted_srcs])
             dst_iface: interface = (
-                EMPTY_INTERFACE if not row in json_graph else interface([cast(EndPointType, ep[CPI.TYP]) for ep in json_graph[row]])
+                EMPTY_INTERFACE if row not in json_graph else interface([cast(EndPointType, ep[CPI.TYP]) for ep in json_graph[row]])
             )
             return src_iface, dst_iface
         return gcx["graph"].rows[SrcRowIndex.I], gcx["graph"].rows[DstRowIndex.O]

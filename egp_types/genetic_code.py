@@ -74,7 +74,7 @@ from random import randbytes
 from typing import Any
 from uuid import UUID
 
-from ._genetic_code import (DEFAULT_DYNAMIC_MEMBER_VALUES,
+from ._genetic_code import (DEFAULT_DYNAMIC_MEMBER_VALUES, STORE_STATIC_NON_OBJECT_MEMBERS,
                             DEFAULT_STATIC_MEMBER_VALUES, PURGED_GENETIC_CODE,
                             STORE_DERIVED_MEMBERS, STORE_GC_OBJ_MEMBERS,
                             _genetic_code)
@@ -122,6 +122,8 @@ class genetic_code(_genetic_code):
                     self[member + "_signature"] = gc_dict[member]
             io: tuple[interface, interface] = gc_dict.get("io", EMPTY_IO)
             self["graph"] = graph(gc_dict.get("graph", {}), gca=self["gca"], gcb=self["gcb"], io=io)
+            for member in STORE_STATIC_NON_OBJECT_MEMBERS:
+                self[member] = gc_dict.get(member, DEFAULT_STATIC_MEMBER_VALUES[member])
             if self["gca"] is not PURGED_GENETIC_CODE and self["gcb"] is not PURGED_GENETIC_CODE and not codon:
                 for member in STORE_DERIVED_MEMBERS:
                     # This looks weird but it will generate the derived members when __getitem__ is called.
@@ -136,19 +138,9 @@ class genetic_code(_genetic_code):
         if _LOG_DEBUG:
             _logger.debug(f"genetic_code {self.idx} created:\n{self}")
 
-    def mermaid(self) -> list[str]:
-        """Return the Mermaid Chart representation of the genetic code."""
-        header: list[str] = [
-            "---",
-            f"title: Genetic Code instance {id(self)}",
-            "---",
-            "flowchart TB"  
-        ]
-        # TODO: Complete this function
-        return header
-
     def get_interface(self, iface: str = "IO") -> tuple[interface, interface]:
         """Return the source and destination interfaces."""
+        # Access to rows would be a circular reference in _genetic_code.
         _rows: rows = self["graph"].rows
         if iface == "IO":
             return _rows[SrcRowIndex.I], _rows[DstRowIndex.O]
@@ -160,6 +152,7 @@ class genetic_code(_genetic_code):
 
     def random(self, depth: int = 5, io: tuple[interface, interface] = EMPTY_IO) -> None:
         """Create a random genetic code with up to depth levels of sub-graphs."""
+        # Access to graph would be a circular reference in _genetic_code.
         self["graph"] = graph({}, rndm=True, io=io)
         assert 2**depth < _genetic_code.gene_pool_cache.size(), "Recursive depth too large."
         if depth:
@@ -171,7 +164,3 @@ class genetic_code(_genetic_code):
             self["gcb"]["signature"] = randbytes(32)
             self["gca"]["generation"] = 0
             self["gcb"]["generation"] = 0
-
-    def assertions(self) -> None:
-        """Validate assertions for the genetic code."""
-        self["graph"].assertions()
