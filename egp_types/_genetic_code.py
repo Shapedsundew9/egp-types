@@ -393,8 +393,8 @@ DEFAULT_PROPERTIES: int64 = INT64_ZERO
 DEFAULT_STATIC_MEMBER_VALUES: dict[str, Any] = {
     "ancestor_a": EMPTY_GENETIC_CODE,
     "ancestor_b": EMPTY_GENETIC_CODE,
-    "e_count": INT32_ZERO,
-    "evolvability": FLOAT32_ZERO,
+    "e_count": INT32_ONE,
+    "evolvability": FLOAT32_ONE,
     "f_count": INT32_ZERO,
     "fitness": FLOAT32_ZERO,
     "gca": EMPTY_GENETIC_CODE,
