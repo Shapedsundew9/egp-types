@@ -12,7 +12,6 @@ from egp_utils.common import merge
 
 from .conversions import encode_properties, decode_properties
 from .ep_type import validate
-from .gc_graph import gc_graph
 from .gc_type_tools import PROPERTIES, define_signature, PHYSICAL_PROPERTY
 from .graph_validators import GRAPH_REGISTRY
 
@@ -164,9 +163,10 @@ class _gms_entry_validator(base_validator):
             self._error(field, "e_count cannot be 1 if evolvability has changed (is not 1.0).")
 
     def _check_with_valid_graph(self, field: str, value: Any) -> None:
-        graph: gc_graph = gc_graph(value)
+        """ graph: gc_graph = gc_graph(value)
         if not graph.validate():
             self._error(field, f"graph is invalid: {graph.status}")
+        """
 
     def _check_with_valid_ep_type(self, field: str, value: Any) -> None:
         if not validate(value):

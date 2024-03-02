@@ -3,9 +3,6 @@
 from enum import IntEnum
 from typing import Any, Literal, LiteralString, NotRequired, TypedDict, TypeGuard, cast
 
-from graph_tool import Edge as gt_edge
-from graph_tool import Vertex as gt_vertex
-
 DestinationRow = Literal["A", "B", "F", "O", "P", "U"]
 SourceRow = Literal["I", "C", "A", "B"]
 Row = Literal["A", "B", "F", "O", "P", "I", "C", "U"]
@@ -271,14 +268,6 @@ def isConstantPair(obj: tuple[str, Any]) -> TypeGuard[ConstantPair]:
 def isConnectionPair(obj: tuple[str, Any]) -> TypeGuard[ConnectionPair]:
     """Narrow a connection graph key:value pair to a connection row."""
     return obj[0] != "C"
-
-
-class vertex(gt_vertex):
-    """Static type checking cannot follow the graph_tool Vertex class."""
-
-
-class edge(gt_edge):
-    """Static type checking cannot follow the graph_tool Edge class."""
 
 
 class EndPointTypeLookupFile(TypedDict):
