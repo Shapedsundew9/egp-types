@@ -73,6 +73,7 @@ from pprint import pformat
 from random import randbytes
 from typing import Any
 from uuid import UUID
+from itertools import count
 
 from ._genetic_code import (DEFAULT_DYNAMIC_MEMBER_VALUES, STORE_STATIC_NON_OBJECT_MEMBERS,
                             DEFAULT_STATIC_MEMBER_VALUES, PURGED_GENETIC_CODE,
@@ -95,6 +96,10 @@ PREDEFINED_MEMBERS: set[str] = {"gca", "gcb", "graph"}
 CODON_CREATOR_UUID = UUID('22c23596-df90-4b87-88a4-9409a0ea764f')
 
 
+# Uniquely number genetic code classes
+gc_class_number = count()
+
+
 class genetic_code(_genetic_code):
     """A genetic code is a codon with a source interface and a destination interface."""
 
@@ -102,7 +107,8 @@ class genetic_code(_genetic_code):
         # All data is in the class store to keep it compact.
         # The store is a singleton and is shared by all instances of the class.
         # Runtime for genetic_code operations is not critical path but memory is.
-        self.idx: int = _genetic_code.gene_pool_cache.assign_index(self)
+        cls = type(self)
+        self.idx: int = cls.gene_pool_cache.assign_index(self)
         self.touch()
         super().__init__()
         # Generate a random genetic code if the "rndm" key is in the gc_dict.
@@ -154,13 +160,20 @@ class genetic_code(_genetic_code):
         """Create a random genetic code with up to depth levels of sub-graphs."""
         # Access to graph would be a circular reference in _genetic_code.
         self["graph"] = graph({}, rndm=True, io=io)
-        assert 2**depth < _genetic_code.gene_pool_cache.size(), "Recursive depth too large."
+        cls = type(self)
+        assert 2**depth < cls.gene_pool_cache.size(), "Recursive depth too large."
         if depth:
-            self["gca"] = genetic_code({"rndm": depth-1, "io": self.get_interface("A")})
-            self["gcb"] = genetic_code({"rndm": depth-1, "io": self.get_interface("B")})
+            self["gca"] = cls({"rndm": depth-1, "io": self.get_interface("A")})
+            self["gcb"] = cls({"rndm": depth-1, "io": self.get_interface("B")})
         if depth == 1:
             # At the leaf level the graph is a single codon.
             self["gca"]["signature"] = randbytes(32)
             self["gcb"]["signature"] = randbytes(32)
             self["gca"]["generation"] = 0
             self["gcb"]["generation"] = 0
+
+
+def genetic_code_factory() -> type[_genetic_code]:
+    """Return the next genetic_code class."""
+    return type(f"genetic_code_{next(gc_class_number)}", (genetic_code,), {})
+

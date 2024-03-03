@@ -129,8 +129,9 @@ class _genetic_code:
     def __getitem__(self, member: str) -> Any:
         """Return the specified member."""
         # Touch
-        gpc: gene_pool_cache = _genetic_code.gene_pool_cache
-        gpc.access_sequence[self.idx] = next(_genetic_code.access_number)
+        cls = type(self)
+        gpc: gene_pool_cache = cls.gene_pool_cache
+        gpc.access_sequence[self.idx] = next(cls.access_number)
         if _LOG_DEEP_DEBUG:
             _logger.debug(
                 f"Read access of '{member}' of genetic code {self.idx} sequence number "
@@ -163,8 +164,9 @@ class _genetic_code:
     def __setitem__(self, member: str, value: object) -> None:
         """Set the specified member to the specified value."""
         # Touch
-        gpc: gene_pool_cache = _genetic_code.gene_pool_cache
-        gpc.access_sequence[self.idx] = next(_genetic_code.access_number)
+        cls = type(self)
+        gpc: gene_pool_cache = cls.gene_pool_cache
+        gpc.access_sequence[self.idx] = next(cls.access_number)
         if member in STORE_DIRTY_MEMBERS:
             # Mark as dirty (push to GP on eviction) if the member updated is one that needs to be preserved.
             self.dirty()
@@ -226,7 +228,7 @@ class _genetic_code:
 
     def clean(self) -> None:
         """Set the state of the GC to clean."""
-        _genetic_code.gene_pool_cache.status_byte[self.idx] &= 0xFE
+        type(self).gene_pool_cache.status_byte[self.idx] &= 0xFE
 
     def code_depth(self) -> int32:
         """Return the depth of the genetic code."""
@@ -238,7 +240,7 @@ class _genetic_code:
 
     def dirty(self) -> None:
         """Set the state of the GC to dirty."""
-        _genetic_code.gene_pool_cache.status_byte[self.idx] |= 1
+        type(self).gene_pool_cache.status_byte[self.idx] |= 1
 
     def gca_signature(self) -> NDArray:
         """Return the signature of the genetic code."""
@@ -264,7 +266,7 @@ class _genetic_code:
 
     def is_dirty(self) -> bool:
         """Return True if the genetic code is dirty."""
-        return bool(_genetic_code.gene_pool_cache.status_byte[self.idx] & 1)
+        return bool(type(self).gene_pool_cache.status_byte[self.idx] & 1)
 
     def make_leaf(self) -> None:
         """Make the genetic code a leaf node by calculating the fields that are derived from other
@@ -315,7 +317,8 @@ class _genetic_code:
         the first place. They may be needed in the future and so are returned to the caller.
         """
         # Determine if anything has been purged: This is a search so a "no touch" activity.
-        purged: dict[str, bool] = {m: getattr(getattr(_genetic_code.gene_pool_cache, m), "idx", -1) in purged_gcs for m in STORE_GC_OBJ_MEMBERS}
+        cls = type(self)
+        purged: dict[str, bool] = {m: getattr(getattr(cls.gene_pool_cache, m), "idx", -1) in purged_gcs for m in STORE_GC_OBJ_MEMBERS}
 
         # Return if nothing has been purged there is nothing to do an no orphans
         if not any(purged.values()):
@@ -343,7 +346,8 @@ class _genetic_code:
 
     def touch(self) -> None:
         """Update the access sequence for the genetic code."""
-        _genetic_code.gene_pool_cache.access_sequence[self.idx] = next(_genetic_code.access_number)
+        cls = type(self)
+        cls.gene_pool_cache.access_sequence[self.idx] = next(cls.access_number)
 
     def valid(self) -> bool:
         """Return True if the genetic code is not empty or purged."""
@@ -352,19 +356,19 @@ class _genetic_code:
     @classmethod
     def get_gpc(cls) -> gene_pool_cache:
         """Return the gene pool cache."""
-        return _genetic_code.gene_pool_cache
+        return cls.gene_pool_cache
 
     @classmethod
     def reset(cls, size: int | None = None) -> None:
         """A full reset of the store allows the size to be changed. All genetic codes
         are deleted which pushes the genetic codes to the genomic library as required."""
-        _genetic_code.gene_pool_cache.reset(size)
-        _genetic_code.access_number = count(FIRST_ACCESS_NUMBER)
+        cls.gene_pool_cache.reset(size)
+        cls.access_number = count(FIRST_ACCESS_NUMBER)
 
     @classmethod
     def set_gpc(cls, gpc: Any) -> None:
         """Set the gene pool cache."""
-        _genetic_code.gene_pool_cache = gpc
+        cls.gene_pool_cache = gpc
 
 
 class _special_genetic_code(_genetic_code):
