@@ -13,8 +13,6 @@ from typing import Any
 import pytest
 from tqdm import trange
 
-from egp_types.reference import reference
-from egp_types.eGC import set_reference_generator
 from egp_types.egp_typing import DST_EP, SRC_EP, JSONGraph, ConnectionGraph, connection_graph_to_json, json_to_connection_graph
 from egp_types.ep_type import EP_TYPE_VALUES, INVALID_EP_TYPE_VALUE, asint, ep_type_lookup
 from egp_types.gc_graph import gc_graph, random_gc_graph
@@ -30,10 +28,6 @@ getLogger("ep_type").setLevel(INFO)
 _TEST_RESULTS_JSON = "data/test_gc_graph_results.json"
 _RANDOM_GRAPHS_JSON = "data/random_graphs.json"
 NUM_TEST_CASES = 200
-
-# Reference generation for eGC's
-ref_generator = partial(reference, gpspuid=127, counter=count())
-set_reference_generator(ref_generator)
 
 
 # Generating graphs is slow so we generate them once as needed
@@ -121,14 +115,6 @@ def test_graph_str(i, case) -> None:
     _logger.debug(f"Case {i}")
     gcg = gc_graph(case["graph"])
     assert str(gcg)
-
-
-@pytest.mark.parametrize("i, case", enumerate(results))
-def test_graph_draw(i, case) -> None:
-    """Verification the draw() method is not broken."""
-    gcg = gc_graph(case["graph"])
-    if case["valid"]:
-        gcg.draw(join(dirname(__file__), "../logs/gc_graph_" + str(i)))
 
 
 @pytest.mark.parametrize("i, case", enumerate(results))

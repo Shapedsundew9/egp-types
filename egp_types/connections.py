@@ -59,15 +59,16 @@ class ConnIdx(IntEnum):
 
 class connections(ndarray):
     """Connections between source and destination rows in a graph."""
+
     # NOTE: There is a 112 byte overhead for a numpy array. For 8 bit integers this is about the
     # same as a list with 1 ints (80 + 28 = 108). Therefore it is efficient in almost all scenarios.
     # However, it is still a lot of overhead for an interface that typically consists of only a few
     # values. e.g. 16 connections = 112 + 1 * 4 * 16 = 176 bytes. 175% overhead.
     # A more efficient implementation (in memory) would be to use a dynamic_store with a contiguous
     # indexed numpy array. This would be a lot of work and
-    # complexity but, if the typical connections, has 16 a saving of 112MB on a 2**20 
+    # complexity but, if the typical connections, has 16 a saving of 112MB on a 2**20
     # (1 million) entry Gene Pool Cache could be made.
-    # The base implmentation could be shared with the interface class. 
+    # The base implmentation could be shared with the interface class.
 
     def __init__(self, json_graph: JSONGraph, **kwargs) -> None:
         super().__init__()

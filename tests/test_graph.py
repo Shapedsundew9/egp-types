@@ -50,9 +50,9 @@ def test_random_graph(_) -> None:
     """Test the random graph function generates a valid graph that can be converted to JSON
     and back again to a graph. The two graphs should be equal."""
     g1 = graph({}, rows=choice(VALID_COMBOS), rndm=True, verify=True)
-    #_logger.debug(f"Random graph:\n{repr(g1)}")
+    # _logger.debug(f"Random graph:\n{repr(g1)}")
     json_graph: JSONGraph = g1.json_graph()
-    #_logger.debug(f"Random JSON graph:\n{pformat(json_graph)}")
+    # _logger.debug(f"Random JSON graph:\n{pformat(json_graph)}")
     valid: bool = graph_validator.validate({"graph": json_graph})
     if not valid:
         _logger.error(f"Invalid JSON graph:\n{graph_validator.error_str()}\n{pformat(json_graph)}")

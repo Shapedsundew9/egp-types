@@ -9,12 +9,22 @@ from typing import Any, Generator, Iterable, Literal, cast
 from operator import attrgetter
 
 from .common import random_constant_str
-from .egp_typing import (DESTINATION_ROWS, DST_EP, SOURCE_ROWS, SRC_EP, ROWS,
-                         VALID_ROW_SOURCES, DestinationRow, DstEndPointHash,
-                         EndPointClass, Row, SourceRow, SrcEndPointHash, EndPointIndex)
-from .end_point import (dst_end_point, dst_end_point_ref, isDstEndPoint,
-                        isSrcEndPoint, src_end_point, src_end_point_ref,
-                        x_end_point)
+from .egp_typing import (
+    DESTINATION_ROWS,
+    DST_EP,
+    SOURCE_ROWS,
+    SRC_EP,
+    ROWS,
+    VALID_ROW_SOURCES,
+    DestinationRow,
+    DstEndPointHash,
+    EndPointClass,
+    Row,
+    SourceRow,
+    SrcEndPointHash,
+    EndPointIndex,
+)
+from .end_point import dst_end_point, dst_end_point_ref, isDstEndPoint, isSrcEndPoint, src_end_point, src_end_point_ref, x_end_point
 from .ep_type import EP_TYPE_VALUES_TUPLE, asint
 from .graph_validators import igraph_validator
 from .mermaid_charts import MERMAID_IGRAPH_CLASS_DEF_STR, MERMAID_IGRAPH_COLORS
@@ -34,7 +44,7 @@ DstEndPointDict = dict[DstEndPointHash, dst_end_point]
 
 # Mermaid chart formatting.
 # Can be pasted after the flowchart definition of the internal chart to add colouring/formatting etc.
-MERMAID_IGRAPH_CLASS_STR = ( 
+MERMAID_IGRAPH_CLASS_STR = (
     "\n"
     "class I0000 Iclass\n"
     "class C0000 Cclass\n"
@@ -53,29 +63,29 @@ class internal_graph(EndPointDict):
 
     def __repr__(self) -> str:
         """Return a mermaid chart flowchart representation of the internal graph.
-            flowchart TB
-                subgraph R
+        flowchart TB
+            subgraph R
+                direction TB
+                subgraph Rs
                     direction TB
-                    subgraph Rs
-                        direction TB
-                        R000s["R000s: ep.typ"]
-                        R001s["R000s: ep.typ"]
-                        ...
-                        Rxxxs["Rxxxs: ep.typ"]
-                    end
-                    subgraph Rd
-                        direction TB
-                        R000d["R000d: ep.typ"]
-                        R001d["R000d: ep.typ"]
-                        ...
-                        Rxxxd["Rxxxd: ep.typ"]
-                    end
+                    R000s["R000s: ep.typ"]
+                    R001s["R000s: ep.typ"]
+                    ...
+                    Rxxxs["Rxxxs: ep.typ"]
                 end
-                ...
+                subgraph Rd
+                    direction TB
+                    R000d["R000d: ep.typ"]
+                    R001d["R000d: ep.typ"]
+                    ...
+                    Rxxxd["Rxxxd: ep.typ"]
+                end
+            end
+            ...
 
-                x000s --> y004d
-                y000s --> z002d
-                ...     
+            x000s --> y004d
+            y000s --> z002d
+            ...
         """
         if not self:
             return "\n%% Instance ID: {id(self)}\nEmpty internal graph\n"
@@ -96,17 +106,17 @@ class internal_graph(EndPointDict):
         # Add the relevant row subgraphs
         ret_list_str: list[str] = []
         for row in sorted(set(ep.row for ep in self.values() if ep.row != "U")):
-            ret_list_str.append(f"\tsubgraph {row}{uid:04x}[\"{row}\"]")
+            ret_list_str.append(f'\tsubgraph {row}{uid:04x}["{row}"]')
             ret_list_str.append("\t\tdirection TB")
             if self.num_eps(row, SRC_EP):
-                ret_list_str.append(f"\t\tsubgraph {row}s{uid:04x}[\"{row}s\"]")
+                ret_list_str.append(f'\t\tsubgraph {row}s{uid:04x}["{row}s"]')
                 for ep in self.src_row_filter(row):
-                    ret_list_str.append(f"\t\t\t{ep.key()}{uid:04x}[\"{ep.key()}: {ep.typ}\"]")
+                    ret_list_str.append(f'\t\t\t{ep.key()}{uid:04x}["{ep.key()}: {ep.typ}"]')
                 ret_list_str.append("\t\tend")
             if self.num_eps(row, DST_EP):
-                ret_list_str.append(f"\t\tsubgraph {row}d{uid:04x}[\"{row}d\"]")
+                ret_list_str.append(f'\t\tsubgraph {row}d{uid:04x}["{row}d"]')
                 for ep in self.dst_row_filter(row):
-                    ret_list_str.append(f"\t\t\t{ep.key()}{uid:04x}[\"{ep.key()}: {ep.typ}\"]")
+                    ret_list_str.append(f'\t\t\t{ep.key()}{uid:04x}["{ep.key()}: {ep.typ}"]')
                 ret_list_str.append("\t\tend")
             ret_list_str.append("\tend")
         return ret_list_str
@@ -119,12 +129,16 @@ class internal_graph(EndPointDict):
                 ret_list_str.append(f"\t{ep.key()}{uid:04x} --> {ref.key()}{uid:04x}")
         return ret_list_str
 
-    def mermaid_style_str(self, link_list_str:list[str]) -> list[str]:
+    def mermaid_style_str(self, link_list_str: list[str]) -> list[str]:
         """Return the mermaid link style lists."""
         row_link_counts: dict[Row, list[str]] = {r: [] for r in ROWS}
         for i, link_str in enumerate(link_list_str):
             row_link_counts[cast(Row, link_str[1])].append(str(i))
-        return [f"linkStyle {','.join(link_counts)} stroke:{MERMAID_IGRAPH_COLORS[row]['link']}" for row, link_counts in row_link_counts.items() if link_counts]
+        return [
+            f"linkStyle {','.join(link_counts)} stroke:{MERMAID_IGRAPH_COLORS[row]['link']}"
+            for row, link_counts in row_link_counts.items()
+            if link_counts
+        ]
 
     def mermaid_class_str(self, uid: int = 0) -> list[str]:
         """Return the mermaid class style lists."""
@@ -248,7 +262,11 @@ class internal_graph(EndPointDict):
 
     def pass_thru(self, dst_row_a: DestinationRow, dst_row_b: DestinationRow, mapping: list[EndPointIndex]) -> SrcEndPointDict:
         """Pass through the endpoints from dst_row_a in RGC to dst_row_b in FGC using mapping."""
-        i_eps: Generator[src_end_point, None, None] = (src_end_point("I", ep.idx, ep.typ, refs=[dst_end_point_ref(dst_row_b, mapping.pop(0))]) for ep in self.dst_row_filter(dst_row_a) if ep.refs)
+        i_eps: Generator[src_end_point, None, None] = (
+            src_end_point("I", ep.idx, ep.typ, refs=[dst_end_point_ref(dst_row_b, mapping.pop(0))])
+            for ep in self.dst_row_filter(dst_row_a)
+            if ep.refs
+        )
         return {ep.key(): ep for ep in i_eps}
 
     def row_types(self, row: Row, cls: EndPointClass) -> set[int]:
@@ -360,11 +378,13 @@ class internal_graph(EndPointDict):
 
         # Valid structure and hash keys
         valid: bool = igraph_validator.validate(validation_structure) and all(k == v.key() for k, v in self.items())
-        if not valid: 
+        if not valid:
             _logger.debug("igraph_validator returned False.")
 
         # Valid reference types
-        valid = valid and all(isinstance(ep_ref, (src_end_point_ref, dst_end_point_ref)[ep.cls]) for ep in self.values() for ep_ref in ep.refs)
+        valid = valid and all(
+            isinstance(ep_ref, (src_end_point_ref, dst_end_point_ref)[ep.cls]) for ep in self.values() for ep_ref in ep.refs
+        )
 
         if not valid and _LOG_DEBUG:
             _logger.debug(f"Validation JSON:\n{pformat(validation_structure, 4)}")

@@ -13,36 +13,9 @@ from logging import DEBUG, Logger, NullHandler, getLogger
 from math import sqrt
 from random import choice, randint, sample
 from typing import Any, Iterable, Literal, LiteralString, Sequence, cast
-
-import gi
 from surebrec.surebrec import generate
 
-# Needed to prevent something pulling in GtK 4.0 and graph_tool complaining.
-gi.require_version("Gtk", "3.0")  # pylint: disable=wrong-import-position
-
-from itertools import count  # pylint: disable=wrong-import-order
-
-from bokeh.io import output_file, save
-from bokeh.models import (
-    BoxSelectTool,
-    Circle,
-    ColumnDataSource,
-    GraphRenderer,
-    HoverTool,
-    LabelSet,
-    MultiLine,
-    NodesAndLinkedEdges,
-    Range1d,
-    TapTool,
-)
-from bokeh.palettes import Category20_20, Greys9
-from bokeh.plotting import figure, from_networkx
-from cairo import FONT_WEIGHT_BOLD  # pylint: disable=no-name-in-module
-from cairo import FontWeight  # pylint: disable=no-name-in-module
-from graph_tool import EdgePropertyMap, Graph, VertexPropertyMap
-from graph_tool.draw import graph_draw
-from networkx import get_node_attributes  # type: ignore
-from networkx import DiGraph, spring_layout  # type: ignore
+from itertools import count
 from text_token import register_token_code, text_token
 
 from egp_utils.base_validator import base_validator
@@ -70,7 +43,6 @@ from .egp_typing import (
     SrcEndPointHash,
     isConnectionPair,
     json_to_connection_graph,
-    vertex,
 )
 from .end_point import dst_end_point, dst_end_point_ref, x_end_point, end_point_ref, src_end_point, src_end_point_ref
 from .ep_type import REAL_EP_TYPE_VALUES, asint, asstr, compatible, validate, validate_value
@@ -79,106 +51,6 @@ from .internal_graph import internal_graph
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
 _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
-
-
-# NetworkX & Bokeh parameters
-_NX_NODE_RADIUS: Literal[30] = 30
-_NX_NODE_FONT: Literal["courier"] = "courier"
-_NX_HOVER_TOOLTIPS: list[tuple[str, str]] = [
-    ("Type", "@type"),
-    ("Value", "@value"),
-    ("EP Type", "@ep_type"),
-]
-_NX_ROW_EDGE_ATTR: dict[str, str] = {
-    "line": Greys9[4],
-    "select": Greys9[0],
-    "hover": Greys9[0],
-}
-_NX_ROW_NODE_ATTR: dict[Row, dict[str, str]] = {
-    "I": {
-        "fill": Greys9[8],
-        "select": Greys9[7],
-        "hover": Greys9[7],
-        "line": Greys9[0],
-        "label": "I",
-    },
-    "C": {
-        "fill": Category20_20[11],
-        "select": Category20_20[10],
-        "hover": Category20_20[10],
-        "line": Greys9[0],
-        "label": "C",
-    },
-    "A": {
-        "fill": Category20_20[7],
-        "select": Category20_20[6],
-        "hover": Category20_20[6],
-        "line": Greys9[0],
-        "label": "A",
-    },
-    "B": {
-        "fill": Category20_20[1],
-        "select": Category20_20[0],
-        "hover": Category20_20[0],
-        "line": Greys9[0],
-        "label": "B",
-    },
-    "F": {
-        "fill": Category20_20[13],
-        "select": Category20_20[12],
-        "hover": Category20_20[12],
-        "line": Greys9[0],
-        "label": "F",
-    },
-    "O": {
-        "fill": Greys9[5],
-        "select": Greys9[4],
-        "hover": Greys9[4],
-        "line": Greys9[0],
-        "label": "O",
-    },
-    "P": {
-        "fill": Category20_20[5],
-        "select": Category20_20[4],
-        "hover": Category20_20[4],
-        "line": Greys9[0],
-        "label": "P",
-    },
-    "U": {
-        "fill": Category20_20[17],
-        "select": Category20_20[16],
-        "hover": Category20_20[16],
-        "line": Greys9[0],
-        "label": "U",
-    },
-}
-for _, _v in _NX_ROW_NODE_ATTR.items():
-    _v["font"] = _NX_NODE_FONT
-
-
-# Graph Tool parameters
-_GT_NODE_DIAMETER: Literal[60] = 60
-_GT_NODE_SHAPE: Literal["circle"] = "circle"
-_GT_NODE_FONT_SIZE: Literal[14] = 14
-_GT_NODE_FONT_WEIGHT: FontWeight = FONT_WEIGHT_BOLD
-_GT_ROW_NODE_ATTR: dict[Row, dict[str, Any]] = {
-    "I": {"fill_color": [1.0, 1.0, 1.0, 1.0], "text": "I"},
-    "C": {"fill_color": [0.5, 0.5, 0.5, 1.0], "text": "C"},
-    "F": {"fill_color": [0.0, 1.0, 1.0, 1.0], "text": "F"},
-    "A": {"fill_color": [1.0, 0.0, 0.0, 1.0], "text": "A"},
-    "B": {"fill_color": [0.0, 0.0, 1.0, 1.0], "text": "B"},
-    "P": {"fill_color": [0.0, 1.0, 0.0, 1.0], "text": "P"},
-    "O": {"fill_color": [0.0, 0.0, 0.0, 1.0], "text": "O"},
-    "U": {"fill_color": [0.0, 1.0, 0.0, 1.0], "text": "U"},
-}
-for _, _v in _GT_ROW_NODE_ATTR.items():
-    _v["size"] = _GT_NODE_DIAMETER
-    _v["shape"] = _GT_NODE_SHAPE
-    _v["font_size"] = _GT_NODE_FONT_SIZE
-    _v["font_weight"] = _GT_NODE_FONT_WEIGHT
-
-_GT_EDGE_PEN_WIDTH: Literal[4] = 4
-_GT_EDGE_MARKER_SIZE: Literal[24] = 24
 
 
 register_token_code("E01000", "A graph must have at least one output.")
@@ -403,7 +275,6 @@ class gc_graph:
         graph: ConnectionGraph = {}
         for ep in sorted(self.i_graph.dst_filter(), key=lambda x: x.idx):
             row: DestinationRow = ep.row
-            print(ep)
             graph.setdefault(row, []).append((ep.refs[0].row, ep.refs[0].idx, ep.typ))
         for ep in sorted(self.i_graph.row_filter("C"), key=lambda x: x.idx):
             if "C" not in graph:
@@ -413,238 +284,6 @@ class gc_graph:
         # if _LOG_DEBUG and not graph_validator.validate({'graph': graph}):
         #    raise ValueError(f"Connection graph is not valid:\n{pformat(graph, indent=4)}\n\n{graph_validator.error_str()}")
         return graph
-
-    def nx_graph(self) -> DiGraph:
-        """Create a directed networkx graph treating each destination endpoint as a unique node.
-
-        NetworkX is used because of its integration with Bokeh.
-        Bokeh has limited graph drawing capabilities. Specifically it cannot handle multiple edges
-        between the same nodes nor indicating direction of edges. However it has good interactions.
-
-        Returns
-        -------
-        DiGraph: A networkX direction graph of the GC graph.
-        There are three types of vertices:
-            row: Each row (with the single exception of 'C') has a single vertex with an area
-                proportional to the number of total number of endpoints in the row.
-            endpoint: Each endpoint is represented by a node thus:
-                A row has a set of source endpoint vertices connected to it
-                A row has a set of destination endpoint vertices connected to it
-                NOTE: The constant row is only represented as a set of endpoint vertices.
-            codon: If the graph is of a codon i.e. there are no rows A, B or C then a codon vertex is
-                added to connect any inputs & outputs to.
-        Connections between rows are represented by edges between endpoint vertices.
-        """
-        nx_graph: DiGraph = DiGraph()
-        gtg: dict[str, dict[bool, dict[int, str]]] = {k: {SRC_EP: {}, DST_EP: {}} for k in ROWS}
-        node_map: dict[str, int] = {}
-        node_counter = count()
-        for ep in self.i_graph.values():
-            if ep.row not in node_map:
-                node_map[ep.row] = next(node_counter)
-                size: int = round(_NX_NODE_RADIUS * sqrt(float(self.rows[SRC_EP].get(ep.row, 0) + self.rows[DST_EP].get(ep.row, 0))))
-                nx_graph.add_node(
-                    node_map[ep.row],
-                    text=ep.row,
-                    size=size,
-                    font_size="28px",
-                    x_offset=-8,
-                    y_offset=-19,
-                    type="GC",
-                    ep_type="N/A",
-                    value="N/A",
-                    **_NX_ROW_NODE_ATTR[ep.row],
-                )
-            if ep.idx not in gtg[ep.row][ep.cls]:
-                row: LiteralString = ep.row if ep.cls else ep.row.lower()
-                node: str = row + str(ep.idx)
-                node_map[node] = next(node_counter)
-                if _LOG_DEBUG:
-                    _logger.debug(f"Adding to nx_graph node: {node}")
-                ep_type: Literal["Destination", "Source"] = ("Destination", "Source")[ep.cls]
-                value: Any = ep.val if ep.row == "C" else "N/A"
-                nx_graph.add_node(
-                    node_map[node],
-                    text=node,
-                    size=_NX_NODE_RADIUS,
-                    font_size="16px",
-                    x_offset=-9,
-                    y_offset=-11,
-                    type=asstr(ep.typ),
-                    ep_type=ep_type,
-                    value=value,
-                    **_NX_ROW_NODE_ATTR[ep.row],
-                )
-                data: tuple[int, int] = (node_map[ep.row], node_map[node]) if ep.cls else (node_map[node], node_map[ep.row])
-                nx_graph.add_edge(*data, **_NX_ROW_EDGE_ATTR)
-                gtg[ep.row][ep.cls][ep.idx] = node
-        for ep in self.i_graph.dst_filter():
-            for ref in ep.refs:
-                dst_node: str = gtg[ep.row][DST_EP][ep.idx]
-                src_node: str = gtg[ref.row][SRC_EP][ref.idx]
-                nx_graph.add_edge(node_map[src_node], node_map[dst_node], **_NX_ROW_EDGE_ATTR)
-                if _LOG_DEBUG:
-                    _logger.debug(f"Adding to nx_graph edge : {src_node}->{dst_node}")
-        return nx_graph
-
-    def nx_draw(self, path: str = "./nx_graph", size: tuple[int, int] = (1600, 1600)) -> None:
-        """Draw the directed networkx graph where each destination endpoint as a unique node.
-
-        Args
-        ----
-        path: Folder plus base file name of the output image. '.html' will be appended.
-        size: Tuple of x, y output image dimensions.
-        """
-        nx_graph: DiGraph = self.nx_graph()
-        plot: figure = figure(
-            max_width=size[0],
-            max_height=size[1],
-            tools="pan,wheel_zoom,save,reset",
-            active_scroll="wheel_zoom",
-            title="Erasmus GP GC Internal Graph",
-            x_range=Range1d(-110.1, 110.1),
-            y_range=Range1d(-110.1, 110.1),
-        )  # type: ignore
-        plot.add_tools(HoverTool(tooltips=_NX_HOVER_TOOLTIPS, anchor="top_right"), TapTool(), BoxSelectTool())  # type: ignore
-        bk_graph: GraphRenderer = from_networkx(nx_graph, spring_layout, scale=100, center=(0, 0))  # type: ignore
-        bk_graph.node_renderer.glyph = Circle(line_color="line", size="size", fill_color="fill")  # type: ignore
-        bk_graph.node_renderer.selection_glyph = Circle(line_color="line", size="size", fill_color="select")  # type: ignore
-        bk_graph.node_renderer.hover_glyph = Circle(line_color="line", size="size", fill_color="hover")  # type: ignore
-        bk_graph.edge_renderer.glyph = MultiLine(line_color="line", line_alpha=0.8, line_width=2)  # type: ignore
-        bk_graph.edge_renderer.selection_glyph = MultiLine(line_color="select", line_width=3)  # type: ignore
-        bk_graph.edge_renderer.hover_glyph = MultiLine(line_color="hover", line_width=3)  # type: ignore
-        bk_graph.selection_policy = NodesAndLinkedEdges()  # type: ignore
-        bk_graph.inspection_policy = NodesAndLinkedEdges()  # type: ignore
-        plot.renderers.append(bk_graph)  # type: ignore
-
-        x_y: tuple[tuple[float, ...], tuple[float, ...]] = tuple(
-            zip(*bk_graph.layout_provider.graph_layout.values())  # pylint: disable=no-member, # type: ignore
-        )
-        node_labels: dict[str, str] = get_node_attributes(nx_graph, "text")
-        label_x_offsets: dict[str, float] = get_node_attributes(nx_graph, "x_offset")
-        label_y_offsets: dict[str, float] = get_node_attributes(nx_graph, "y_offset")
-        label_font_sizes: dict[str, str] = get_node_attributes(nx_graph, "font_size")
-        label_font: dict[str, str] = get_node_attributes(nx_graph, "font")
-        source: ColumnDataSource = ColumnDataSource(
-            {
-                "x": x_y[0],
-                "y": x_y[1],
-                "text": list(node_labels.values()),
-                "x_offset": list(label_x_offsets.values()),
-                "y_offset": list(label_y_offsets.values()),
-                "font_size": list(label_font_sizes.values()),
-                "font": list(label_font.values()),  # type: ignore
-            }
-        )
-        labels: LabelSet = LabelSet(
-            x="x",
-            y="y",
-            text="text",
-            source=source,
-            text_font_size="font_size",
-            x_offset="x_offset",
-            y_offset="y_offset",
-            text_font="font",
-            text_font_style="bold",
-            text_color="black",
-        )  # type: ignore
-        plot.renderers.append(labels)  # type: ignore pylint: disable=no-member
-        output_file(f"{path}.html", title="Erasmus GP GC Internal Graph")
-        save(plot)
-
-    def gt_graph(
-        self,
-    ) -> tuple[Graph, dict[str, VertexPropertyMap], dict[str, EdgePropertyMap]]:
-        """Create a graph_tool graph treating rows as nodes.
-
-        graph_tool is used because its drawing capabilities allow for multiple edges between nodes (unlike Bokeh)
-        though it has much more limited interactions.
-
-        Returns
-        -------
-            (Graph): A graph_tool Graph object.
-            (dict): Dict of vertex properties.
-            (dict): Dict of edge properties.
-        """
-        graph: Graph = Graph()
-        node_p: dict[str, VertexPropertyMap] = {
-            "text": graph.new_vertex_property("string"),
-            "shape": graph.new_vertex_property("string"),
-            "fill_color": graph.new_vertex_property("vector<float>"),
-            "size": graph.new_vertex_property("int"),
-            "font_size": graph.new_vertex_property("int"),
-            "font_weight": graph.new_vertex_property("int"),
-        }
-        edge_p: dict[str, EdgePropertyMap] = {
-            "pen_width": graph.new_edge_property("int"),
-            "marker_size": graph.new_edge_property("int"),
-        }
-
-        gtg: dict[Row, vertex] = {}
-        for row in ROWS:
-            dst_list: tuple[dst_end_point, ...] = tuple(self.i_graph.dst_row_filter(row))
-            src_list: tuple[src_end_point, ...] = tuple(self.i_graph.src_row_filter(row))
-            size: int = max((len(dst_list), len(src_list)))
-            if size:
-                node: vertex = graph.add_vertex()  # type: ignore
-                if _LOG_DEBUG:
-                    _logger.debug(f"Adding to gt_graph node: {row}")
-                for k, v in _GT_ROW_NODE_ATTR[row].items():
-                    node_p[k][node] = v
-                node_p["size"][node] = round(node_p["size"][node] * sqrt(size))
-                node_p["font_size"][node] = round(node_p["font_size"][node] * sqrt(size))
-                gtg[row] = node
-        for row in gtg:
-            dst_list: tuple[dst_end_point, ...] = tuple(self.i_graph.dst_row_filter(row))
-            for ep in dst_list:
-                dst_row: DestinationRow = ep.row
-                src_row: SourceRow = ep.refs[0].row
-                if _LOG_DEBUG:
-                    _logger.debug(f"Adding to gt_graph edge: {src_row}->{dst_row}")
-                edge: edge = graph.add_edge(gtg[src_row], gtg[dst_row])  # type: ignore
-                edge_p["pen_width"][edge] = _GT_EDGE_PEN_WIDTH
-                edge_p["marker_size"][edge] = _GT_EDGE_MARKER_SIZE
-        return graph, node_p, edge_p
-
-    def gt_draw(self, path="./gt_graph", size=(1600, 900)) -> None:
-        """Draw the graph_tool row node graph.
-
-        Args
-        ----
-            path (str): folder plus base file name of the output image. '.png' will be appended.
-            size ((int, int)): Tuple of x, y output image dimensions.
-        """
-        graph_properties: tuple[Graph, dict[str, VertexPropertyMap], dict[str, EdgePropertyMap]] = self.gt_graph()
-        node_p: dict[str, VertexPropertyMap] = graph_properties[1]
-        edge_p: dict[str, EdgePropertyMap] = graph_properties[2]
-        graph_draw(
-            graph_properties[0],
-            vertex_text=node_p["text"],
-            vertex_shape=node_p["shape"],
-            vertex_fill_color=node_p["fill_color"],
-            vertex_size=node_p["size"],
-            vertex_font_weight=node_p["font_weight"],
-            vertex_font_size=node_p["font_size"],
-            edge_pen_width=edge_p["pen_width"],
-            edge_marker_size=edge_p["marker_size"],
-            output=path + ".png",
-            output_size=size,
-        )
-
-    def draw(self, path="./graph", size=(1600, 900)) -> None:
-        """Draw both the nx_graph & the gt_graph.
-
-        Args
-        ----
-            path (str): folder plus base file name of the output image.
-                        '.png' will be appended to the gt_graph.
-                        '.html' will be appended to the nx_graph.
-            size ((int, int)): Tuple of x, y output image dimensions.
-        """
-        if _LOG_DEBUG:
-            _logger.debug(f"Graph to draw:\n{self}")
-        self.gt_draw(path, size)
-        self.nx_draw(path, size)
 
     def add_input(self, ep_type: int | None = None) -> None:
         """Create and append an unconnected row I endpoint.
@@ -1194,7 +833,6 @@ class gc_graph:
             _logger.debug(f"Selecting connection to remove from destination endpoint tuple: {dst_ep_tuple}")
         if dst_ep_tuple:
             self.remove_connection(dst_ep_tuple)
-
 
     def random_add_connection(self) -> None:
         """Randomly choose two endpoints to connect.

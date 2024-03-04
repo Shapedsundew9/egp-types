@@ -22,17 +22,16 @@ def test_empty_interface() -> None:
     with raises(AssertionError):
         empty_interface().insert(0, None)
     with raises(AssertionError):
-        empty_interface()[0] = [2,3]
+        empty_interface()[0] = [2, 3]
 
 
 def test_interface_assertions() -> None:
     """Test the assertions for an interface."""
     # Not all valid EndPointTypes
-    test_interface = interface([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15])
+    test_interface = interface([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
     with raises(ValueError):
         test_interface.assertions()
     # Too many endpoints
     test_interface = interface([2] * 257)
     with raises(ValueError):
         test_interface.assertions()
-    

@@ -36,6 +36,7 @@ _logger.addHandler(NullHandler())
 
 class interface(ndarray):
     """An interface is a node in the genomic library."""
+
     # NOTE: There is a 112 byte overhead for a numpy array. For 16 bit integers this is about the
     # same as a list with 1 ints (80 + 28 = 108). Therefore it is efficient in almost all scenarios.
     # However, it is still a lot of overhead for an interface that typically consists of only a few
@@ -44,7 +45,7 @@ class interface(ndarray):
     # indexed numpy array. This would be a lot of work and
     # complexity but, if the typical interface, has 8 endpoints of which every GC has 2 could save
     # 224 MB on a 2**20 (1,000,000) entry Gene Pool Cache.
-    # The base implmentation could be shared with the connections class. 
+    # The base implmentation could be shared with the connections class.
 
     def __init__(self, val: list[EndPointType]) -> None:
         self[:] = val
@@ -66,11 +67,11 @@ class interface(ndarray):
         """Create a hash for the interface object."""
         return hash(self.tobytes())
 
-    def mermaid(self, row:Row, cls:EndPointClassStr) -> list[str]:
+    def mermaid(self, row: Row, cls: EndPointClassStr) -> list[str]:
         """Return the mermaid charts string for the source interface.
         e.g. uidA001d["A001d: 1"]"""
         endpoints: list[str] = [f'\tuid{row}{idx:03}{cls}["{row}{idx:03}{cls}: {ept}"]' for idx, ept in enumerate(self)]
-        return[f"subgraph uid{row}{cls}", "\tdirection TB"] + endpoints + ["end"]
+        return [f"subgraph uid{row}{cls}", "\tdirection TB"] + endpoints + ["end"]
 
     def assertions(self) -> None:
         """Validate assertions for the interface."""
@@ -113,15 +114,16 @@ class empty_interface(interface):
 class src_interface(interface):
     """A source interface is an interface that can only have connections to destination interfaces."""
 
-    def mermaid(self, row:Row, cls: Literal["s"] = "s") -> list[str]:
+    def mermaid(self, row: Row, cls: Literal["s"] = "s") -> list[str]:
         """Return the mermaid charts string for the source interface.
         e.g. A001s["A001s: 1"]"""
         return super().mermaid(row, cls)
 
+
 class dst_interface(interface):
     """A destination interface is an interface that can only have connections from source interfaces."""
 
-    def mermaid(self, row:Row, cls: Literal["d"] = "d") -> list[str]:
+    def mermaid(self, row: Row, cls: Literal["d"] = "d") -> list[str]:
         """Return the mermaid charts string for the source interface.
         e.g. A001d["A001d: 1"]"""
         return super().mermaid(row, cls)

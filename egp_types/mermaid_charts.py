@@ -13,7 +13,8 @@ MERMAID_IGRAPH_COLORS: dict[str, dict[str, str]] = {
     "W": {"fill": "#518", "link": "#A2F"},
 }
 MERMAID_IGRAPH_CLASS_DEF_STR: list[str] = [
-    *(f"{row}:::{row}class" for row in MERMAID_IGRAPH_COLORS), "",
+    *(f"{row}:::{row}class" for row in MERMAID_IGRAPH_COLORS),
+    "",
     f"classDef Iclass fill:{MERMAID_IGRAPH_COLORS['I']['fill']},stroke:#333,stroke-width:4px",
     f"classDef Cclass fill:{MERMAID_IGRAPH_COLORS['C']['fill']},stroke:#333,stroke-width:4px",
     f"classDef Fclass fill:{MERMAID_IGRAPH_COLORS['F']['fill']},stroke:#333,stroke-width:4px",
@@ -21,5 +22,5 @@ MERMAID_IGRAPH_CLASS_DEF_STR: list[str] = [
     f"classDef Bclass fill:{MERMAID_IGRAPH_COLORS['B']['fill']},stroke:#333,stroke-width:4px",
     f"classDef Oclass fill:{MERMAID_IGRAPH_COLORS['O']['fill']},stroke:#333,stroke-width:4px",
     f"classDef Pclass fill:{MERMAID_IGRAPH_COLORS['P']['fill']},stroke:#333,stroke-width:4px",
-    f"classDef Wclass fill:{MERMAID_IGRAPH_COLORS['W']['fill']},stroke:#333,stroke-width:4px"
+    f"classDef Wclass fill:{MERMAID_IGRAPH_COLORS['W']['fill']},stroke:#333,stroke-width:4px",
 ]

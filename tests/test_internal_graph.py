@@ -10,15 +10,19 @@ from random import choice, seed
 import pytest
 from tqdm import trange
 
-from egp_types.eGC import set_reference_generator
 from egp_types.egp_typing import DST_EP, SRC_EP, VALID_GRAPH_ROW_COMBINATIONS
 from egp_types.end_point import dst_end_point, src_end_point
 from egp_types.gc_graph import gc_graph
-from egp_types.internal_graph import (DstEndPointDict, EndPointDict,
-                                      SrcEndPointDict, dst_end_point_ref,
-                                      internal_graph, internal_graph_from_json,
-                                      random_internal_graph, src_end_point_ref)
-from egp_types.reference import reference
+from egp_types.internal_graph import (
+    DstEndPointDict,
+    EndPointDict,
+    SrcEndPointDict,
+    dst_end_point_ref,
+    internal_graph,
+    internal_graph_from_json,
+    random_internal_graph,
+    src_end_point_ref,
+)
 
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
@@ -26,11 +30,6 @@ _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 getLogger("surebrec").setLevel(INFO)
 getLogger("eGC").setLevel(INFO)
 getLogger("ep_type").setLevel(INFO)
-
-
-# Reference generation for eGC's
-ref_generator = partial(reference, gpspuid=127, counter=count())
-set_reference_generator(ref_generator)
 
 
 NUM_RANDOM_GRAPHS = 4000

@@ -4,7 +4,6 @@ from logging import NullHandler, getLogger, Logger
 
 import pytest
 
-from egp_types.eGC import eGC
 from egp_types.ep_type import (
     EP_TYPE_VALUES,
     INVALID_EP_TYPE_NAME,
@@ -24,12 +23,11 @@ from egp_types.xGC import xGC
 
 _logger: Logger = getLogger(__name__)
 _logger.addHandler(NullHandler())
-eGC.new_reference = lambda: 1
 
 
 @pytest.mark.parametrize(
     "type_object, valid",
-    ((int, True), (str, True), (object, False), (eGC, True), (xGC, True)),
+    ((int, True), (str, True), (object, False), (xGC, True), (xGC, True)),
 )
 def test_validate_type_objects(type_object, valid) -> None:
     """Confirm validation of type_objects is correct."""
@@ -38,7 +36,7 @@ def test_validate_type_objects(type_object, valid) -> None:
 
 @pytest.mark.parametrize(
     "obj, valid",
-    ((8, True), ("Test", True), ([], False), (eGC(), True), (xGC, False), ({}, False)),
+    ((8, True), ("Test", True), ([], False), (xGC(), True), (xGC, False), ({}, False)),
 )
 def test_validate_objects(obj, valid) -> None:
     """Confirm validation of objects is correct."""
@@ -47,7 +45,7 @@ def test_validate_objects(obj, valid) -> None:
 
 @pytest.mark.parametrize(
     "string, valid",
-    (("8", True), ("str(8)", True), ("egp_types_eGC_eGC()", True), ("{}", False)),
+    (("8", True), ("str(8)", True), ("egp_types_xGC_xGC()", True), ("{}", False)),
 )
 def test_validate_ep_type_str_instances(string, valid) -> None:
     """Confirm validation of EP type names is correct."""
@@ -76,7 +74,7 @@ def test_validate_ep_type_values(value, valid) -> None:
         ("builtins_int", True),
         ("builtins_str", True),
         ("invalid", False),  # Reserved for testing
-        ("egp_types_eGC_eGC", True),
+        ("egp_types_xGC_xGC", True),
         (INVALID_EP_TYPE_NAME, False),
         (UNKNOWN_EP_TYPE_NAME, True),
     ),
@@ -88,7 +86,7 @@ def test_validate_ep_type_names(string, valid) -> None:
 
 @pytest.mark.parametrize(
     "type_object, ep_type_int",
-    ((int, 2), (str, 5), (object, INVALID_EP_TYPE_VALUE), (eGC, -1), (xGC, -2)),
+    ((int, 2), (str, 5), (object, INVALID_EP_TYPE_VALUE), (xGC, -1), (xGC, -1)),
 )
 def test_asint_type_objects(type_object, ep_type_int) -> None:
     """Confirm asint() of type_objects is correct."""
@@ -101,7 +99,7 @@ def test_asint_type_objects(type_object, ep_type_int) -> None:
         (8, 2),
         ("Test", 5),
         ([], INVALID_EP_TYPE_VALUE),
-        (eGC(), -1),
+        (xGC(), -1),
         (xGC, INVALID_EP_TYPE_VALUE),
         ({}, INVALID_EP_TYPE_VALUE),
     ),
@@ -118,7 +116,7 @@ def test_asint_objects(obj, ep_type_int) -> None:
         ("str(8)", 5),
         ("bytes()", INVALID_EP_TYPE_VALUE),
         ("invalid()", INVALID_EP_TYPE_VALUE),
-        ("egp_types_eGC_eGC()", -1),
+        ("egp_types_xGC_xGC()", -1),
         ("{}", INVALID_EP_TYPE_VALUE),
     ),
 )
@@ -133,7 +131,7 @@ def test_asint_ep_type_str_instances(string, ep_type_int) -> None:
         ("builtins_int", 2),
         ("builtins_str", 5),
         ("invalid", INVALID_EP_TYPE_VALUE),  # Reserved for testing
-        ("egp_types_eGC_eGC", -1),
+        ("egp_types_xGC_xGC", -1),
         (INVALID_EP_TYPE_NAME, INVALID_EP_TYPE_VALUE),
         (UNKNOWN_EP_TYPE_NAME, UNKNOWN_EP_TYPE_VALUE),
     ),
@@ -149,7 +147,7 @@ def test_asint_ep_type_names(string, ep_type_int) -> None:
         (int, "builtins_int"),
         (str, "builtins_str"),
         (object, INVALID_EP_TYPE_NAME),
-        (eGC, "egp_types_eGC_eGC"),
+        (xGC, "egp_types_xGC_xGC"),
         (xGC, "egp_types_xGC_xGC"),
     ),
 )
@@ -164,7 +162,7 @@ def test_asstr_type_objects(type_object, ep_type_str) -> None:
         (8, "builtins_int"),
         ("Test", "builtins_str"),
         ([], INVALID_EP_TYPE_NAME),
-        (eGC(), "egp_types_eGC_eGC"),
+        (xGC(), "egp_types_xGC_xGC"),
         (xGC, INVALID_EP_TYPE_NAME),
         ({}, INVALID_EP_TYPE_NAME),
     ),
@@ -181,7 +179,7 @@ def test_asstr_objects(obj, ep_type_str) -> None:
         ("str(8)", "builtins_str"),
         ("bytes()", INVALID_EP_TYPE_NAME),
         ("invalid()", INVALID_EP_TYPE_NAME),
-        ("egp_types_eGC_eGC()", "egp_types_eGC_eGC"),
+        ("egp_types_xGC_xGC()", "egp_types_xGC_xGC"),
         ("{}", INVALID_EP_TYPE_NAME),
     ),
 )
@@ -196,7 +194,7 @@ def test_asstr_ep_type_str_instances(string, ep_type_str) -> None:
         (2, "builtins_int"),
         (5, "builtins_str"),
         (-32766, INVALID_EP_TYPE_NAME),  # Reserved for testing
-        (-1, "egp_types_eGC_eGC"),
+        (-1, "egp_types_xGC_xGC"),
         (INVALID_EP_TYPE_VALUE, INVALID_EP_TYPE_NAME),
         (UNKNOWN_EP_TYPE_VALUE, UNKNOWN_EP_TYPE_NAME),
     ),
@@ -221,7 +219,7 @@ def test_compatible() -> None:
     assert compatible(2, 2)
 
 
-@pytest.mark.parametrize("ep_type_int, string", ((2, "int"), (5, "str"), (-1, "egp_types_eGC_eGC")))
+@pytest.mark.parametrize("ep_type_int, string", ((2, "int"), (5, "str"), (-1, "egp_types_xGC_xGC")))
 def test_type_str(ep_type_int, string) -> None:
     """Confirm type_str() works correctly."""
     assert type_str(ep_type_int) == string

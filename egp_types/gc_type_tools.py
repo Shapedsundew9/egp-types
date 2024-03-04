@@ -137,7 +137,9 @@ def define_signature(mgc: Any) -> bytes:
     return sha256(string.encode()).digest()
 
 
-def signature(gca_sig: memoryview, gcb_sig: memoryview, i_data: memoryview, o_data: memoryview, con_data: memoryview, inline: str = "") -> NDArray:
+def signature(
+    gca_sig: memoryview, gcb_sig: memoryview, i_data: memoryview, o_data: memoryview, con_data: memoryview, inline: str = ""
+) -> NDArray:
     """Return the signature of a genetic code."""
     # NOTE: This needs to be very specific and stand the test of time!
     hash_obj: _Hash = sha256(gca_sig)

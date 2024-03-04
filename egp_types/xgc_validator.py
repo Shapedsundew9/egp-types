@@ -163,7 +163,7 @@ class _gms_entry_validator(base_validator):
             self._error(field, "e_count cannot be 1 if evolvability has changed (is not 1.0).")
 
     def _check_with_valid_graph(self, field: str, value: Any) -> None:
-        """ graph: gc_graph = gc_graph(value)
+        """graph: gc_graph = gc_graph(value)
         if not graph.validate():
             self._error(field, f"graph is invalid: {graph.status}")
         """
