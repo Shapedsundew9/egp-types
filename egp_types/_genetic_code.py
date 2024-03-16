@@ -72,7 +72,7 @@ from itertools import count
 from logging import DEBUG, Logger, NullHandler, getLogger
 from typing import TYPE_CHECKING, Any, Callable
 
-from numpy import array, zeros, bytes_, int32, int64, intp, float32, ndarray, signedinteger, floating
+from numpy import array, zeros, uint8, int32, int64, intp, float32, ndarray, signedinteger, floating
 from numpy.typing import NDArray
 
 from .gc_type_tools import signature
@@ -96,7 +96,7 @@ FIRST_ACCESS_NUMBER: int = 0  # iinfo(int64).min
 STORE_GC_OBJ_MEMBERS: tuple[str, ...] = ("gca", "gcb", "ancestor_a", "ancestor_b", "pgc")
 STORE_PROXY_SIGNATURE_MEMBERS: tuple[str, ...] = tuple(m + "_signature" for m in STORE_GC_OBJ_MEMBERS)
 STORE_SIGNATURE_MEMBERS: tuple[str, ...] = STORE_PROXY_SIGNATURE_MEMBERS + ("signature",)
-NULL_SIGNATURE: NDArray[bytes_] = zeros(32, dtype=bytes_)
+NULL_SIGNATURE: NDArray[uint8] = zeros(32, dtype=uint8)
 STORE_DEFAULT_MEMBERS: tuple[str, ...] = ("e_count", "evolvability", "f_count", "fitness", "reference_count", "survivability")
 STORE_DIRTY_MEMBERS: set[str] = set(STORE_DEFAULT_MEMBERS)
 STORE_STATIC_NON_OBJECT_MEMBERS: tuple[str, ...] = (
@@ -160,7 +160,7 @@ class _genetic_code:
                 value = raw_value.data.hex()
             else:
                 value = raw_value
-            str_list.append(f"  {member}: {type(self[member])}: {value}")
+            str_list.append(f"  {member}: {type(raw_value)}: {value}")
         return "\n".join(str_list)
 
     def __setitem__(self, member: str, value: object) -> None:
@@ -185,8 +185,6 @@ class _genetic_code:
                 _logger.debug(f"Setting dynamic member '{member}' dynamic index {gpc.common_ds_idx[self.idx]}.")
                 assert member in STORE_DYNAMIC_MEMBERS, f"Member '{member}' is not a dynamic member of genetic code."
             gpc._common_ds_members[member][self.idx] = value
-            _logger.debug(f"Set dynamic member '{gpc._common_ds_members[member][self.idx]}.")
-
 
     def as_dict(self) -> dict[str, Any]:
         """Return the genetic code as a dictionary."""
@@ -197,15 +195,15 @@ class _genetic_code:
                 if raw_value is EMPTY_GENETIC_CODE:
                     value = None
                 elif raw_value is PURGED_GENETIC_CODE:
-                    value: Any = self[member + "_signature"].data
+                    value: Any = self[member + "_signature"]
                 else:
-                    value = raw_value["signature"].data
+                    value = raw_value["signature"]
             elif isinstance(raw_value, signedinteger):
                 value = int(raw_value)
             elif isinstance(raw_value, floating):
                 value = float(raw_value)
             elif member == "signature":
-                value = raw_value.data
+                value = raw_value
             elif isinstance(raw_value, ndarray):
                 value = raw_value.tolist()
             elif raw_value is None:
@@ -334,7 +332,7 @@ class _genetic_code:
         # dynamic store when loaded. Therefore the inline part of the signature definition
         # is never needed.
         io_data: tuple[interface, interface] = self["graph"].get_io()
-        retval =  signature(
+        retval = signature(
             self["gca"]["signature"].data, self["gcb"]["signature"].data, io_data[0].data, io_data[1].data, self["graph"].connections.data
         )
         _logger.debug(f"Signature of genetic code {self.idx}: {retval.data.hex()}")

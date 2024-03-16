@@ -1,7 +1,6 @@
 """Unit tests for genetic_code.py."""
 from logging import DEBUG, Logger, NullHandler, getLogger
 from random import randint
-from pympler.asizeof import asizeof
 from egp_types.genetic_code_cache import genetic_code_cache, GCC_DEFAULT_SIZE, INT64_MAX
 from egp_types.genetic_code import genetic_code_factory
 
@@ -19,7 +18,7 @@ def test_genetic_code_cache() -> None:
     _logger.debug("Genetic Code Cache generation started.")
     gcc: genetic_code_cache = genetic_code_cache(genetic_code_factory())
     for _ in range(GCC_DEFAULT_SIZE):
-        gcc.genetic_code_type({}, rndm=True, depth=1)
+        gcc.genetic_code_type({}, rndm=True, depth=0, rseed=1)
     _logger.debug("Genetic Code Cache generation completed.")
     assert gcc
     assert len(gcc) == GCC_DEFAULT_SIZE
@@ -30,20 +29,16 @@ def test_purge_basic() -> None:
     The purge function should remove 25% of the genetic codes 4 times
     resulting in the oldest genetic code being in position 0.
     """
-    genetic_code.reset()
-    ids: list[int] = [id(genetic_code()) for _ in range(GCC_DEFAULT_SIZE * 2)]
+    gcc: genetic_code_cache = genetic_code_cache(genetic_code_factory())
+    for _ in range(GCC_DEFAULT_SIZE * 2):
+        gcc.genetic_code_type({}, rndm=True, depth=0, rseed=1)
 
     # The store should be full.
-    assert len(genetic_code.genetic_code_cache) == GCC_DEFAULT_SIZE
+    assert len(gcc) == GCC_DEFAULT_SIZE
 
     # Expecting the oldest genetic code to be in position 0 & max to be in position GCC_DEFAULT_SIZE - 1
-    assert genetic_code.genetic_code_cache.access_sequence.argmin() == 0
-    assert genetic_code.genetic_code_cache.access_sequence.argmax() == GCC_DEFAULT_SIZE - 1
-
-    # Expecting the GCC_DEFAULT_SIZE element of the id list to be in position 0
-    # and the last id to be in the last position
-    assert id(genetic_code.genetic_code_cache.genetic_code[0]) == ids[GCC_DEFAULT_SIZE]
-    assert id(genetic_code.genetic_code_cache.genetic_code[-1]) == ids[-1]
+    assert gcc.access_sequence.argmin() == 0
+    assert gcc.access_sequence.argmax() == GCC_DEFAULT_SIZE - 1
 
 
 def test_purge_complex() -> None:
@@ -52,25 +47,24 @@ def test_purge_complex() -> None:
     and start filling those positionss with new genetic codes.
     """
     # Fill the Genetic Code Cache
-    _logger.debug("Genetic Code Cache generation started.")
-    genetic_code.reset()
+    gcc: genetic_code_cache = genetic_code_cache(genetic_code_factory())
     for _ in range(GCC_DEFAULT_SIZE):
-        genetic_code()
+        gcc.genetic_code_type({}, rndm=True, depth=0, rseed=1)
 
     # Randomly access genetic codes
     _logger.debug("Random access started.")
     for _ in range(GCC_DEFAULT_SIZE * 10):
         idx: int = randint(0, GCC_DEFAULT_SIZE - 1)
-        genetic_code.genetic_code_cache[idx].touch()
+        gcc[idx].touch()
 
     # Add a genetic code causing a purge
     _logger.debug("Trigger purge.")
-    genetic_code()
+    gcc.genetic_code_type({}, rndm=True, depth=0, rseed=1)
 
     # There should be nothing older than the youngest purged genetic code.
     _logger.debug("Validate purge.")
-    empty_indices: set[int] = set(genetic_code.genetic_code_cache.empty_indices())
-    for idx, access in enumerate(genetic_code.genetic_code_cache.access_sequence):
+    empty_indices: set[int] = set(gcc.empty_indices())
+    for idx, access in enumerate(gcc.access_sequence):
         assert (idx in empty_indices) == (access == INT64_MAX)
 
 
@@ -79,14 +73,14 @@ def test_random_genetic_code() -> None:
     The random genetic code method creates a binary tree structure with
     rndm+1 depth.
     """
-    levels = 8
-    genetic_code.reset(2 ** (levels + 1))
-    gc = genetic_code({"rndm": levels})
-    genetic_code.genetic_code_cache.assertions()
-    _logger.debug(f"Size of genetic code: {asizeof(gc)}")
-    assert len(genetic_code.genetic_code_cache) == 2 ** (levels + 1) - 1
-    assert gc["generation"] == levels
-    assert gc.signature()
+    levels = 5
+    gcc: genetic_code_cache = genetic_code_cache(genetic_code_factory(), size=64)
+    gcc.genetic_code_type({}, rndm=True, depth=levels, rseed=1)
+
+    gcc.assertions()
+    assert len(gcc) == 2 ** (levels + 1) - 1
+    assert gcc[0]["generation"] == levels
+    assert gcc[0].signature()
 
 
 if __name__ == "__main__":

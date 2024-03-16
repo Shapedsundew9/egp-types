@@ -74,6 +74,7 @@ from random import randbytes
 from typing import Any
 from uuid import UUID
 from itertools import count
+from numpy import array, uint8
 
 from ._genetic_code import (
     DEFAULT_DYNAMIC_MEMBER_VALUES,
@@ -183,7 +184,7 @@ class genetic_code(_genetic_code):
             self["gca"] = EMPTY_GENETIC_CODE
             self["gcb"] = EMPTY_GENETIC_CODE
             self["generation"] = 0
-            self["signature"] = randbytes(32)
+            self["signature"] = array(tuple(randbytes(32)), dtype=uint8)
 
 
 def genetic_code_factory() -> type[_genetic_code]:

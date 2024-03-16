@@ -50,21 +50,24 @@ Bit of an anti-pattern for python but in this case the savings are worth it.
 
 from gc import collect
 from logging import DEBUG, Logger, NullHandler, getLogger
-from typing import Any, Callable, Generator, Iterable, Iterator, cast
+from typing import Any, Callable, Generator, Iterable, Iterator
+from itertools import count
 
-from ._genetic_code import (DEFAULT_DYNAMIC_MEMBER_VALUES,
-                                     DEFAULT_STATIC_MEMBER_VALUES,
-                                     EMPTY_GENETIC_CODE, STORE_ALL_MEMBERS,
-                                     STORE_PROXY_SIGNATURE_MEMBERS,
-                                     PURGED_GENETIC_CODE,
-                                     _genetic_code)
+from ._genetic_code import (
+    DEFAULT_DYNAMIC_MEMBER_VALUES,
+    DEFAULT_STATIC_MEMBER_VALUES,
+    EMPTY_GENETIC_CODE,
+    STORE_ALL_MEMBERS,
+    STORE_PROXY_SIGNATURE_MEMBERS,
+    PURGED_GENETIC_CODE,
+    _genetic_code,
+)
 from .connections import connections
 from .graph import graph
 from .interface import interface, EMPTY_INTERFACE, EMPTY_INTERFACE_C
 from .rows import rows
 from egp_utils.store import DDSL, dynamic_store, static_store
-from numpy import (argsort, bytes_, full, iinfo, int32, int64, ndarray, uint8,
-                   zeros, intp, logical_and, argwhere, bitwise_and, bool_)
+from numpy import argsort, full, iinfo, int32, int64, ndarray, uint8, zeros, intp, logical_and, argwhere, bitwise_and, bool_
 from numpy.typing import NDArray
 from pypgtable.pypgtable_typing import SchemaColumn
 
@@ -79,6 +82,10 @@ _logger.debug(f"All store members: {STORE_ALL_MEMBERS}")
 
 # TODO: Make a new cerberus validator for this extending the pypgtable raw_table_column_config_validator
 # TODO: Definition class below should inherit from pypgtable (when it has a typeddict defined)
+
+
+# Uniquely number ds_index_wrapper classes
+ds_index_wrapper_class_number = count()
 
 
 class ConfigDefinition(SchemaColumn):
@@ -121,11 +128,10 @@ class ds_index_wrapper:
         if mapping_idx == -1:
             # If there is no mapping then the attribute is dynamically calculated
             # self.index_mapping[idx] = cls.dstore.next_index()
-            _logger.debug(f"Returning dynamic callable value for {self.member} at index {idx} is -1")
-            return getattr(cls.genetic_codes[idx], self.member)()
-            # mapping_idx = self.index_mapping[idx]
-        _logger.debug(f"Returning dynamic stored value for {self.member} at index {idx} is -1")
-        return cls.dstore[self.member][mapping_idx]
+            retval: Any = getattr(cls.genetic_codes[idx], self.member)()
+        else:
+            retval = cls.dstore[self.member][mapping_idx]
+        return retval
 
     def __setitem__(self, idx: int, val: Any) -> None:
         """Set the object at the specified index."""
@@ -136,19 +142,19 @@ class ds_index_wrapper:
             mapping_idx = cls.dstore.next_index()
             self.index_mapping[idx] = mapping_idx
         cls.dstore[self.member][mapping_idx] = val
-        _logger.debug(f"Set {self.member} at index {idx} to {val} at index {mapping_idx}")
 
 
-class common_ds_index_wrapper(ds_index_wrapper):
-    """Wrapper for common dynamic store index."""
+def _ds_index_wrapper_factory() -> type[ds_index_wrapper]:
+    """Return the next ds_index_wrapper class."""
+    return type(f"common_ds_index_wrapper_{next(ds_index_wrapper_class_number)}", (ds_index_wrapper,), {})
 
 
 def dynamic_val_type(size: int, member: str) -> NDArray:
     """Return the default store object of the member."""
     value: Any = DEFAULT_DYNAMIC_MEMBER_VALUES[member]
     if isinstance(value, ndarray):
-        _logger.debug(f"Creating dynamic store member {member} with shape ({size},{value.shape})")
-        return zeros((size, 32), dtype=bytes_)
+        _logger.debug(f"Creating dynamic store member {member} with shape ({size},{value.shape[0]})")
+        return zeros((size, 32), dtype=uint8)
     _logger.debug(f"Creating dynamic store member {member} with shape ({size},)")
     return full(size, value, dtype=type(value))
 
@@ -176,14 +182,21 @@ def static_val_type(member: str) -> tuple[Any, type]:
     return DEFAULT_STATIC_MEMBER_VALUES[member], type(DEFAULT_STATIC_MEMBER_VALUES[member])
 
 
+def _dummy_update(ggcs: Iterable[dict[str, Any]]) -> None:
+    """Dummy function to replace the push_to_gp function when the GCC is full."""
+
+
 class genetic_code_cache(static_store):
     """A memory efficient store genetic codes."""
+
     # TODO: Consider numpy record arrays for the static store members
 
-    def __init__(self,
+    def __init__(
+        self,
         genetic_code_type: type[_genetic_code],
         size: int = GCC_DEFAULT_SIZE,
-        push_to_gp: Callable[[Iterable[dict[str, Any]]], None] = lambda x: None) -> None:
+        push_to_gp: Callable[[Iterable[dict[str, Any]]], None] = _dummy_update,
+    ) -> None:
         """Initialize the storage."""
         super().__init__(size)
         self.genetic_code_type = genetic_code_type
@@ -209,18 +222,21 @@ class genetic_code_cache(static_store):
         # Status byte for each genetic code.
         # 0 = dirty bit. If set then the genetic code has been modified and needs to be written to the GP.
         # 1:7 = reserved (read and written as 0)
-        self.status_byte: NDArray[bytes_] = zeros(self._size, dtype=uint8)
+        self.status_byte: NDArray[uint8] = zeros(self._size, dtype=uint8)
 
         # Common dynamic store indices. -1 means not in the common dynamic store.
         self.common_ds_idx: NDArray[int32] = full(self._size, int32(-1), dtype=int32)
         # Not static store members: Must begin with '_'
         self._common_ds = dynamic_store(GCC_ds_common, max((size.bit_length() - 7, DDSL)))
         # Set up dynamic store member index wrappers
-        common_ds_index_wrapper.dstore = self._common_ds
-        common_ds_index_wrapper.genetic_codes = self.genetic_code
+        # Need a new class for each member to avoid conflict on class members
+        self.common_ds_index_wrapper: type[ds_index_wrapper] = _ds_index_wrapper_factory()
+        self.common_ds_index_wrapper.dstore = self._common_ds
+        self.common_ds_index_wrapper.genetic_codes = self.genetic_code
+
         # If a member has the "_idx" suffix then it indexes the signatures store
-        self._common_ds_members: dict[str, common_ds_index_wrapper] = {
-            m: common_ds_index_wrapper(m, self.common_ds_idx) for m in self._common_ds.members
+        self._common_ds_members: dict[str, ds_index_wrapper] = {
+            m: self.common_ds_index_wrapper(m, self.common_ds_idx) for m in self._common_ds.members
         }
 
         # Method to push genetic codes to the gene pool when the GCC is full
@@ -427,6 +443,7 @@ class genetic_code_cache(static_store):
         """A full reset of the store allows the size to be changed. All genetic codes
         are deleted which pushes the genetic codes to the genomic library as required.
         """
+        self.purge(fraction=1.0)
         super().reset(size)
         # Static store members
         for member in DEFAULT_STATIC_MEMBER_VALUES:
@@ -442,7 +459,7 @@ class genetic_code_cache(static_store):
         # Re-initialize the common dynamic store wrapper
         for index_wrapper in self._common_ds_members.values():
             index_wrapper.index_mapping = self.common_ds_idx
-        common_ds_index_wrapper.genetic_codes = self.genetic_code
+        self.common_ds_index_wrapper.genetic_codes = self.genetic_code
 
         # Clean up the heap
         _logger.info("GCC reset to {self._size} entries and cleared.")
@@ -450,10 +467,10 @@ class genetic_code_cache(static_store):
 
         # Total = 2* 8 + 5 * 4 = 36 bytes + base class per element
 
-    def signatures(self) -> Iterator[memoryview]:
+    def signatures(self) -> Iterator[NDArray[uint8]]:
         """Return the signatures of the genetic codes."""
         for gc in self.values():
-            yield gc["signature"].data
+            yield gc["signature"]
 
     def update(self, ggcs: Iterable[dict[str, Any]]) -> list[int]:
         """Add an iterable dict type genetic code to the store checking for signatures that

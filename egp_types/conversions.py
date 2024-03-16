@@ -7,15 +7,14 @@ The need for type conversions is driven by:
 """
 from base64 import b64decode, b64encode
 from json import dumps, loads
-from typing import Union
 from zlib import compress, decompress
-from numpy import asarray, bytes_
+from numpy import array, uint8, frombuffer
 from numpy.typing import NDArray
 
 from egp_types.gc_type_tools import PROPERTIES
 
 
-def json_obj_to_str(obj: Union[dict, list, None]) -> Union[str, None]:
+def json_obj_to_str(obj: dict | list | None) -> str | None:
     """Dump a python object that is a valid JSON structure to a string.
 
     Args
@@ -29,7 +28,7 @@ def json_obj_to_str(obj: Union[dict, list, None]) -> Union[str, None]:
     return None if obj is None else dumps(obj)
 
 
-def str_to_json_obj(obj: Union[str, None]) -> Union[dict, list, None]:
+def str_to_json_obj(obj: str | None) -> dict | list | None:
     """Dump a python object that is a valid JSON structure to a string.
 
     Args
@@ -43,7 +42,7 @@ def str_to_json_obj(obj: Union[str, None]) -> Union[dict, list, None]:
     return None if obj is None else loads(obj)
 
 
-def encode_effective_pgcs(obj: Union[list[list[bytes]], None]) -> Union[list[list[bytes]], None]:
+def encode_effective_pgcs(obj: list[list[bytes]] | None) -> list[list[bytes]] | None:
     """Encode the effective_pgcs list of lists of binary signatures into a JSON compatible object.
 
     Args
@@ -60,7 +59,7 @@ def encode_effective_pgcs(obj: Union[list[list[bytes]], None]) -> Union[list[lis
     return [[b64encode(signature) for signature in layer] for layer in obj]
 
 
-def decode_effective_pgcs(obj: Union[list[list[str]], None]) -> Union[list[list[bytes]], None]:
+def decode_effective_pgcs(obj: list[list[str]] | None) -> list[list[bytes]] | None:
     """Encode the effective_pgcs list of lists of binary signatures into a JSON compatible object.
 
     Args
@@ -77,7 +76,7 @@ def decode_effective_pgcs(obj: Union[list[list[str]], None]) -> Union[list[list[
     return [[b64decode(signature) for signature in layer] for layer in obj]
 
 
-def compress_json(obj) -> bytes | memoryview | bytearray | None:
+def compress_json(obj: dict | list | None) -> bytes | memoryview | bytearray | None:
     """Compress a JSON dict object.
 
     Args
@@ -100,7 +99,7 @@ def compress_json(obj) -> bytes | memoryview | bytearray | None:
     raise TypeError(f"Un-encodeable type '{type(obj)}': Expected 'dict' or byte type.")
 
 
-def decompress_json(obj) -> dict | list | None:
+def decompress_json(obj: bytes | None) -> dict | list | None:
     """Decompress a compressed JSON dict object.
 
     Args
@@ -114,7 +113,7 @@ def decompress_json(obj) -> dict | list | None:
     return None if obj is None else loads(decompress(obj).decode())
 
 
-def memoryview_to_bytes(obj) -> bytes | None:
+def memoryview_to_bytes(obj: memoryview | None) -> bytes | None:
     """Convert a memory view to a bytes object.
 
     Args
@@ -128,8 +127,8 @@ def memoryview_to_bytes(obj) -> bytes | None:
     return None if obj is None else bytes(obj)
 
 
-def memoryview_to_ndarray(obj) -> NDArray | None:
-    """Convert a memory view to a numpy ndarray.
+def memoryview_to_ndarray(obj: memoryview | None) -> NDArray | None:
+    """Convert a memory view to a 32 uint8 numpy ndarray.
 
     Args
     ----
@@ -139,11 +138,11 @@ def memoryview_to_ndarray(obj) -> NDArray | None:
     -------
     (numpy.ndarray or NoneType)
     """
-    return None if obj is None else asarray(obj, dtype=bytes_)
+    return None if obj is None else frombuffer(obj, dtype=uint8, count=32)
 
 
-def ndarray_to_memoryview(obj) -> memoryview | None:
-    """Convert a numpy ndarray to a memory view.
+def ndarray_to_memoryview(obj: NDArray | None) -> memoryview | None:
+    """Convert a numpy 32 uint8 ndarray to a memory view.
 
     Args
     ----
@@ -153,7 +152,25 @@ def ndarray_to_memoryview(obj) -> memoryview | None:
     -------
     (memoryview or NoneType)
     """
+    if isinstance(obj, bytes):
+        return memoryview(obj)
     return None if obj is None else obj.data
+
+
+def ndarray_to_bytes(obj: NDArray | None) -> bytes | None:
+    """Convert a numpy 32 uint8 ndarray to a bytes object.
+
+    Args
+    ----
+    obj (numpy.ndarray or NoneType):
+
+    Returns
+    -------
+    (bytes or NoneType)
+    """
+    if isinstance(obj, bytes):
+        return obj
+    return None if obj is None else obj.tobytes()
 
 
 def encode_properties(obj: dict[str, bool] | int | None) -> int:
