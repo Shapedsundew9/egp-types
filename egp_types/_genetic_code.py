@@ -72,10 +72,10 @@ from itertools import count
 from logging import DEBUG, Logger, NullHandler, getLogger
 from typing import TYPE_CHECKING, Any, Callable
 
-from numpy import array, zeros, uint8, int32, int64, intp, float32, ndarray, signedinteger, floating
+from numpy import array, zeros, uint8, int32, int64, intp, ndarray, signedinteger, floating
 from numpy.typing import NDArray
 
-from .gc_type_tools import signature
+from .gc_type_tools import signature, INT32_ZERO, INT32_ONE, INT64_ZERO, FLOAT32_ZERO, FLOAT32_ONE
 
 
 # Type checking
@@ -113,12 +113,6 @@ STORE_DERIVED_MEMBERS: tuple[str, ...] = ("code_depth", "codon_depth", "generati
 STORE_DYNAMIC_MEMBERS: tuple[str, ...] = STORE_PROXY_SIGNATURE_MEMBERS + STORE_DERIVED_MEMBERS
 HIGHER_LAYER_MEMBERS: tuple[str, ...] = STORE_DERIVED_MEMBERS + STORE_STATIC_MEMBERS
 STORE_ALL_MEMBERS: tuple[str, ...] = STORE_DYNAMIC_MEMBERS + STORE_STATIC_MEMBERS
-INT32_ZERO = int32(0)
-INT32_ONE = int32(1)
-INT32_MINUS_ONE = int32(-1)
-INT64_ZERO = int64(0)
-FLOAT32_ZERO = float32(0.0)
-FLOAT32_ONE = float32(1.0)
 
 
 class _genetic_code:
@@ -180,11 +174,7 @@ class _genetic_code:
         if member in STORE_STATIC_MEMBERS:
             getattr(gpc, member)[self.idx] = value
         else:
-            # Setting a dynamic member.
-            if _LOG_DEEP_DEBUG:
-                _logger.debug(f"Setting dynamic member '{member}' dynamic index {gpc.common_ds_idx[self.idx]}.")
-                assert member in STORE_DYNAMIC_MEMBERS, f"Member '{member}' is not a dynamic member of genetic code."
-            gpc._common_ds_members[member][self.idx] = value
+            raise KeyError(f"Member '{member}' is not a static member of genetic code.")
 
     def as_dict(self) -> dict[str, Any]:
         """Return the genetic code as a dictionary."""
@@ -243,6 +233,16 @@ class _genetic_code:
         """Set the state of the GC to dirty."""
         type(self).genetic_code_cache.status_byte[self.idx] |= 1
 
+    def fake_leaf(self, **kwargs) -> None:
+        """This is a test support function that allows a leaf GC to be defined from parameters."""
+        gpc: genetic_code_cache = type(self).genetic_code_cache
+        if _LOG_DEEP_DEBUG:
+            _logger.debug(f"Faking genetic code {self.idx} as a leaf node.")
+        for member in STORE_GC_OBJ_MEMBERS:
+            self[member + "_signature"] = kwargs[member]
+        for member in STORE_DERIVED_MEMBERS:
+            gpc._common_ds_members[member][self.idx] = kwargs[member]
+
     def gca_signature(self) -> NDArray:
         """Return the signature of the genetic code."""
         return self["gca"]["signature"]
@@ -272,13 +272,17 @@ class _genetic_code:
     def make_leaf(self) -> None:
         """Make the genetic code a leaf node by calculating the fields that are derived from other
         genetic codes and stored. This allows the other genetic codes to be purged or deleted."""
+        gpc: genetic_code_cache = type(self).genetic_code_cache
         if _LOG_DEEP_DEBUG:
             _logger.debug(f"Making genetic code {self.idx} a leaf node.")
         for member in STORE_GC_OBJ_MEMBERS:
             self[member + "_signature"] = self[member]["signature"]
         for member in STORE_DERIVED_MEMBERS:
-            # This looks weird but it will generate the derived members when __getitem__ is called.
-            self[member] = self[member]
+            # Setting a dynamic member.
+            if _LOG_DEEP_DEBUG:
+                _logger.debug(f"Setting dynamic member '{member}' dynamic index {gpc.common_ds_idx[self.idx]}.")
+                assert member in STORE_DYNAMIC_MEMBERS, f"Member '{member}' is not a dynamic member of genetic code."
+            gpc._common_ds_members[member][self.idx] = self[member]
 
     def mermaid(self) -> list[str]:
         """Return the Mermaid Chart representation of the genetic code."""

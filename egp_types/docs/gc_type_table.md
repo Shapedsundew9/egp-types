@@ -1,56 +1,38 @@
-GC Type Field Requirements
-==========================
+# GC Type Flows
 
-:large_blue_circle:: Defined if not set, :black_circle:: Required.
+```mermaid
+flowchart TD
+    %% Shows the paths for GC type conversions in EGP
+    %% NOTE aGC is not necessarily a complete type for purpose
+    A[JSON] --> B1[eGC]
+    B1 --> |Derived| B2[aGC]
+    A --> B2
+    B2 --> |Consistency Check| C[Genomic Library]
+    C --> D[aGC]
+    D --> |Derived| E[gGC]
+    E --> |Consistency Check| F[Gene Pool]
+    subgraph Gene Pool Cache
+        direction TB
+        G[Genetic Code]
+    end
+    F --> G
+    G --> H[dGC]
+    H --> G
+    I[eGC] --> |Conversion| J[dGC]
+    J --> |Consistency Check| G
+    G --> K[gGC]
+    K --> |Consistency Check| F
+    F --> |Consistency Check| C
+```
 
-| Field | _GC | eGC | mGC |
-| --- | --- | --- | --- |
-| _ac_count | :large_blue_circle: |  |  |
-| _alpha_class | :large_blue_circle: |  |  |
-| _e_count | :large_blue_circle: |  |  |
-| _evolvability | :large_blue_circle: |  |  |
-| _f_count | :large_blue_circle: |  |  |
-| _fitness | :large_blue_circle: |  |  |
-| _reference_count | :large_blue_circle: |  |  |
-| ac_count | :large_blue_circle: |  |  |
-| alpha_class | :large_blue_circle: |  |  |
-| ancestor_a | :large_blue_circle: |  |  |
-| ancestor_a_ref | :large_blue_circle: |  |  |
-| ancestor_b | :large_blue_circle: |  |  |
-| ancestor_b_ref | :large_blue_circle: |  |  |
-| code_depth | :large_blue_circle: |  |  |
-| codon_depth | :large_blue_circle: |  |  |
-| created | :large_blue_circle: |  |  |
-| creator | :large_blue_circle: |  |  |
-| e_count | :large_blue_circle: |  |  |
-| evolvability | :large_blue_circle: |  |  |
-| f_count | :large_blue_circle: |  |  |
-| fitness | :large_blue_circle: |  |  |
-| gca | :large_blue_circle: |  |  |
-| gca_ref | :large_blue_circle: | :large_blue_circle: | :large_blue_circle: |
-| gcb | :large_blue_circle: |  |  |
-| gcb_ref | :large_blue_circle: | :large_blue_circle: | :large_blue_circle: |
-| generation | :large_blue_circle: |  |  |
-| graph | :black_circle: |  |  |
-| igraph | :black_circle: | :black_circle: | :black_circle: |
-| individual | :large_blue_circle: |  |  |
-| input_types | :large_blue_circle: | :black_circle: | :black_circle: |
-| inputs | :large_blue_circle: | :black_circle: | :black_circle: |
-| interface | :black_circle: |  |  |
-| meta_data | :large_blue_circle: |  |  |
-| modified | :large_blue_circle: |  |  |
-| num_codes | :large_blue_circle: |  |  |
-| num_inputs | :large_blue_circle: |  |  |
-| num_outputs | :large_blue_circle: |  |  |
-| num_unique_codes | :large_blue_circle: |  |  |
-| opt_num_codons | :large_blue_circle: |  |  |
-| output_types | :large_blue_circle: | :black_circle: | :black_circle: |
-| outputs | :large_blue_circle: | :black_circle: | :black_circle: |
-| pgc | :large_blue_circle: |  |  |
-| pgc_ref | :large_blue_circle: |  |  |
-| properties | :large_blue_circle: |  |  |
-| raw_num_codons | :large_blue_circle: |  |  |
-| ref | :large_blue_circle: | :large_blue_circle: | :large_blue_circle: |
-| reference_count | :large_blue_circle: |  |  |
-| signature | :large_blue_circle: |  |  |
-| updated | :large_blue_circle: |  |  |
+# Transformations
+
+Column header types can be converted row types where there is an **X**
+
+|     | eGC | dGC | gGC | GC | aGC |
+|-----|-----|-----|-----|----|-----|
+| eGC |  X  |     |     |    |     |
+| dGC |  X  |  X  |     |  X |     |
+| gGC |     |     |  X  |  X |  X  |
+| GC  |     |  X  |  X  |  X |     |
+| aGC |  X  |     |     |    |  X  |

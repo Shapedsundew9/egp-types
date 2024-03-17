@@ -53,6 +53,8 @@ from logging import DEBUG, Logger, NullHandler, getLogger
 from typing import Any, Callable, Generator, Iterable, Iterator
 from itertools import count
 
+from numpy._typing import _8Bit
+
 from ._genetic_code import (
     DEFAULT_DYNAMIC_MEMBER_VALUES,
     DEFAULT_STATIC_MEMBER_VALUES,
@@ -63,13 +65,14 @@ from ._genetic_code import (
     _genetic_code,
 )
 from .connections import connections
-from .graph import graph
+from .graph import graph, EMPTY_GRAPH
 from .interface import interface, EMPTY_INTERFACE, EMPTY_INTERFACE_C
 from .rows import rows
 from egp_utils.store import DDSL, dynamic_store, static_store
-from numpy import argsort, full, iinfo, int32, int64, ndarray, uint8, zeros, intp, logical_and, argwhere, bitwise_and, bool_
+from numpy import argsort, full, iinfo, int32, int64, ndarray, uint8, zeros, intp, logical_and, argwhere, bitwise_and, bool_, where, array_equal
 from numpy.typing import NDArray
 from pypgtable.pypgtable_typing import SchemaColumn
+from .gc_type_tools import NULL_SIGNATURE_ARRAY
 
 
 # Logging
@@ -191,6 +194,13 @@ class genetic_code_cache(static_store):
 
     # TODO: Consider numpy record arrays for the static store members
 
+    # Constants here to avoid circular imports in modules being passed the GPC
+    EMPTY_GENETIC_CODE: _genetic_code = EMPTY_GENETIC_CODE
+    PURGED_GENETIC_CODE: _genetic_code = PURGED_GENETIC_CODE
+    EMPTY_INTERFACE: interface = EMPTY_INTERFACE
+    EMPTY_INTERFACE_C: interface = EMPTY_INTERFACE_C
+    EMPTY_GRAPH: graph = EMPTY_GRAPH
+
     def __init__(
         self,
         genetic_code_type: type[_genetic_code],
@@ -292,9 +302,28 @@ class genetic_code_cache(static_store):
         for gc in self.values():
             yield gc.as_dict()
 
+    def find(self, signatures: tuple[NDArray[uint8], ...]) -> list[_genetic_code]:
+        """Return the genetic code with the specified signature or the empty GC if it is not found.
+        NOTE: Duplicate signatures are not supported.
+        NOTE: This is an expensive operation.
+        """
+        sigs = tuple((idx, sig) for idx, sig in enumerate(signatures) if not array_equal(sig, NULL_SIGNATURE_ARRAY))
+        retval: list[_genetic_code] = [EMPTY_GENETIC_CODE] * len(signatures)
+        found_set = set()
+        for gc in self.values():
+            # TODO: Below would be faster using a 2D numpy array for sigs & argwhere() or similar
+            for idx, sig in sigs:
+                if array_equal(gc["signature"], sig):
+                    retval[idx] = gc
+                    assert idx not in found_set, f"Signature {sig.tobytes().hex()} found more than once."
+                    found_set.add(idx)
+                    if len(found_set) == len(sigs):
+                        return retval
+        assert len(found_set) == len(sigs), f"Signatures not found: {[sig.tobytes().hex() for idx, sig in sigs if idx not in found_set]}"
+        return retval
+
     def leaves(self) -> Iterator[intp]:
         """Return each index of the leaf genetic codes."""
-        # TODO: See how much faster this would be as numpy array manipulation
         valid: NDArray[intp] = argwhere(self.common_ds_idx != -1).flatten()
         yield from valid
 

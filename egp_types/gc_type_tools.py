@@ -7,7 +7,7 @@ from logging import DEBUG, Logger, NullHandler, getLogger
 from pprint import pformat
 from typing import TYPE_CHECKING, Any, Literal, LiteralString
 
-from numpy import asarray, bytes_
+from numpy import asarray, uint8, int32, int64, float32
 from numpy.typing import NDArray
 
 from .ep_type import asint
@@ -21,6 +21,12 @@ _logger.addHandler(NullHandler())
 _LOG_DEBUG: bool = _logger.isEnabledFor(DEBUG)
 
 
+# GC signatre None type management
+# It is space efficient to have None types in the DB for signatures but not in the cache.
+# In the GPC a None type is represented by a 0 SHA256
+NULL_SIGNATURE_BYTES: bytes = b"\x00" * 32
+NULL_SIGNATURE_ARRAY: NDArray[uint8] = asarray([0] * 32, dtype=uint8)
+
 # Evolve a pGC after this many 'uses'.
 # MUST be a power of 2
 M_CONSTANT: int = 1 << 4
@@ -32,6 +38,13 @@ NUM_PGC_LAYERS = 16
 # 100 years. A million super fast cores doing 5.8 million per second...only an outside chance
 # of hitting the limit if Erasmus becomes a global phenomenon and is not rewritten! Sensibly future proofed.
 
+# Constants
+INT32_ZERO = int32(0)
+INT32_ONE = int32(1)
+INT32_MINUS_ONE = int32(-1)
+INT64_ZERO = int64(0)
+FLOAT32_ZERO = float32(0.0)
+FLOAT32_ONE = float32(1.0)
 
 # FIXME: This is duplicated in egp_types.gc_type. Consider creating a seperate module of
 # field definitions.
@@ -138,8 +151,7 @@ def define_signature(mgc: Any) -> bytes:
 
 
 def signature(
-    gca_sig: memoryview, gcb_sig: memoryview, i_data: memoryview, o_data: memoryview, con_data: memoryview, inline: str = ""
-) -> NDArray:
+    gca_sig: memoryview, gcb_sig: memoryview, i_data: memoryview, o_data: memoryview, con_data: memoryview, meta_data: dict[str, Any] = {}) -> NDArray:
     """Return the signature of a genetic code."""
     # NOTE: This needs to be very specific and stand the test of time!
     hash_obj: _Hash = sha256(gca_sig)
@@ -147,6 +159,13 @@ def signature(
     hash_obj.update(i_data)
     hash_obj.update(o_data)
     hash_obj.update(con_data)
-    if inline:
-        hash_obj.update(inline.encode())
-    return asarray(hash_obj.digest(), dtype=bytes_)
+    if "function" in meta_data:
+        hash_obj.update(meta_data["function"]["python3"]["0"]["inline"].encode())
+        if "code" in meta_data["function"]["python3"]["0"]:
+            hash_obj.update(meta_data["function"]["python3"]["0"]["code"].encode())
+    return asarray(hash_obj.digest(), dtype=uint8)
+
+
+def app_sig_to_array(signature: bytes | memoryview | None) -> NDArray[uint8]:
+    """Convert the application signature to a numpy array."""
+    return asarray(signature, dtype=uint8) if signature is not None else NULL_SIGNATURE_ARRAY
