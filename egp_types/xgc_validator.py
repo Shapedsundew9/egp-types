@@ -1,4 +1,12 @@
-"""Validate & normalise JSON Genetic Code definitions."""
+"""Validate & normalise external sources of Genetic Code definitions.
+
+External sources include JSON files and PostgreSQL databases. Both of these sources
+could be corrupt, missing data or have been tampered with. This module provides some
+self contained (within the genetic code) validation and normalisation.
+
+Corruption entering the genetic code is very hard to unwind.
+This is just the first line of defense.
+"""
 
 from copy import deepcopy
 from datetime import datetime
@@ -338,7 +346,7 @@ class _gms_entry_validator(base_validator):
         return bytes(value)
 
 
-class _LGC_entry_validator(_gms_entry_validator):
+class _lGC_entry_validator(_gms_entry_validator):
     # TODO: Make errors ValidationError types for full disclosure
     # https://docs.python-cerberus.org/en/stable/customize.html#validator-error
 
@@ -426,7 +434,7 @@ class _LGC_entry_validator(_gms_entry_validator):
         return define_signature(self.document)
 
 
-class _LGC_json_load_entry_validator(_LGC_entry_validator):
+class _lGC_json_load_entry_validator(_lGC_entry_validator):
     # TODO: Make errors ValidationError types for full disclosure
     # https://docs.python-cerberus.org/en/stable/customize.html#validator-error
 
@@ -437,7 +445,7 @@ class _LGC_json_load_entry_validator(_LGC_entry_validator):
         return bytes.fromhex(value) if isinstance(value, str) else value
 
 
-class _LGC_json_dump_entry_validator(_LGC_entry_validator):
+class _lGC_json_dump_entry_validator(_lGC_entry_validator):
     # TODO: Make errors ValidationError types for full disclosure
     # https://docs.python-cerberus.org/en/stable/customize.html#validator-error
 
@@ -448,28 +456,28 @@ class _LGC_json_dump_entry_validator(_LGC_entry_validator):
         return value.hex() if isinstance(value, (bytes, memoryview, bytearray)) else value
 
 
-class _gGC_entry_validator(_LGC_entry_validator):
+class _gGC_entry_validator(_lGC_entry_validator):
     """Validator for the Gene Pool Genetic Code."""
 
 
 gms_entry_validator: _gms_entry_validator = _gms_entry_validator()
-LGC_entry_validator: _LGC_entry_validator = _LGC_entry_validator()
-LGC_json_load_entry_validator: _LGC_json_load_entry_validator = _LGC_json_load_entry_validator()
-LGC_json_dump_entry_validator: _LGC_json_dump_entry_validator = _LGC_json_dump_entry_validator()
+lGC_entry_validator: _lGC_entry_validator = _lGC_entry_validator()
+lGC_json_load_entry_validator: _lGC_json_load_entry_validator = _lGC_json_load_entry_validator()
+lGC_json_dump_entry_validator: _lGC_json_dump_entry_validator = _lGC_json_dump_entry_validator()
 gGC_entry_validator: _gGC_entry_validator = _gGC_entry_validator(purge_unknown=True)
 
 gms_entry_validator.rules_set_registry = GRAPH_REGISTRY
-LGC_entry_validator.rules_set_registry = GRAPH_REGISTRY
-LGC_json_load_entry_validator.rules_set_registry = GRAPH_REGISTRY
-LGC_json_dump_entry_validator.rules_set_registry = GRAPH_REGISTRY
+lGC_entry_validator.rules_set_registry = GRAPH_REGISTRY
+lGC_json_load_entry_validator.rules_set_registry = GRAPH_REGISTRY
+lGC_json_dump_entry_validator.rules_set_registry = GRAPH_REGISTRY
 gGC_entry_validator.rules_set_registry = GRAPH_REGISTRY
 
 gms_entry_validator.schema = GMS_ENTRY_SCHEMA
-LGC_entry_validator.schema = _LGC_ENTRY_SCHEMA
-LGC_json_load_entry_validator.schema = _LGC_JSON_LOAD_ENTRY_SCHEMA
-LGC_json_dump_entry_validator.schema = _LGC_JSON_DUMP_ENTRY_SCHEMA
+lGC_entry_validator.schema = _LGC_ENTRY_SCHEMA
+lGC_json_load_entry_validator.schema = _LGC_JSON_LOAD_ENTRY_SCHEMA
+lGC_json_dump_entry_validator.schema = _LGC_JSON_DUMP_ENTRY_SCHEMA
 gGC_entry_validator.schema = _GGC_ENTRY_SCHEMA
 
 
-class xgc_validator_generator(_gGC_entry_validator, _LGC_entry_validator):
+class xgc_validator_generator(_gGC_entry_validator, _lGC_entry_validator):
     """Superset validator from which to derive transient xGC type validators."""

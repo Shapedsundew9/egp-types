@@ -72,4 +72,4 @@ class eGC():
 
 
 class lGC(eGC):
-
+    """Library genetic code class (Application Layer)."""

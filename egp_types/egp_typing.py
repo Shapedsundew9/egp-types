@@ -10,9 +10,7 @@ EndPointClass = bool
 EndPointClassStr = Literal["s", "d"]
 EndPointIndex = int
 EndPointType = int
-SrcEndPointHash = str
-DstEndPointHash = str
-EndPointHash = SrcEndPointHash | DstEndPointHash | str
+
 
 # TODO: Can GCGraphRows be constrained further to tuple[dict[DestinationRow, int], dict[SourceRow, int]]
 GCGraphRows = tuple[dict[Row, int], dict[Row, int]]
