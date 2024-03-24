@@ -153,8 +153,13 @@ register_token_code("I01900", "No source endpoints in the list to remove.")
 class gc_graph:
     """Manipulating Genetic Code Graphs."""
 
-    def __init__(self, json_graph: JSONGraph) -> None:
-        self.igraph: internal_graph = internal_graph_from_JSONGraph(json_graph)
+    def __init__(self, **kwargs) -> None:
+        if "json_graph" in kwargs:
+            self.igraph: internal_graph = internal_graph_from_JSONGraph(kwargs["json_graph"])
+        elif "igraph" in kwargs:
+            self.igraph = kwargs["igraph"]
+        else:
+            assert False, "Must provide either a JSON graph or an internal graph."
         self.status = []
         self.rows: tuple[dict[Row, int], dict[Row, int]] = (
             dict(Counter([ep.row for ep in self.igraph.dst_filter()])),
@@ -892,7 +897,7 @@ def random_gc_graph(validator: base_validator, verify: bool = False, seed: int |
     elif "C" in rc_graph:
         del rc_graph["C"]
 
-    gcg = gc_graph(rc_graph)
+    gcg = gc_graph(json_graph=rc_graph)
     if _LOG_DEBUG:
         _logger.debug(f"Pre-normalized randomly generated internal graph:\n{gcg}")
 

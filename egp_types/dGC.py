@@ -60,6 +60,7 @@ class dGC:
         self.reference_count: int64 = INT64_ZERO
         self.survivability: float32 = FLOAT32_ZERO
         self.members_ = tuple(m for m in self.__dict__ if not m.endswith("_"))
+        self.placeholder_: _genetic_code = gcc[gcc.add({})]
         if "dGC" in kwargs:
             self.from_dGC(kwargs["dGC"])
         elif "eGC" in kwargs:
