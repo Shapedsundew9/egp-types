@@ -312,7 +312,7 @@ class _gms_entry_validator(base_validator):
 
     def _normalize_default_setter_set_output_types(self, document) -> list[int]:
         # Gather all the output endpoint types. Reduce in a set then order the list.
-        return sorted(set([ep[2] for ep in document["graph"].get("O", tuple())]))
+        return sorted({ep[2] for ep in document["graph"].get("O", tuple())})
 
     def _normalize_default_setter_set_input_indices(self, document) -> bytes:
         # Get the type list then find all the inputs in order & look them up.

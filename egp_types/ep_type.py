@@ -45,15 +45,15 @@ _EGP_TYPE_LIMIT: Literal[32769] = 32769
 
 
 def _special_type_filter(v) -> bool:
-    return v < _EGP_PHYSICAL_TYPE_LIMIT and v >= _EGP_SPECIAL_TYPE_LIMIT
+    return _EGP_SPECIAL_TYPE_LIMIT <= v < _EGP_PHYSICAL_TYPE_LIMIT
 
 
 def _physical_type_filter(v) -> bool:
-    return v < _EGP_REAL_TYPE_LIMIT and v >= _EGP_PHYSICAL_TYPE_LIMIT
+    return _EGP_PHYSICAL_TYPE_LIMIT <= v < _EGP_REAL_TYPE_LIMIT
 
 
 def _real_type_filter(v) -> bool:
-    return v < _EGP_TYPE_LIMIT and v >= _EGP_REAL_TYPE_LIMIT
+    return _EGP_REAL_TYPE_LIMIT <= v < _EGP_TYPE_LIMIT
 
 
 SPECIAL_EP_TYPE_VALUES: tuple[int, ...] = tuple((v for v in filter(_special_type_filter, ep_type_lookup["v2n"])))
@@ -218,7 +218,7 @@ def validate(obj: Any, value_t: vtype = vtype.EP_TYPE_INT) -> bool:
             name: str = fully_qualified_name(eval(obj))  # pylint: disable=eval-used
         except NameError:
             # If it looks like a GC type instanciation assume it is OK.
-            return any([x + "(" in obj for x in _GC_TYPE_NAMES])
+            return any(x + "(" in obj for x in _GC_TYPE_NAMES)
         return name in EP_TYPE_NAMES
     if value_t == vtype.EP_TYPE_STR:
         return obj != INVALID_EP_TYPE_NAME and obj in EP_TYPE_NAMES

@@ -8,7 +8,7 @@ The need for type conversions is driven by:
 from base64 import b64decode, b64encode
 from json import dumps, loads
 from zlib import compress, decompress
-from numpy import array, uint8, frombuffer
+from numpy import uint8, frombuffer
 from numpy.typing import NDArray
 
 from egp_types.gc_type_tools import PROPERTIES
@@ -92,7 +92,7 @@ def compress_json(obj: dict | list | None) -> bytes | memoryview | bytearray | N
     # compression token dictionary.
     if isinstance(obj, dict):
         return compress(dumps(obj).encode())
-    if isinstance(obj, memoryview) or isinstance(obj, bytearray) or isinstance(obj, bytes):
+    if isinstance(obj, (memoryview, bytearray, bytes)):
         return obj
     if obj is None:
         return None

@@ -12,6 +12,7 @@ from .ep_type import validate, MIN_EP_TYPE_VALUE, MAX_EP_TYPE_VALUE, ep_type_loo
 
 
 # Suppress noisy loggers
+getLogger("eGC").setLevel(INFO)
 getLogger("ep_type").setLevel(INFO)
 
 
@@ -70,8 +71,30 @@ with open(join(dirname(__file__), "formats/gms_entry_format.json"), "r", encodin
 del GRAPH_SCHEMA["graph"]["check_with"]
 _GRAPH_SCHEMA: dict[str, dict[str, Any]] = deepcopy(GRAPH_SCHEMA)
 
+# Internal Graph Schema
+with open(
+    join(dirname(__file__), "formats/internal_graph_format.json"),
+    "r",
+    encoding="utf8",
+) as file_ptr:
+    INTERNAL_GRAPH_SCHEMA: dict[str, dict[str, Any]] = load(file_ptr)
+_INTERNAL_GRAPH_SCHEMA: dict[str, dict[str, Any]] = deepcopy(INTERNAL_GRAPH_SCHEMA)
+
+# Create a limited version that does not have such long lists for random generation
+LIMITED_INTERNAL_GRAPH_SCHEMA: dict[str, dict[str, Any]] = deepcopy(INTERNAL_GRAPH_SCHEMA)
+LIMITED_INTERNAL_GRAPH_SCHEMA["internal_graph"]["maxlength"] = 64
+for ep in LIMITED_INTERNAL_GRAPH_SCHEMA["internal_graph"]["valuesrules"]["oneof"]:
+    if "anyof" in ep["valuesrules"]:
+        for epdef in ep["valuesrules"]["anyof"]:
+            epdef["items"][4]["maxlength"] = 8
+    else:
+        ep["valuesrules"]["items"][4]["maxlength"] = 8
+_LIMITED_INTERNAL_GRAPH_SCHEMA: dict[str, dict[str, Any]] = deepcopy(LIMITED_INTERNAL_GRAPH_SCHEMA)
+
 
 class base_graph_validator(base_validator):
+    """Base validator for graph schemas."""
+
     # TODO: Make errors ValidationError types for full disclosure
     # https://docs.python-cerberus.org/en/stable/customize.html#validator-error
 
@@ -81,5 +104,11 @@ class base_graph_validator(base_validator):
 
 
 graph_validator: base_graph_validator = base_graph_validator()
+igraph_validator: base_graph_validator = base_graph_validator()
+limited_igraph_validator: base_graph_validator = base_graph_validator()
 graph_validator.rules_set_registry = GRAPH_REGISTRY
+igraph_validator.rules_set_registry = GRAPH_REGISTRY
+limited_igraph_validator.rules_set_registry = GRAPH_REGISTRY
 graph_validator.schema = _GRAPH_SCHEMA
+igraph_validator.schema = _INTERNAL_GRAPH_SCHEMA
+limited_igraph_validator.schema = _LIMITED_INTERNAL_GRAPH_SCHEMA

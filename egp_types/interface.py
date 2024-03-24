@@ -21,7 +21,7 @@ Destination interfaces can only have connections from source interfaces.
 from __future__ import annotations
 
 from logging import Logger, NullHandler, getLogger
-from typing import cast, Literal
+from typing import cast
 
 from numpy import int16, ndarray, array_equal
 
@@ -57,13 +57,13 @@ class interface(ndarray):
         """Return the string representation of the interface."""
         return f"Interface instance: {id(self)}\n\t" + "\n\t".join(f"{i}: {asstr(val)} ({val})" for i, val in enumerate(self))
 
-    def __eq__(self, __value: object) -> bool:
+    def __eq__(self, other: object) -> bool:
         """Return True if the rows are equal to the value."""
-        if not isinstance(__value, interface):
-            return super().__eq__(__value)
-        return array_equal(self, __value)
+        if not isinstance(other, interface):
+            return super().__eq__(other)
+        return array_equal(self, other)
 
-    def __hash__(self) -> int:
+    def __hash__(self) -> int:  # type: ignore [reportIncompatibleVariableOverride]
         """Create a hash for the interface object."""
         return hash(self.tobytes())
 
@@ -94,7 +94,7 @@ class empty_interface(interface):
     def __setitem__(self, _, value) -> None:
         assert not value, "empty_interface cannot be modified"
 
-    def mermaid(self, _: Row, __: Literal["s", "d"] = "s") -> list[str]:
+    def mermaid(self, row: Row, cls: EndPointClassStr = "s") -> list[str]:
         """Mermaid charts string is empty for an empty interface."""
         return []
 
@@ -114,7 +114,7 @@ class empty_interface(interface):
 class src_interface(interface):
     """A source interface is an interface that can only have connections to destination interfaces."""
 
-    def mermaid(self, row: Row, cls: Literal["s"] = "s") -> list[str]:
+    def mermaid(self, row: Row, cls: EndPointClassStr = "s") -> list[str]:
         """Return the mermaid charts string for the source interface.
         e.g. A001s["A001s: 1"]"""
         return super().mermaid(row, cls)
@@ -123,7 +123,7 @@ class src_interface(interface):
 class dst_interface(interface):
     """A destination interface is an interface that can only have connections from source interfaces."""
 
-    def mermaid(self, row: Row, cls: Literal["d"] = "d") -> list[str]:
+    def mermaid(self, row: Row, cls: EndPointClassStr = "d") -> list[str]:
         """Return the mermaid charts string for the source interface.
         e.g. A001d["A001d: 1"]"""
         return super().mermaid(row, cls)

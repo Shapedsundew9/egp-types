@@ -150,8 +150,9 @@ def define_signature(mgc: Any) -> bytes:
     return sha256(string.encode()).digest()
 
 
-def signature(
-    gca_sig: memoryview, gcb_sig: memoryview, i_data: memoryview, o_data: memoryview, con_data: memoryview, meta_data: dict[str, Any] = {}) -> NDArray:
+def signature(  # pylint: disable=dangerous-default-value
+    gca_sig: memoryview, gcb_sig: memoryview, i_data: memoryview, o_data: memoryview, con_data: memoryview, meta_data: dict[str, Any] = {}
+) -> NDArray:
     """Return the signature of a genetic code."""
     # NOTE: This needs to be very specific and stand the test of time!
     hash_obj: _Hash = sha256(gca_sig)
@@ -163,9 +164,9 @@ def signature(
         hash_obj.update(meta_data["function"]["python3"]["0"]["inline"].encode())
         if "code" in meta_data["function"]["python3"]["0"]:
             hash_obj.update(meta_data["function"]["python3"]["0"]["code"].encode())
-    return asarray(hash_obj.digest(), dtype=uint8)
+    return asarray(bytearray(hash_obj.digest()), dtype=uint8)
 
 
-def app_sig_to_array(signature: bytes | memoryview | None) -> NDArray[uint8]:
+def app_sig_to_array(sig: bytes | memoryview | None) -> NDArray[uint8]:
     """Convert the application signature to a numpy array."""
-    return asarray(signature, dtype=uint8) if signature is not None else NULL_SIGNATURE_ARRAY
+    return asarray(sig, dtype=uint8) if sig is not None else NULL_SIGNATURE_ARRAY

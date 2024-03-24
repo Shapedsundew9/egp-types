@@ -57,15 +57,19 @@ class rows(ndarray):
         super().__init__()
         gca: _genetic_code = kwargs.get("gca", EMPTY_GENETIC_CODE)
         gcb: _genetic_code = kwargs.get("gcb", EMPTY_GENETIC_CODE)
-        self[SrcRowIndex.I] = self.i_from_graph(json_graph)
+        self[SrcRowIndex.I] = kwargs["io"][0] if "io" in kwargs else self.i_from_graph(json_graph)
         self[SrcRowIndex.C] = self.c_from_graph(json_graph)
         self[DstRowIndex.F] = INTERFACE_F if "F" in json_graph else EMPTY_INTERFACE
         self[SrcRowIndex.A], self[DstRowIndex.A] = self.ab_from_graph(json_graph, "A", gca)
         self[SrcRowIndex.B], self[DstRowIndex.B] = self.ab_from_graph(json_graph, "B", gcb)
         self[DstRowIndex.O] = (
-            interface([cast(EndPointType, src_ep[CPI.TYP]) for src_ep in json_graph["O"]])
-            if "O" in json_graph and json_graph["O"]
-            else EMPTY_INTERFACE
+            kwargs["io"][1]
+            if "io" in kwargs
+            else (
+                interface([cast(EndPointType, src_ep[CPI.TYP]) for src_ep in json_graph["O"]])
+                if "O" in json_graph and json_graph["O"]
+                else EMPTY_INTERFACE
+            )
         )
         self[DstRowIndex.P] = self[DstRowIndex.O] if "F" in json_graph else EMPTY_INTERFACE
         self[DstRowIndex.U] = (
@@ -82,13 +86,13 @@ class rows(ndarray):
         """Return the string representation of the rows."""
         return "\n".join(f"Row {ROW_CLS_INDEXED[i]}\n" + repr(self[i]) + "\n" for i in GRAPH_ROW_INDEX_ORDER)
 
-    def __eq__(self, __value: object) -> bool:
+    def __eq__(self, other: object) -> bool:
         """Return True if the rows are equal to the value."""
-        if not isinstance(__value, rows):
-            return super().__eq__(__value)
-        return array_equal(self, __value)
+        if not isinstance(other, rows):
+            return super().__eq__(other)
+        return array_equal(self, other)
 
-    def __hash__(self) -> int:
+    def __hash__(self) -> int:  # type: ignore [reportIncompatibleVariableOverride]
         """Return the hash of the rows."""
         return hash(self.tobytes())
 
@@ -156,6 +160,9 @@ class rows(ndarray):
         has_f: bool = "F" in rows_str
         if io[0] is not EMPTY_INTERFACE:
             self[SrcRowIndex.I] = io[0]
+            if 1 not in io[0]:
+                # Cannot have F no matter what the rows_str says
+                has_f = False
         elif "I" in rows_str:
             # If F is to be defined ensure at least one endpoint has type bool.
             num_eps: int = randint(1, max_eps) if not has_f else randint(1, max_eps - 1)
@@ -197,6 +204,16 @@ class rows(ndarray):
                 shuffle(self[SrcRowIndex.B])
         if io[1] is not EMPTY_INTERFACE:
             self[DstRowIndex.O] = io[1]
+            missing = list(set(io[1]) - set(valid_types))
+            if missing:
+                # There are types in the O interface that are not in the I, A, B or C interfaces. Force into row C.
+                if self[SrcRowIndex.C] is EMPTY_INTERFACE_C:
+                    # A new C interface
+                    self[SrcRowIndex.C] = interface_c(values=[random_constant_str(ept) for ept in missing], types=missing)
+                else:
+                    # Extend the interface that was there before.
+                    vals: list[str] = list(self[SrcRowIndex.C].values) + [random_constant_str(ept) for ept in missing]
+                    self[SrcRowIndex.C] = interface_c(values=vals, types=self[SrcRowIndex.C].tolist() + missing)
         elif "O" in rows_str:
             self[DstRowIndex.O] = interface(choices(valid_types, k=randint(1, max_eps)))
         self[DstRowIndex.P] = self[DstRowIndex.O] if has_f else EMPTY_INTERFACE

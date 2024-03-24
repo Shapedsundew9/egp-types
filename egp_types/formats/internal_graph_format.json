@@ -1,0 +1,509 @@
+{
+    "internal_graph": {
+        "required": true,
+        "type": "dict",
+        "keysrules": {
+            "type": "string",
+            "regex": "[ICFABOPU][0-9]{3}[sd]"
+        },
+        "valuesrules": {
+            "required": true,
+            "type": "dict",  
+            "oneof": [
+                {
+                    "required": true,
+                    "minlength": 1,
+                    "maxlength": 1,
+                    "keysrules": {
+                        "type": "string",
+                        "regex": "I([01][0-9]{2}|2[0-4][0-9]|25[0-5])s"
+                    },
+                    "valuesrules": {
+                        "required": true,
+                        "type": "list",
+                        "anyof": [
+                            {
+                                "items": [
+                                    {
+                                        "type": "string",
+                                        "allowed": ["I"]
+                                    },
+                                    "ep_idx",
+                                    "ep_type_not_bool",
+                                    {
+                                        "type": "boolean",
+                                        "allowed": [true]
+                                    },
+                                    {
+                                        "type": "list",
+                                        "minlength": 0,
+                                        "maxlength": 255,
+                                        "schema": {
+                                            "type": "list",
+                                            "items": [
+                                                {
+                                                    "type": "string",
+                                                    "allowed": ["A", "B", "O", "P", "U"]
+                                                },
+                                                "ep_idx"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "nullable": true,
+                                        "allowed": [null]
+                                    }
+                                ]
+                            },
+                            {
+                                "items": [
+                                    {
+                                        "type": "string",
+                                        "allowed": ["I"]
+                                    },
+                                    "ep_idx",
+                                    "ep_type_only_bool",
+                                    {
+                                        "type": "boolean",
+                                        "allowed": [true]
+                                    },
+                                    {
+                                        "type": "list",
+                                        "minlength": 0,
+                                        "maxlength": 255,
+                                        "schema": {
+                                            "type": "list",
+                                            "oneof": [
+                                                {
+                                                    "items": [
+                                                        {
+                                                            "type": "string",
+                                                            "allowed": ["A", "B", "O", "P", "U"]
+                                                        },
+                                                        "ep_idx"
+                                                    ]
+                                                },
+                                                {
+                                                    "items": [
+                                                        {
+                                                            "type": "string",
+                                                            "allowed": ["F"]
+                                                        },
+                                                        {
+                                                            "type": "integer",
+                                                            "allowed": [0]
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "nullable": true,
+                                        "allowed": [null]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "required": true,
+                    "minlength": 1,
+                    "maxlength": 1,
+                    "keysrules": {
+                        "type": "string",
+                        "regex": "C([01][0-9]{2}|2[0-4][0-9]|25[0-5])s"
+                    },
+                    "valuesrules": {
+                        "required": true,
+                        "type": "list",
+                        "items": [
+                            {
+                                "type": "string",
+                                "allowed": ["C"]
+                            },
+                            "ep_idx",
+                            "ep_type",
+                            {
+                                "type": "boolean",
+                                "allowed": [true]
+                            },
+                            {
+                                "type": "list",
+                                "minlength": 0,
+                                "maxlength": 255,
+                                "schema": {
+                                    "type": "list",
+                                    "items": [
+                                        {
+                                            "type": "string",
+                                            "allowed": ["A", "B", "O", "P", "U"]
+                                        },
+                                        "ep_idx"
+                                    ]
+                                }
+                            },
+                            "ep_const_value"
+                        ]
+                    }
+                },
+                {
+                    "required": true,
+                    "minlength": 1,
+                    "maxlength": 1,
+                    "keysrules": {
+                        "type": "string",
+                        "regex": "F000d"
+                    },
+                    "valuesrules": {
+                        "required": true,
+                        "type": "list",
+                        "items": [
+                            {
+                                "type": "string",
+                                "allowed": ["F"]
+                            },
+                            {
+                                "type": "integer",
+                                "allowed": [0]
+                            },
+                            "ep_type_only_bool",
+                            {
+                                "type": "boolean",
+                                "allowed": [false]
+                            },
+                            {
+                                "type": "list",
+                                "minlength": 0,
+                                "maxlength": 1,
+                                "schema": {
+                                    "type": "list",
+                                    "items": [
+                                        {
+                                            "type": "string",
+                                            "allowed": ["I"]
+                                        },
+                                        "ep_idx"
+                                    ]
+                                }
+                            },
+                            {
+                                "nullable": true,
+                                "allowed": [null]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "required": true,
+                    "minlength": 1,
+                    "maxlength": 1,
+                    "keysrules": {
+                        "type": "string",
+                        "regex": "A([01][0-9]{2}|2[0-4][0-9]|25[0-5])s"
+                    },
+                    "valuesrules": {
+                        "required": true,
+                        "type": "list",
+                        "items": [
+                            {
+                                "type": "string",
+                                "allowed": ["A"]
+                            },
+                            "ep_idx",
+                            "ep_type",
+                            {
+                                "type": "boolean",
+                                "allowed": [true]
+                            },
+                            {
+                                "type": "list",
+                                "minlength": 0,
+                                "maxlength": 255,
+                                "schema": {
+                                    "type": "list",
+                                    "items": [
+                                        {
+                                            "type": "string",
+                                            "allowed": ["B", "O", "P", "U"]
+                                        },
+                                        "ep_idx"
+                                    ]
+                                }
+                            },
+                            {
+                                "nullable": true,
+                                "allowed": [null]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "required": true,
+                    "minlength": 1,
+                    "maxlength": 1,
+                    "keysrules": {
+                        "type": "string",
+                        "regex": "A([01][0-9]{2}|2[0-4][0-9]|25[0-5])d"
+                    },
+                    "valuesrules": {
+                        "required": true,
+                        "type": "list",
+                        "items": [
+                            {
+                                "type": "string",
+                                "allowed": ["A"]
+                            },
+                            "ep_idx",
+                            "ep_type",
+                            {
+                                "type": "boolean",
+                                "allowed": [false]
+                            },
+                            {
+                                "type": "list",
+                                "minlength": 0,
+                                "maxlength": 255,
+                                "schema": {
+                                    "type": "list",
+                                    "items": [
+                                        {
+                                            "type": "string",
+                                            "allowed": ["I", "C"]
+                                        },
+                                        "ep_idx"
+                                    ]
+                                }
+                            },
+                            {
+                                "nullable": true,
+                                "allowed": [null]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "required": true,
+                    "minlength": 1,
+                    "maxlength": 1,
+                    "keysrules": {
+                        "type": "string",
+                        "regex": "B([01][0-9]{2}|2[0-4][0-9]|25[0-5])s"
+                    },
+                    "valuesrules": {
+                        "required": true,
+                        "type": "list",
+                        "items": [
+                            {
+                                "type": "string",
+                                "allowed": ["B"]
+                            },
+                            "ep_idx",
+                            "ep_type",
+                            {
+                                "type": "boolean",
+                                "allowed": [true]
+                            },
+                            {
+                                "type": "list",
+                                "minlength": 0,
+                                "maxlength": 255,
+                                "schema": {
+                                    "type": "list",
+                                    "items": [
+                                        {
+                                            "type": "string",
+                                            "allowed": ["O", "P", "U"]
+                                        },
+                                        "ep_idx"
+                                    ]
+                                }
+                            },
+                            {
+                                "nullable": true,
+                                "allowed": [null]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "required": true,
+                    "minlength": 1,
+                    "maxlength": 1,
+                    "keysrules": {
+                        "type": "string",
+                        "regex": "B([01][0-9]{2}|2[0-4][0-9]|25[0-5])d"
+                    },
+                    "valuesrules": {
+                        "required": true,
+                        "type": "list",
+                        "items": [
+                            {
+                                "type": "string",
+                                "allowed": ["B"]
+                            },
+                            "ep_idx",
+                            "ep_type",
+                            {
+                                "type": "boolean",
+                                "allowed": [false]
+                            },
+                            {
+                                "type": "list",
+                                "minlength": 0,
+                                "maxlength": 255,
+                                "schema": {
+                                    "type": "list",
+                                    "items": [
+                                        {
+                                            "type": "string",
+                                            "allowed": ["I", "C", "A"]
+                                        },
+                                        "ep_idx"
+                                    ]
+                                }
+                            },
+                            {
+                                "nullable": true,
+                                "allowed": [null]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "required": true,
+                    "minlength": 1,
+                    "maxlength": 1,
+                    "keysrules": {
+                        "type": "string",
+                        "regex": "O([01][0-9]{2}|2[0-4][0-9]|25[0-5])d"
+                    },
+                    "valuesrules": {
+                        "required": true,
+                        "type": "list",
+                        "items": [
+                            {
+                                "type": "string",
+                                "allowed": ["O"]
+                            },
+                            "ep_idx",
+                            "ep_type",
+                            {
+                                "type": "boolean",
+                                "allowed": [false]
+                            },
+                            {
+                                "type": "list",
+                                "minlength": 0,
+                                "maxlength": 255,
+                                "schema": {
+                                    "type": "list",
+                                    "items": [
+                                        {
+                                            "type": "string",
+                                            "allowed": ["I", "C", "A", "B"]
+                                        },
+                                        "ep_idx"
+                                    ]
+                                }
+                            },
+                            {
+                                "nullable": true,
+                                "allowed": [null]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "required": true,
+                    "minlength": 1,
+                    "maxlength": 1,
+                    "keysrules": {
+                        "type": "string",
+                        "regex": "P([01][0-9]{2}|2[0-4][0-9]|25[0-5])d"
+                    },
+                    "valuesrules": {
+                        "required": true,
+                        "type": "list",
+                        "items": [
+                            {
+                                "type": "string",
+                                "allowed": ["P"]
+                            },
+                            "ep_idx",
+                            "ep_type",
+                            {
+                                "type": "boolean",
+                                "allowed": [false]
+                            },
+                            {
+                                "type": "list",
+                                "minlength": 0,
+                                "maxlength": 255,
+                                "schema": {
+                                    "type": "list",
+                                    "items": [
+                                        {
+                                            "type": "string",
+                                            "allowed": ["I", "C", "B"]
+                                        },
+                                        "ep_idx"
+                                    ]
+                                }
+                            },
+                            {
+                                "nullable": true,
+                                "allowed": [null]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "required": true,
+                    "minlength": 1,
+                    "maxlength": 1,
+                    "keysrules": {
+                        "type": "string",
+                        "regex": "U([01][0-9]{2}|2[0-4][0-9]|25[0-5])d"
+                    },
+                    "valuesrules": {
+                        "required": true,
+                        "type": "list",
+                        "items": [
+                            {
+                                "type": "string",
+                                "allowed": ["U"]
+                            },
+                            "ep_idx",
+                            "ep_type",
+                            {
+                                "type": "boolean",
+                                "allowed": [false]
+                            },
+                            {
+                                "type": "list",
+                                "minlength": 0,
+                                "maxlength": 255,
+                                "schema": {
+                                    "type": "list",
+                                    "items": [
+                                        {
+                                            "type": "string",
+                                            "allowed": ["I", "C", "A", "B"]
+                                        },
+                                        "ep_idx"
+                                    ]
+                                }
+                            },
+                            {
+                                "nullable": true,
+                                "allowed": [null]
+                           }
+                        ]
+                    }
+                }
+            ]
+        }
+    }
+}

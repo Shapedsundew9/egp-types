@@ -1,6 +1,4 @@
 """Test cases for the internal graph module."""
-from functools import partial
-from itertools import count
 from json import dump, load
 from logging import DEBUG, INFO, Logger, NullHandler, getLogger
 from os.path import dirname, exists, join
@@ -12,7 +10,6 @@ from tqdm import trange
 
 from egp_types.egp_typing import DST_EP, SRC_EP, VALID_GRAPH_ROW_COMBINATIONS
 from egp_types.end_point import dst_end_point, src_end_point
-from egp_types.gc_graph import gc_graph
 from egp_types.internal_graph import (
     DstEndPointDict,
     EndPointDict,
@@ -378,7 +375,7 @@ def test_random_internal_graph() -> None:
     """Test case for random_internal_graph()"""
     graph: internal_graph = random_internal_graph("AB", max_row_eps=8, row_stablization=True, verify=True)
     assert isinstance(graph, internal_graph)
-    assert len(graph) >= 2 and len(graph) <= 16
+    assert len(graph) >= 2 and len(graph) <= 24  # A & B with up to 8 eps each + O with up to 8 eps
     assert "A000s" in graph
     assert "A000d" not in graph
     assert "B000s" in graph
@@ -400,11 +397,3 @@ def test_to_json_from_json(igraph: internal_graph) -> None:
         _logger.debug(f"igraph:\n{igraph}")
         _logger.debug(f"igraph2:\n{igraph2}")
     assert igraph == igraph2
-
-
-@pytest.mark.parametrize("igraph", RANDOM_GRAPHS)
-def test_random_internal_graph_as_gc_graph(igraph) -> None:
-    """Test that a random internal graph is a valid (but not necessarily stable) gc_graph."""
-    gcg = gc_graph(i_graph=igraph)
-    gcg.normalize()
-    assert gcg.validate()

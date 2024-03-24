@@ -14,10 +14,11 @@ from typing import cast
 from .connections import connections, EMPTY_CONNECTIONS
 from .egp_typing import ALL_ROWS_STR, ROWS, ROWS_INDEXED, DestinationRow, DstRowIndex, EndPointType, JSONGraph, Row, SrcRowIndex
 from .ep_type import EP_TYPE_VALUES_TUPLE
-from ._genetic_code import _genetic_code, EMPTY_GENETIC_CODE
 from .mermaid_charts import MERMAID_IGRAPH_CLASS_DEF_STR, MERMAID_IGRAPH_COLORS
 from .rows import rows, EMPTY_ROWS
 from .interface import EMPTY_INTERFACE, interface
+from .internal_graph import internal_graph_from_JSONGraph, internal_graph
+
 
 # Logging
 _logger: Logger = getLogger(__name__)
@@ -39,7 +40,6 @@ class graph:
         - max_eps: int = 8: The maximum number of endpoints to use if rndm is True.
         - verify: bool = True: If True then the graph is verified after initialisation.
         """
-        io: tuple[interface, interface] = kwargs.get("io", (EMPTY_INTERFACE, EMPTY_INTERFACE))
         if kwargs.get("rndm", False):
             if kwargs.get("rseed", None) is not None:
                 seed(kwargs["rseed"])
@@ -47,15 +47,14 @@ class graph:
             ep_types: tuple[EndPointType, ...] = kwargs.get("ep_types", EP_TYPE_VALUES_TUPLE)
             max_eps: int = kwargs.get("max_eps", 8)
             verify: bool = kwargs.get("verify", False)
+            io: tuple[interface, interface] = kwargs.get("io", (EMPTY_INTERFACE, EMPTY_INTERFACE))
             self.rows: rows = rows({})
             self.rows.random(rows_str, max_eps, ep_types, io)
-            self.connections: connections = connections({}, _rndm=[self.rows])
+            self.connections: connections = connections({}, rndm=True, rows=self.rows, data={})
             if verify:
                 self.assertions()
         elif json_graph:
-            gca: _genetic_code = kwargs.get("gca", EMPTY_GENETIC_CODE)
-            gcb: _genetic_code = kwargs.get("gcb", EMPTY_GENETIC_CODE)
-            self.rows: rows = rows(json_graph=json_graph, gca=gca, gcb=gcb, io=io)
+            self.rows: rows = rows(json_graph=json_graph, **kwargs)
             self.connections: connections = connections(json_graph=json_graph)
         else:
             self.rows = EMPTY_ROWS
@@ -89,6 +88,10 @@ class graph:
         if self.rows.valid(SrcRowIndex.C):
             json_graph["C"] = [[val, int(typ)] for val, typ in zip(self.rows[SrcRowIndex.C].values, self.rows[SrcRowIndex.C])]
         return json_graph
+
+    def igraph(self) -> internal_graph:
+        """Return the genetic code instance for the graph."""
+        return internal_graph_from_JSONGraph(self.json_graph())
 
     def mermaid(self, uid: int = 0) -> tuple[list[str], list[str]]:
         """Return the mermaid charts list of strings for the graph.

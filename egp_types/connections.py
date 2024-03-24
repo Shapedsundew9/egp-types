@@ -15,7 +15,7 @@ from __future__ import annotations
 from enum import IntEnum
 from logging import DEBUG, Logger, NullHandler, getLogger
 from random import choice
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, cast, Any
 
 from numpy import array, array_equal, ndarray, uint8, unique, where
 from numpy.typing import NDArray
@@ -72,14 +72,14 @@ class connections(ndarray):
 
     def __init__(self, json_graph: JSONGraph, **kwargs) -> None:
         super().__init__()
-        if "_rndm" in kwargs:
+        if kwargs.get("rndm", False):
             # Randomly generated connections
             # It is not possible to know how many connections will be needed without generating them.
-            # kwargs['rndm'] is defined in __new__()
-            self[ConnIdx.SRC_ROW] = kwargs["_rndm"][ConnIdx.SRC_ROW]
-            self[ConnIdx.DST_ROW] = kwargs["_rndm"][ConnIdx.DST_ROW]
-            self[ConnIdx.SRC_IDX] = kwargs["_rndm"][ConnIdx.SRC_IDX]
-            self[ConnIdx.DST_IDX] = kwargs["_rndm"][ConnIdx.DST_IDX]
+            # kwargs['data']['cons'] is defined in __new__()
+            self[ConnIdx.SRC_ROW] = kwargs["data"]["cons"][ConnIdx.SRC_ROW]
+            self[ConnIdx.DST_ROW] = kwargs["data"]["cons"][ConnIdx.DST_ROW]
+            self[ConnIdx.SRC_IDX] = kwargs["data"]["cons"][ConnIdx.SRC_IDX]
+            self[ConnIdx.DST_IDX] = kwargs["data"]["cons"][ConnIdx.DST_IDX]
         else:
             dst_rows: list[DstRowIndex] = sorted(DESTINATION_ROW_INDEXES[row] for row in json_graph if row != "C")
             self[ConnIdx.SRC_ROW] = [
@@ -88,17 +88,19 @@ class connections(ndarray):
             self[ConnIdx.DST_ROW] = [dri for dri in dst_rows for _ in json_graph[DESTINATION_ROW_LETTERS[dri]]]
             self[ConnIdx.SRC_IDX] = [cast(int, ep[CPI.IDX]) for sri in dst_rows for ep in json_graph[DESTINATION_ROW_LETTERS[sri]]]
             self[ConnIdx.DST_IDX] = [idx for dri in dst_rows for idx, _ in enumerate(json_graph[DESTINATION_ROW_LETTERS[dri]])]
+        if _LOG_DEBUG:
+            self.assertions()
 
     def __new__(cls, json_graph: JSONGraph, **kwargs) -> connections:
         """Create a byte array for the connection data"""
         # A valid graph has 1 connection per destination endpoint.
-        if "_rndm" in kwargs:
+        if kwargs.get("rndm", False):
             # In a random graph there is no row U until the connections are defined.
-            # Rows are passed in as the 1st element of the _rndm list.
-            cons: list[list[int]] = cls._random(kwargs["_rndm"][0])
-            del kwargs["_rndm"][0]
-            kwargs["_rndm"].extend(cons)
-            shape: tuple[int, int] = (4, len(cons[ConnIdx.SRC_ROW]))
+            kwargs["data"]["cons"] = cls._random(kwargs["rows"])
+            shape: tuple[int, int] = (4, len(kwargs["data"]["cons"][ConnIdx.SRC_ROW]))
+        elif "plan" in kwargs:
+            kwargs["data"]["cons"] = cls._plan(kwargs["plan"], kwargs["rows"])
+            shape: tuple[int, int] = (4, len(kwargs["data"]["cons"][ConnIdx.SRC_ROW]))
         else:
             # The connection graph is defined by the number of destination endpoints including row U
             shape: tuple[int, int] = (4, sum(len(val) for row, val in json_graph.items() if row in DESTINATION_ROWS))
@@ -121,13 +123,13 @@ class connections(ndarray):
             retval.append("")
         return "\n".join(retval)
 
-    def __eq__(self, __value: object) -> bool:
+    def __eq__(self, other: object) -> bool:
         """Return True if the connections are equal to the value."""
-        if not isinstance(__value, connections):
-            return super().__eq__(__value)
-        return array_equal(self, __value)
+        if not isinstance(other, connections):
+            return super().__eq__(other)
+        return array_equal(self, other)
 
-    def __hash__(self) -> int:
+    def __hash__(self) -> int:  # type: ignore [reportIncompatibleMethodOverride]
         """Generate a hash for the connections object."""
         return hash(self.tobytes())
 
@@ -150,6 +152,23 @@ class connections(ndarray):
         return [f"uid{ROWS_INDEXED[sr]}{si:03}s --> uid{ROWS_INDEXED[dr]}{di:03}d" for sr, dr, si, di in self.T]
 
     @classmethod
+    def _plan(cls, _plan: list[tuple[str, Any]], _rows: rows) -> list[list[int]]:
+        """Use a plan to create connections and randomly fill any gaps."""
+        # Start by populating the destination endpoints: row index & index into row
+        # Source endpoints are unknonw at this time so populated with -1 which is invalid
+        cons: list[list[int]] = [[], [], [], []]
+        for dri in DstRowIndex:
+            length: int = len(_rows[dri])
+            if length:
+                cons[ConnIdx.DST_ROW].extend([dri] * length)
+                cons[ConnIdx.DST_IDX].extend(list(range(length)))
+        cons[ConnIdx.SRC_ROW].extend([-1] * len(cons[ConnIdx.DST_IDX]))
+        cons[ConnIdx.SRC_IDX].extend([-1] * len(cons[ConnIdx.DST_IDX]))
+
+        # Execute the plan
+        return cons
+
+    @classmethod
     def _random(cls, _rows: rows) -> list[list[int]]:
         """Create a random set of connections."""
         cons: list[list[int]] = [[], [], [], []]
@@ -159,6 +178,9 @@ class connections(ndarray):
             # Empty rows will be skipped
             for idx, ept in enumerate(_rows[dri]):
                 # Find valid source rows with the ept in it
+                _logger.debug(f"Valid sources for {ept} in {row}: {VALID_ROW_SOURCES[has_f][row]}")
+                for r in VALID_ROW_SOURCES[has_f][row]:
+                    _logger.debug(f"Row {r} has {ept} at {where(_rows[SOURCE_ROW_INDEXES[r]] == ept)}")
                 sri: SrcRowIndex = choice(
                     [SOURCE_ROW_INDEXES[r] for r in VALID_ROW_SOURCES[has_f][row] if ept in _rows[SOURCE_ROW_INDEXES[r]]]
                 )

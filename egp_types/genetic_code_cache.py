@@ -49,31 +49,29 @@ Bit of an anti-pattern for python but in this case the savings are worth it.
 """
 
 from gc import collect
+from itertools import count
 from logging import DEBUG, Logger, NullHandler, getLogger
 from typing import Any, Callable, Generator, Iterable, Iterator
-from itertools import count
 
-from numpy._typing import _8Bit
+from egp_utils.store import DDSL, dynamic_store, static_store
+from numpy import argsort, argwhere, array_equal, bitwise_and, bool_, full, iinfo, int32, int64, intp, logical_and, ndarray, uint8, zeros
+from numpy.typing import NDArray
+from pypgtable.pypgtable_typing import SchemaColumn
 
 from ._genetic_code import (
     DEFAULT_DYNAMIC_MEMBER_VALUES,
     DEFAULT_STATIC_MEMBER_VALUES,
     EMPTY_GENETIC_CODE,
+    PURGED_GENETIC_CODE,
     STORE_ALL_MEMBERS,
     STORE_PROXY_SIGNATURE_MEMBERS,
-    PURGED_GENETIC_CODE,
     _genetic_code,
 )
 from .connections import connections
-from .graph import graph, EMPTY_GRAPH
-from .interface import interface, EMPTY_INTERFACE, EMPTY_INTERFACE_C
-from .rows import rows
-from egp_utils.store import DDSL, dynamic_store, static_store
-from numpy import argsort, full, iinfo, int32, int64, ndarray, uint8, zeros, intp, logical_and, argwhere, bitwise_and, bool_, where, array_equal
-from numpy.typing import NDArray
-from pypgtable.pypgtable_typing import SchemaColumn
 from .gc_type_tools import NULL_SIGNATURE_ARRAY
-
+from .graph import EMPTY_GRAPH, graph
+from .interface import EMPTY_INTERFACE, EMPTY_INTERFACE_C, interface
+from .rows import rows
 
 # Logging
 _logger: Logger = getLogger(__name__)
@@ -187,6 +185,7 @@ def static_val_type(member: str) -> tuple[Any, type]:
 
 def _dummy_update(ggcs: Iterable[dict[str, Any]]) -> None:
     """Dummy function to replace the push_to_gp function when the GCC is full."""
+    ggcs = tuple(ggcs)
 
 
 class genetic_code_cache(static_store):
@@ -267,7 +266,7 @@ class genetic_code_cache(static_store):
             del self._common_ds[self.common_ds_idx[idx]]
             self.common_ds_idx[idx] = -1
 
-    def __getitem__(self, idx: int) -> _genetic_code:
+    def __getitem__(self, idx: int) -> _genetic_code:  # type: ignore [reportIncompatibleMethodOverride]
         """Return the object at the specified index or the member to be indexed.
         There are 3 possible look up methods:
         1. By index - return the genetic code at the index
@@ -364,7 +363,7 @@ class genetic_code_cache(static_store):
         # #1 & #2
         # For every leaf GC check to see if any of its dependents are in the GCC
         # If they are then populate the object reference field
-        count: int = 0
+        _count: int = 0
         for leaf in self.leaves():
             indices = tuple(sig_to_idx.get(self.genetic_code[leaf][field].tobytes(), -1) for field in STORE_PROXY_SIGNATURE_MEMBERS)
             for field, idx in (x for x in zip(STORE_PROXY_SIGNATURE_MEMBERS, indices) if x[1] >= 0):
@@ -373,13 +372,13 @@ class genetic_code_cache(static_store):
             if all(idx >= 0 for idx in indices):
                 del self._common_ds[self.common_ds_idx[leaf]]
                 self.common_ds_idx[leaf] = -1
-                count += 1
-        _logger.info(f"Found {count} leaf genetic codes that need not be leaves.")
+                _count += 1
+        _logger.info(f"Found {_count} leaf genetic codes that need not be leaves.")
 
         # #3
         # Remove duplicate interfaces
         # NOTE: The hash of an interface is not the same as the instance of an interface.
-        count: int = 0
+        _count: int = 0
         iface_to_iface: dict[interface, interface] = {}
         for gc in self.values():
             _rows: rows = gc["graph"].rows
@@ -389,13 +388,13 @@ class genetic_code_cache(static_store):
                         iface_to_iface[iface] = iface
                     else:
                         _rows[row] = iface_to_iface[iface]
-                        count += 1
-        _logger.info(f"Removed {count} duplicate interfaces.")
+                        _count += 1
+        _logger.info(f"Removed {_count} duplicate interfaces.")
 
         # #4
         # Remove duplicate rows
         # NOTE: The hash of an row is not the same as the instance of a row.
-        count: int = 0
+        _count: int = 0
         rows_to_rows: dict[rows, rows] = {}
         for gc in self.values():
             _rows: rows = gc["graph"].rows
@@ -403,13 +402,13 @@ class genetic_code_cache(static_store):
                 rows_to_rows[_rows] = _rows
             else:
                 gc["graph"].rows = rows_to_rows[_rows]
-                count += 1
-        _logger.info(f"Removed {count} duplicate sets of rows.")
+                _count += 1
+        _logger.info(f"Removed {_count} duplicate sets of rows.")
 
         # #5
         # Remove duplicate connections
         # NOTE: The hash of connections is not the same as the instance of connections.
-        count: int = 0
+        _count: int = 0
         cons_to_cons: dict[connections, connections] = {}
         for gc in self.values():
             _graph = gc["graph"]
@@ -418,14 +417,14 @@ class genetic_code_cache(static_store):
                 cons_to_cons[cons] = cons
             else:
                 _graph.connections = cons_to_cons[cons]
-                count += 1
-        _logger.info(f"Removed {count} duplicate graph connection definitions.")
+                _count += 1
+        _logger.info(f"Removed {_count} duplicate graph connection definitions.")
 
         # #6
         # Remove duplicate graphs
         # This is more efficient than duplicating the interfaces and connections
         # NOTE: The hash of a graph is not the same as the instance of a graph.
-        count: int = 0
+        _count: int = 0
         graph_to_graph: dict[graph, graph] = {}
         for gc in self.values():
             _graph: graph = gc["graph"]
@@ -433,8 +432,8 @@ class genetic_code_cache(static_store):
                 graph_to_graph[_graph] = _graph
             else:
                 gc["graph"] = graph_to_graph[_graph]
-                count += 1
-        _logger.info(f"Removed {count} duplicate graphs.")
+                _count += 1
+        _logger.info(f"Removed {_count} duplicate graphs.")
         collect()
 
     def purge(self, fraction: float = 0.25) -> None:

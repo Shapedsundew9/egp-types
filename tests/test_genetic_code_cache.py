@@ -80,7 +80,7 @@ def test_random_genetic_code() -> None:
     gcc.assertions()
     assert len(gcc) == 2 ** (levels + 1) - 1
     assert gcc[0]["generation"] == levels
-    assert gcc[0].signature()
+    assert gcc[0].signature().sum() != 0
 
 
 if __name__ == "__main__":

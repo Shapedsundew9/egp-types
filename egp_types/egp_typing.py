@@ -1,15 +1,18 @@
 """Common Erasmus GP Types."""
 
 from enum import IntEnum
-from typing import Any, Literal, LiteralString, NotRequired, TypedDict, TypeGuard, cast
+from typing import Any, Literal, LiteralString, TypedDict, TypeGuard
 
 DestinationRow = Literal["A", "B", "F", "O", "P", "U"]
 SourceRow = Literal["I", "C", "A", "B"]
 Row = Literal["A", "B", "F", "O", "P", "I", "C", "U"]
 EndPointClass = bool
 EndPointClassStr = Literal["s", "d"]
+SrcEndPointHash = str
+DstEndPointHash = str
 EndPointIndex = int
 EndPointType = int
+EndPointHash = SrcEndPointHash | DstEndPointHash | str
 
 
 # TODO: Can GCGraphRows be constrained further to tuple[dict[DestinationRow, int], dict[SourceRow, int]]
@@ -222,13 +225,9 @@ class PairIdx(IntEnum):
 # A ConnectionGraph is the graph defined in the GC GMS.
 # It is a dict of Destination Rows (or constant value row - which makes things a bit more awkward)
 # with a list of the Source row references + type that connect to it.
-ConnectionPoint = tuple[SourceRow, EndPointIndex, EndPointType]
-ConnectionRow = list[ConnectionPoint]
 ConstantExecStr = str
 ConstantValue = tuple[ConstantExecStr, EndPointType]
 ConstantRow = list[ConstantValue]
-ConnectionGraphPair = tuple[DestinationRow | Literal["C"], ConnectionRow | ConstantRow]
-ConnectionPair = tuple[DestinationRow, ConnectionRow]
 ConstantPair = tuple[Literal["C"], ConstantRow]
 JSONGraph = dict[
     DestinationRow | Literal["C"],
@@ -236,36 +235,9 @@ JSONGraph = dict[
 ]
 
 
-class ConnectionGraph(TypedDict):
-    """The structure of the connection graph (the graph defined in a GMS)."""
-
-    A: NotRequired[ConnectionRow]
-    B: NotRequired[ConnectionRow]
-    C: NotRequired[ConstantRow]
-    F: NotRequired[ConnectionRow]
-    O: NotRequired[ConnectionRow]
-    P: NotRequired[ConnectionRow]
-    U: NotRequired[ConnectionRow]
-
-
-def json_to_connection_graph(json_graph: JSONGraph) -> ConnectionGraph:
-    """convert a JSON connection graph to a ConnectionGraph."""
-    return cast(ConnectionGraph, {k: [tuple(e) for e in v] for k, v in json_graph.items()})
-
-
-def connection_graph_to_json(connection_graph: ConnectionGraph) -> JSONGraph:
-    """convert a JSON connection graph to a ConnectionGraph."""
-    return cast(JSONGraph, {k: [list(e) for e in v] for k, v in connection_graph.items()})  # type: ignore
-
-
 def isConstantPair(obj: tuple[str, Any]) -> TypeGuard[ConstantPair]:
     """Narrow a connection graph key:value pair to a constant row."""
     return obj[0] == "C"
-
-
-def isConnectionPair(obj: tuple[str, Any]) -> TypeGuard[ConnectionPair]:
-    """Narrow a connection graph key:value pair to a connection row."""
-    return obj[0] != "C"
 
 
 class EndPointTypeLookupFile(TypedDict):

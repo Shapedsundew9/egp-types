@@ -122,7 +122,7 @@ class _genetic_code:
     access_number: count = count(FIRST_ACCESS_NUMBER)
     __slots__: list[str] = ["idx"]
 
-    def __init__(self, _: dict[str, Any] = {}, **__) -> None:
+    def __init__(self, _: dict[str, Any] = {}, **__) -> None:  # pylint: disable=dangerous-default-value
         self.idx: int
 
     def __getitem__(self, member: str) -> Any:
@@ -174,6 +174,7 @@ class _genetic_code:
         if member in STORE_STATIC_MEMBERS:
             getattr(gpc, member)[self.idx] = value
         else:
+            # Dynamic members can only be set if they are all set using self.fake_feaf()
             raise KeyError(f"Member '{member}' is not a static member of genetic code.")
 
     def as_dict(self) -> dict[str, Any]:
@@ -233,16 +234,6 @@ class _genetic_code:
         """Set the state of the GC to dirty."""
         type(self).genetic_code_cache.status_byte[self.idx] |= 1
 
-    def fake_leaf(self, **kwargs) -> None:
-        """This is a test support function that allows a leaf GC to be defined from parameters."""
-        gpc: genetic_code_cache = type(self).genetic_code_cache
-        if _LOG_DEEP_DEBUG:
-            _logger.debug(f"Faking genetic code {self.idx} as a leaf node.")
-        for member in STORE_GC_OBJ_MEMBERS:
-            self[member + "_signature"] = kwargs[member]
-        for member in STORE_DERIVED_MEMBERS:
-            gpc._common_ds_members[member][self.idx] = kwargs[member]
-
     def gca_signature(self) -> NDArray:
         """Return the signature of the genetic code."""
         return self["gca"]["signature"]
@@ -282,7 +273,7 @@ class _genetic_code:
             if _LOG_DEEP_DEBUG:
                 _logger.debug(f"Setting dynamic member '{member}' dynamic index {gpc.common_ds_idx[self.idx]}.")
                 assert member in STORE_DYNAMIC_MEMBERS, f"Member '{member}' is not a dynamic member of genetic code."
-            gpc._common_ds_members[member][self.idx] = self[member]
+            gpc._common_ds_members[member][self.idx] = self[member]  # pylint: disable=protected-access
 
     def mermaid(self) -> list[str]:
         """Return the Mermaid Chart representation of the genetic code."""
@@ -341,6 +332,14 @@ class _genetic_code:
         )
         _logger.debug(f"Signature of genetic code {self.idx}: {retval.data.hex()}")
         return retval
+
+    def store_leaf(self, **kwargs) -> None:
+        """This is a support function that allows a leaf GC to be defined from parameters."""
+        gpc: genetic_code_cache = type(self).genetic_code_cache
+        if _LOG_DEEP_DEBUG:
+            _logger.debug(f"Storing genetic code {self.idx} as a leaf node.")
+        for member in STORE_DERIVED_MEMBERS:
+            gpc._common_ds_members[member][self.idx] = kwargs[member]  # pylint: disable=protected-access
 
     def touch(self) -> None:
         """Update the access sequence for the genetic code."""
@@ -407,7 +406,7 @@ class _special_genetic_code(_genetic_code):
         """Return the number of codons that make up this genetic code."""
         return INT32_ZERO
 
-    def purge(self, _: set[int]) -> list[int]:
+    def purge(self, purged_gcs: set[intp]) -> list[intp]:
         """Return an empty list. A special genetic code is never a leaf."""
         return []
 

@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 from tqdm import trange
 
-from egp_types.egp_typing import DST_EP, SRC_EP, JSONGraph, ConnectionGraph, connection_graph_to_json, json_to_connection_graph
+from egp_types.egp_typing import DST_EP, SRC_EP, JSONGraph
 from egp_types.ep_type import EP_TYPE_VALUES, INVALID_EP_TYPE_VALUE, asint, ep_type_lookup
 from egp_types.gc_graph import gc_graph, random_gc_graph
 from egp_types.graph_validators import graph_validator
@@ -32,20 +32,19 @@ NUM_TEST_CASES = 200
 
 # Generating graphs is slow so we generate them once as needed
 if not exists(join(dirname(__file__), _RANDOM_GRAPHS_JSON)):
-    json_graphs: list[JSONGraph] = [
-        connection_graph_to_json(random_gc_graph(graph_validator, True, i).connection_graph()) for i in trange(1000)
-    ]
+    json_graphs: list[JSONGraph] = [random_gc_graph(graph_validator, True, i).igraph.json_graph() for i in trange(1000)]
     with open(join(dirname(__file__), _RANDOM_GRAPHS_JSON), "w", encoding="utf-8") as random_file:
         dump(json_graphs, random_file, indent=4)
 
+
 _logger.debug("Loading random graphs (can take a while)...")
 with open(join(dirname(__file__), _RANDOM_GRAPHS_JSON), "r", encoding="utf-8") as random_file:
-    connection_graphs: list[ConnectionGraph] = [json_to_connection_graph(j_graph) for j_graph in load(random_file)]
-random_graphs: list[gc_graph] = []
-for idx, random_graph in enumerate(connection_graphs):
-    _logger.debug(f"Random graph index: {idx}")
-    random_graphs.append(gc_graph(random_graph))
+    random_graphs: list[gc_graph] = [gc_graph(j_graph) for j_graph in load(random_file)]
 _logger.debug("Random graphs loaded.")
+
+
+with open(join(dirname(__file__), _TEST_RESULTS_JSON), "r", encoding="utf-8") as results_file:
+    results: list[dict[str, Any]] = load(results_file)
 
 
 # Random graph statistics
@@ -60,13 +59,6 @@ _logger.info(f"# random graphs with no row A srcs: {len([graph for graph in rand
 _logger.info(f"# random graphs with no row B srcs: {len([graph for graph in random_graphs if not graph.rows[SRC_EP].get('B', 0)])}")
 _logger.info(f"# random graphs with no row A dsts: {len([graph for graph in random_graphs if not graph.rows[DST_EP].get('A', 0)])}")
 _logger.info(f"# random graphs with no row B dsts: {len([graph for graph in random_graphs if not graph.rows[DST_EP].get('B', 0)])}")
-
-
-# JSON cannot represent the ConnectionGraph type so a conversion step is needed.
-with open(join(dirname(__file__), _TEST_RESULTS_JSON), "r", encoding="utf-8") as results_file:
-    results: list[dict[str, Any]] = load(results_file)
-for result in results:
-    result["graph"] = json_to_connection_graph(result["graph"])
 
 
 def random_type(probability: float = 0.0) -> int:
@@ -118,34 +110,12 @@ def test_graph_str(i, case) -> None:
 
 
 @pytest.mark.parametrize("i, case", enumerate(results))
-def test_graph_internal_simple(i, case) -> None:
-    """Verification initializing with an internal representation is self consistent."""
-    gcg = gc_graph(case["graph"])
-    _logger.debug(f"Case {i}")
-    assert gcg.connection_graph() == gc_graph(i_graph=deepcopy(gcg.i_graph)).connection_graph()
-
-
-@pytest.mark.parametrize("i, case", enumerate(results))
 def test_graph_conversion_simple(i, case) -> None:
     """Verification that converting to internal format and back again is the identity operation."""
     gcg = gc_graph(case["graph"])
     assert i == case["i"]
     if case["valid"]:
-        assert case["graph"] == gcg.connection_graph()
-
-
-@pytest.mark.parametrize("i, gcg", enumerate(sample(random_graphs, NUM_TEST_CASES)))
-def test_graph_internal(i, gcg) -> None:
-    """Verification initializing with an internal representation is self consistent."""
-    _logger.debug(f"Case {i}")
-    assert gcg.connection_graph() == gc_graph(i_graph=deepcopy(gcg.i_graph)).connection_graph()
-
-
-@pytest.mark.parametrize("i, case", enumerate(sample(list(range(len(random_graphs))), NUM_TEST_CASES)))
-def test_graph_conversion(i, case) -> None:
-    """Verification that converting to internal format and back again is the identity operation."""
-    _logger.debug(f"Case {i}")
-    assert connection_graphs[case] == random_graphs[case].connection_graph()
+        assert case["graph"] == gcg.igraph.json_graph()
 
 
 @pytest.mark.parametrize("test", range(NUM_TEST_CASES))
@@ -164,7 +134,6 @@ def test_remove_connection_simple(test) -> None:
     graph.normalize()
     passed: bool = graph.validate()
     if not passed:
-        _logger.debug(f"Initial JSON graph:\n{pformat(connection_graphs[index])}")
         _logger.debug(f"Initial graph:\n{random_graphs[index]}")
         _logger.debug(f"Modified graph:\n{graph}")
         assert False
@@ -190,7 +159,6 @@ def test_add_input_simple(test) -> None:
     assert after == before + 1
     passed: bool = graph.validate()
     if not passed:
-        _logger.debug(f"Initial JSON graph:\n{pformat(connection_graphs[index])}")
         _logger.debug(f"Initial graph:\n{random_graphs[index]}")
         _logger.debug(f"Modified graph:\n{graph}")
         assert False
@@ -218,7 +186,6 @@ def test_remove_input_simple(test) -> None:
     assert after == before - 1 if before else after == before == 0
     passed: bool = graph.validate()
     if not passed:
-        _logger.debug(f"Initial JSON graph:\n{pformat(connection_graphs[index])}")
         _logger.debug(f"Initial graph:\n{random_graphs[index]}")
         _logger.debug(f"Modified graph:\n{graph}")
         codes = set([t.code for t in graph.status])
@@ -246,7 +213,6 @@ def test_add_output_simple(test) -> None:
     after: int = graph.rows[DST_EP].get("O", 0)
     passed: bool = graph.validate() and after == before + 1
     if not passed:
-        _logger.debug(f"Initial JSON graph:\n{pformat(connection_graphs[index])}")
         _logger.debug(f"Initial graph:\n{random_graphs[index]}")
         _logger.debug(f"Modified graph:\n{graph}")
         assert False
@@ -273,7 +239,6 @@ def test_remove_output_simple(test) -> None:
     # E1000 is a legit error when removing an output (no row O).
     passed: bool = graph.validate() and after == before - 1 if before else after == before == 0
     if not passed:
-        _logger.debug(f"Initial JSON graph:\n{pformat(connection_graphs[index])}")
         _logger.debug(f"Initial graph:\n{random_graphs[index]}")
         _logger.debug(f"Modified graph:\n{graph}")
         codes = set([t.code for t in graph.status])
