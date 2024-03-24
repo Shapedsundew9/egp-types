@@ -1,13 +1,9 @@
 """gc_graph verficiation."""
 
-from copy import deepcopy
-from functools import partial
-from itertools import count
 from json import dump, load
 from logging import DEBUG, INFO, Logger, NullHandler, getLogger
 from os.path import dirname, exists, join
-from pprint import pformat
-from random import choice, randint, random, seed, sample
+from random import choice, randint, random, seed
 from typing import Any
 
 import pytest
@@ -39,7 +35,7 @@ if not exists(join(dirname(__file__), _RANDOM_GRAPHS_JSON)):
 
 _logger.debug("Loading random graphs (can take a while)...")
 with open(join(dirname(__file__), _RANDOM_GRAPHS_JSON), "r", encoding="utf-8") as random_file:
-    random_graphs: list[gc_graph] = [gc_graph(j_graph) for j_graph in load(random_file)]
+    random_graphs: list[gc_graph] = [gc_graph(json_graph=j_graph) for j_graph in load(random_file)]
 _logger.debug("Random graphs loaded.")
 
 
@@ -94,7 +90,7 @@ def test_ep_type_int_of_bool() -> None:
 def test_graph_validation(i, case) -> None:
     """Verification the validate() method correctly functions."""
     _logger.debug(f"Case {i}")
-    gcg = gc_graph(case["graph"])
+    gcg = gc_graph(json_graph=case["graph"])
     assert i == case["i"]
     assert case["valid"] == gcg.validate()
     if not case["valid"]:
@@ -105,14 +101,14 @@ def test_graph_validation(i, case) -> None:
 def test_graph_str(i, case) -> None:
     """Verification the __repr__() method is not broken."""
     _logger.debug(f"Case {i}")
-    gcg = gc_graph(case["graph"])
+    gcg = gc_graph(json_graph=case["graph"])
     assert str(gcg)
 
 
 @pytest.mark.parametrize("i, case", enumerate(results))
 def test_graph_conversion_simple(i, case) -> None:
     """Verification that converting to internal format and back again is the identity operation."""
-    gcg = gc_graph(case["graph"])
+    gcg = gc_graph(json_graph=case["graph"])
     assert i == case["i"]
     if case["valid"]:
         assert case["graph"] == gcg.igraph.json_graph()
